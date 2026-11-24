@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.domain.repository.LibraryRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.usecase.CycleRepeatModeUseCase
 import com.xelilovth.nota.domain.usecase.ObserveFavoritesUseCase
@@ -38,6 +39,7 @@ class PlayerViewModel @Inject constructor(
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase? = null,
     private val recordPlayHistoryUseCase: RecordPlayHistoryUseCase? = null,
     private val observeFavoritesUseCase: ObserveFavoritesUseCase? = null,
+    private val libraryRepository: LibraryRepository? = null,
 ) : ViewModel() {
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
 
@@ -49,6 +51,9 @@ class PlayerViewModel @Inject constructor(
         val trackId = state.track?.id ?: return@combine false
         favs.contains(trackId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val upcomingQueue: StateFlow<List<Track>> = libraryRepository?.tracks
+        ?: MutableStateFlow(emptyList())
 
     private var lastRecordedTrackId: Long? = null
 
