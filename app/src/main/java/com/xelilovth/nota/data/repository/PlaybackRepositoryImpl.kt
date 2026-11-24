@@ -51,9 +51,8 @@ class PlaybackRepositoryImpl @Inject constructor(
 
     init { player.addListener(listener); publishState() }
 
-    override fun playTrack(track: Track) {
+    override fun playTrack(track: Track, queue: List<Track>) {
         ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java))
-        val queue = libraryRepository.tracks.value
         val selectedIndex = queue.indexOfFirst { it.id == track.id }
         val tracks = if (selectedIndex >= 0) queue else listOf(track)
         val index = if (selectedIndex >= 0) selectedIndex else 0

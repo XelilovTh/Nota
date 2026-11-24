@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,7 +89,7 @@ fun LibraryScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(AppDimens.ScreenPadding),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                 ) {
-                    items(tracks, key = Track::id) { track -> TrackRow(track) { playerViewModel.play(track) } }
+                    items(tracks, key = Track::id) { track -> TrackRow(track) { playerViewModel.onRowClick(track, tracks) } }
                 }
             }
         }
@@ -108,18 +109,28 @@ private fun PlaybackControls(state: PlaybackState, viewModel: PlayerViewModel) {
                 valueRange = 0f..state.durationMs.toFloat(),
             )
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            Text(if (state.shuffle) "Shuffle on" else "Shuffle off", modifier = Modifier.padding(horizontal = AppDimens.ElementSpacing))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             IconButton(onClick = viewModel::previous) { Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous") }
             IconButton(onClick = viewModel::togglePlayPause) {
                 Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = "Play or pause")
             }
             IconButton(onClick = viewModel::next) { Icon(Icons.Filled.SkipNext, contentDescription = "Next") }
-            Text(state.repeatMode.name, modifier = Modifier.padding(horizontal = AppDimens.ElementSpacing))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
-            Button(onClick = viewModel::toggleShuffle) { Text("Shuffle") }
-            Button(onClick = viewModel::cycleRepeatMode) { Text("Repeat") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(onClick = viewModel::toggleShuffle) {
+                Text(if (state.shuffle) "Shuffle ON" else "Shuffle OFF")
+            }
+            Button(onClick = viewModel::cycleRepeatMode) {
+                Text("Repeat ${state.repeatMode.name}")
+            }
         }
     }
 }
@@ -139,13 +150,16 @@ private fun PermissionRequired(denied: Boolean, onRetry: () -> Unit) {
 
 @Composable
 private fun TrackRow(track: Track, onPlay: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.ElementSpacing)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(vertical = AppDimens.ElementSpacing),
+    ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(track.title, style = MaterialTheme.typography.titleMedium)
             Text("${track.artist} · ${track.album}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             Text(track.folder, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         }
-        IconButton(onClick = onPlay) { Icon(Icons.Filled.PlayArrow, contentDescription = "Play ${track.title}") }
+        Icon(Icons.Filled.PlayArrow, contentDescription = "Play ${track.title}")
     }
 }
 
