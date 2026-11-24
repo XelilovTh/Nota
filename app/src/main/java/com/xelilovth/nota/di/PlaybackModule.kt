@@ -1,0 +1,30 @@
+package com.xelilovth.nota.di
+
+import android.content.Context
+import androidx.media3.exoplayer.ExoPlayer
+import com.xelilovth.nota.data.media.PlaybackPlayerHolder
+import com.xelilovth.nota.data.repository.PlaybackRepositoryImpl
+import com.xelilovth.nota.domain.repository.PlaybackRepository
+import dagger.Binds
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object PlaybackPlayerModule {
+    @Provides
+    @Singleton
+    fun provideExoPlayer(@ApplicationContext context: Context): ExoPlayer = PlaybackPlayerHolder.get(context)
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class PlaybackRepositoryModule {
+    @Binds
+    @Singleton
+    abstract fun bindPlaybackRepository(implementation: PlaybackRepositoryImpl): PlaybackRepository
+}
