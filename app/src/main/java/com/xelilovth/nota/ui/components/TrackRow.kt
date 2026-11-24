@@ -42,7 +42,11 @@ fun TrackRow(
             track = track,
             size = AppDimens.CoverSizeMedium,
         )
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onPlay),
+        ) {
             Text(track.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             Text(
                 "${track.artist} · ${track.album}",
