@@ -42,7 +42,7 @@ private data class TabItem(
 
 private val tabItems = listOf(
     TabItem(AppRoute.HOME, "Home", Icons.Outlined.Home),
-    TabItem(AppRoute.PLAYLISTS, "Playlists", Icons.Outlined.PlaylistPlay),
+    TabItem(AppRoute.PLAYLISTS, "Playlists", Icons.AutoMirrored.Outlined.PlaylistPlay),
     TabItem(AppRoute.SEARCH, "Search", Icons.Outlined.Search),
     TabItem(AppRoute.LIBRARY, "Library", Icons.Outlined.LibraryMusic),
 )
