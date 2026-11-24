@@ -74,4 +74,43 @@ class LibraryViewModelTest {
 
         assertEquals(listOf(9L), playbackRepository.queue.map(Track::id))
     }
+
+    @Test
+    fun toggleFavoriteAndAddToPlaylistInvokeUseCases() {
+        val libraryTracks = listOf(track(1L))
+        val libraryRepository = FakeLibraryRepository(libraryTracks)
+        val playbackRepository = FakePlaybackRepository()
+
+        val favCalls = mutableListOf<Long>()
+        val favRepo = object : com.xelilovth.nota.domain.repository.FavoritesRepository {
+            override fun observeFavoriteTrackIds() = MutableStateFlow(emptySet<Long>())
+            override suspend fun toggleFavorite(trackId: Long) { favCalls += trackId }
+            override suspend fun isFavorite(trackId: Long) = false
+        }
+        val playlistCalls = mutableListOf<String>()
+        val playlistRepo = object : com.xelilovth.nota.domain.repository.PlaylistRepository {
+            override fun observePlaylists() = MutableStateFlow(emptyList<com.xelilovth.nota.domain.model.Playlist>())
+            override fun getPlaylistTracks(playlistId: Long) = MutableStateFlow(emptyList<Track>())
+            override suspend fun createPlaylist(name: String) = 1L
+            override suspend fun deletePlaylist(playlistId: Long) = Unit
+            override suspend fun addTrackToPlaylist(playlistId: Long, trackId: Long) {
+                playlistCalls += "add:$playlistId:$trackId"
+            }
+            override suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) = Unit
+        }
+
+        val viewModel = LibraryViewModel(
+            ObserveTracksUseCase(libraryRepository),
+            ScanLibraryUseCase(libraryRepository),
+            PlayTrackUseCase(playbackRepository),
+            toggleFavoriteUseCase = com.xelilovth.nota.domain.usecase.ToggleFavoriteUseCase(favRepo),
+            addTrackToPlaylistUseCase = com.xelilovth.nota.domain.usecase.AddTrackToPlaylistUseCase(playlistRepo),
+        )
+
+        viewModel.toggleFavorite(1L)
+        viewModel.addTrackToPlaylist(10L, 1L)
+
+        assertEquals(listOf(1L), favCalls)
+        assertEquals(listOf("add:10:1"), playlistCalls)
+    }
 }

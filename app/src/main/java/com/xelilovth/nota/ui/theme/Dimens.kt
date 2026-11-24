@@ -17,4 +17,10 @@ object AppDimens {
     val ShapeMedium = 12.dp
     val ShapeLarge = 16.dp
     val ShapeExtraLarge = 28.dp
+    val IconSizeSmall = 20.dp
+    val IconSizeMedium = 24.dp
+    val DialogPadding = 24.dp
+    val TabSpacing = 4.dp
+    val DividerThickness = 1.dp
 }
+

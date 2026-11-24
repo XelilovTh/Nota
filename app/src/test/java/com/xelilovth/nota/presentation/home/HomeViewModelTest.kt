@@ -133,4 +133,30 @@ class HomeViewModelTest {
         assertEquals(emptyList<Track>(), viewModel.tracks.value)
         assertEquals(emptyList<Long>(), repository.played)
     }
+
+    @Test
+    fun playFavoritesPlaysFirstFavoriteAndQueuesAllFavorites() {
+        val repository = FakeRepository()
+        val libraryTracks = listOf(track(10), track(20), track(30))
+        val library = object : LibraryRepository {
+            override val tracks = MutableStateFlow(libraryTracks)
+            override suspend fun scan() = libraryTracks
+        }
+        val favoritesRepo = object : com.xelilovth.nota.domain.repository.FavoritesRepository {
+            override fun observeFavoriteTrackIds() = MutableStateFlow(setOf(20L, 30L))
+            override suspend fun toggleFavorite(trackId: Long) = Unit
+            override suspend fun isFavorite(trackId: Long) = true
+        }
+
+        val viewModel = HomeViewModel(
+            ObserveTracksUseCase(library), repository,
+            PlayTrackUseCase(repository), ToggleShuffleUseCase(repository),
+            observeFavoritesUseCase = com.xelilovth.nota.domain.usecase.ObserveFavoritesUseCase(favoritesRepo),
+        )
+
+        viewModel.playFavorites(shuffle = false)
+
+        assertEquals(listOf(20L), repository.played)
+        assertEquals(listOf(20L, 30L), repository.queues.single())
+    }
 }

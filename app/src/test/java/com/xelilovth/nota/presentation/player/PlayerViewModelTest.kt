@@ -125,4 +125,45 @@ class PlayerViewModelTest {
         assertEquals(420L, viewModel.playbackState.value.positionMs)
         assertEquals(repository.playbackState, viewModel.playbackState)
     }
+
+    @Test fun toggleFavoriteInvokesUseCase() {
+        val repository = FakeRepository()
+        val favoritesCalls = mutableListOf<Long>()
+        val favoriteRepo = object : com.xelilovth.nota.domain.repository.FavoritesRepository {
+            override fun observeFavoriteTrackIds() = MutableStateFlow(emptySet<Long>())
+            override suspend fun toggleFavorite(trackId: Long) { favoritesCalls += trackId }
+            override suspend fun isFavorite(trackId: Long) = false
+        }
+        val viewModel = PlayerViewModel(
+            repository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+            SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
+            ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
+            ToggleFavoriteUseCase(favoriteRepo),
+        )
+
+        viewModel.toggleFavorite(55L)
+
+        assertEquals(listOf(55L), favoritesCalls)
+    }
+
+    @Test fun onRowClickRecordsPlayHistory() {
+        val repository = FakeRepository()
+        val historyCalls = mutableListOf<Long>()
+        val historyRepo = object : com.xelilovth.nota.domain.repository.HistoryRepository {
+            override fun observeHistory() = MutableStateFlow(emptyList<com.xelilovth.nota.domain.model.PlayHistoryEntry>())
+            override suspend fun recordPlay(trackId: Long) { historyCalls += trackId }
+            override suspend fun clearHistory() = Unit
+        }
+        val viewModel = PlayerViewModel(
+            repository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+            SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
+            ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
+            recordPlayHistoryUseCase = RecordPlayHistoryUseCase(historyRepo),
+        )
+
+        val track = track(77L)
+        viewModel.onRowClick(track, listOf(track))
+
+        assertEquals(listOf(77L), historyCalls)
+    }
 }

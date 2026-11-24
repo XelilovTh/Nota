@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,8 +32,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -39,11 +45,52 @@ import com.xelilovth.nota.ui.theme.AppDimens
 fun NowPlayingScreen(
     state: PlaybackState,
     viewModel: PlayerViewModel,
-    onBack: () -> Unit,
-    onEqualizer: () -> Unit,
-    onSleepTimer: () -> Unit,
-    onLyrics: () -> Unit,
-    onSettings: () -> Unit,
+    onBack: () -> Unit = {},
+    onEqualizer: () -> Unit = {},
+    onSleepTimer: () -> Unit = {},
+    onLyrics: () -> Unit = {},
+    onSettings: () -> Unit = {},
+    isFavorite: Boolean? = null,
+    onToggleFavorite: (() -> Unit)? = null,
+) {
+    val currentIsFavorite by viewModel.isCurrentTrackFavorite.collectAsStateWithLifecycle()
+    val effectiveIsFavorite = isFavorite ?: currentIsFavorite
+    val effectiveToggleFavorite = onToggleFavorite ?: { viewModel.toggleFavorite() }
+
+    NowPlayingContent(
+        state = state,
+        isFavorite = effectiveIsFavorite,
+        onToggleFavorite = effectiveToggleFavorite,
+        onTogglePlayPause = viewModel::togglePlayPause,
+        onNext = viewModel::next,
+        onPrevious = viewModel::previous,
+        onSeek = viewModel::seek,
+        onToggleShuffle = viewModel::toggleShuffle,
+        onCycleRepeatMode = viewModel::cycleRepeatMode,
+        onBack = onBack,
+        onEqualizer = onEqualizer,
+        onSleepTimer = onSleepTimer,
+        onLyrics = onLyrics,
+        onSettings = onSettings,
+    )
+}
+
+@Composable
+fun NowPlayingContent(
+    state: PlaybackState,
+    isFavorite: Boolean = false,
+    onToggleFavorite: () -> Unit = {},
+    onTogglePlayPause: () -> Unit = {},
+    onNext: () -> Unit = {},
+    onPrevious: () -> Unit = {},
+    onSeek: (Long) -> Unit = {},
+    onToggleShuffle: () -> Unit = {},
+    onCycleRepeatMode: () -> Unit = {},
+    onBack: () -> Unit = {},
+    onEqualizer: () -> Unit = {},
+    onSleepTimer: () -> Unit = {},
+    onLyrics: () -> Unit = {},
+    onSettings: () -> Unit = {},
 ) {
     val duration = state.durationMs.coerceAtLeast(0L)
     val sliderMax = duration.coerceAtLeast(1L).toFloat()
@@ -77,27 +124,43 @@ fun NowPlayingScreen(
             )
         }
 
-        Column(
+        Row(
             Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                state.track?.title ?: "No track selected",
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 1,
-            )
-            Text(
-                state.track?.artist.orEmpty(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+            ) {
+                Text(
+                    state.track?.title ?: "No track selected",
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
+                )
+                Text(
+                    state.track?.artist.orEmpty(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            IconButton(
+                onClick = onToggleFavorite,
+                enabled = state.track != null,
+                modifier = Modifier.testTag("favorite_button"),
+            ) {
+                Icon(
+                    if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Favorite active" else "Favorite",
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         Column(Modifier.fillMaxWidth()) {
             Slider(
                 value = position.toFloat(),
-                onValueChange = { viewModel.seek(it.toLong()) },
+                onValueChange = { onSeek(it.toLong()) },
                 valueRange = 0f..sliderMax,
                 enabled = duration > 0L,
             )
@@ -112,26 +175,26 @@ fun NowPlayingScreen(
             horizontalArrangement = Arrangement.spacedBy(AppDimens.PlayerControlSpacing, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = viewModel::toggleShuffle) {
+            IconButton(onClick = onToggleShuffle) {
                 Icon(
                     Icons.Filled.Shuffle,
                     contentDescription = if (state.shuffle) "Shuffle on" else "Shuffle off",
                     tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 )
             }
-            IconButton(onClick = viewModel::previous) {
+            IconButton(onClick = onPrevious) {
                 Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous")
             }
-            IconButton(onClick = viewModel::togglePlayPause) {
+            IconButton(onClick = onTogglePlayPause) {
                 Icon(
                     if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (state.isPlaying) "Pause" else "Play",
                 )
             }
-            IconButton(onClick = viewModel::next) {
+            IconButton(onClick = onNext) {
                 Icon(Icons.Filled.SkipNext, contentDescription = "Next")
             }
-            IconButton(onClick = viewModel::cycleRepeatMode) {
+            IconButton(onClick = onCycleRepeatMode) {
                 Icon(
                     if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                     contentDescription = "Repeat ${state.repeatMode.name.lowercase()}",
@@ -147,7 +210,7 @@ fun NowPlayingScreen(
             TextButton(
                 onClick = onSleepTimer,
                 modifier = Modifier.weight(1f),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = AppDimens.PlayerActionHorizontalPadding),
+                contentPadding = PaddingValues(horizontal = AppDimens.PlayerActionHorizontalPadding),
             ) { Text("Sleep Timer", maxLines = 1) }
             TextButton(onClick = onSettings, modifier = Modifier.weight(1f)) { Text("Settings") }
         }
