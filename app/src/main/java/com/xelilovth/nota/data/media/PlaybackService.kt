@@ -1,10 +1,11 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.xelilovth.nota.data.media
 
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 
-@UnstableApi
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
 

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.xelilovth.nota.data.media
 
 import android.content.Context
@@ -6,7 +8,6 @@ import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 
-@UnstableApi
 object PlaybackPlayerHolder {
     @Volatile private var instance: ExoPlayer? = null
 

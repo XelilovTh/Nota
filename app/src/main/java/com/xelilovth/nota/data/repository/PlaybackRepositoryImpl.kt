@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.xelilovth.nota.data.repository
 
 import android.content.Context
@@ -28,7 +30,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-@UnstableApi
 @Singleton
 class PlaybackRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,

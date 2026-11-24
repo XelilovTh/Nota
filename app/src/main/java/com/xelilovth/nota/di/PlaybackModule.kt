@@ -1,7 +1,6 @@
 package com.xelilovth.nota.di
 
 import android.content.Context
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.xelilovth.nota.data.media.PlaybackPlayerHolder
 import com.xelilovth.nota.data.repository.PlaybackRepositoryImpl
@@ -14,7 +13,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-@UnstableApi
 @Module
 @InstallIn(SingletonComponent::class)
 object PlaybackPlayerModule {
@@ -23,7 +21,6 @@ object PlaybackPlayerModule {
     fun provideExoPlayer(@ApplicationContext context: Context): ExoPlayer = PlaybackPlayerHolder.get(context)
 }
 
-@UnstableApi
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class PlaybackRepositoryModule {
