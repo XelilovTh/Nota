@@ -49,6 +49,7 @@ import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
 import com.xelilovth.nota.presentation.AppRoute
 import com.xelilovth.nota.presentation.library.LibraryViewModel
+import com.xelilovth.nota.ui.components.TrackCover
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
@@ -251,10 +252,15 @@ internal fun CompactTrackRow(track: Track, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = AppDimens.ElementSpacing),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
     ) {
+        TrackCover(
+            track = track,
+            size = AppDimens.CoverSizeMedium,
+        )
         Column(Modifier.weight(1f)) {
-            Text(track.title, style = MaterialTheme.typography.titleMedium)
-            Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text(track.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1)
         }
         Icon(Icons.Filled.PlayArrow, contentDescription = "Play ${track.title}")
     }
@@ -268,10 +274,9 @@ internal fun CustomPlaylistRow(playlist: Playlist, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
         ) {
-            Icon(
-                Icons.Outlined.MusicNote,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+            TrackCover(
+                artworkUri = null,
+                size = AppDimens.CoverSizeMedium,
             )
             Column(Modifier.weight(1f)) {
                 Text(playlist.name, style = MaterialTheme.typography.titleMedium)
@@ -293,13 +298,23 @@ internal fun CustomPlaylistRow(playlist: Playlist, onClick: () -> Unit) {
 @Composable
 internal fun PlaylistGroupRow(group: AutoPlaylist, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Column(Modifier.fillMaxWidth().padding(AppDimens.CardPadding)) {
-            Text(group.title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                "${group.tracks.size} tracks · ${group.type.name.lowercase()}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
+        Row(
+            Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+        ) {
+            TrackCover(
+                track = group.tracks.firstOrNull(),
+                size = AppDimens.CoverSizeMedium,
             )
+            Column(Modifier.weight(1f)) {
+                Text(group.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${group.tracks.size} tracks · ${group.type.name.lowercase()}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }

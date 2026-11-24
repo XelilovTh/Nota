@@ -53,7 +53,7 @@ class HomeViewModel @Inject constructor(
     val favorites: StateFlow<List<Track>> = if (observeFavoritesUseCase != null) {
         combine(tracks, observeFavoritesUseCase()) { allTracks, favIds ->
             allTracks.filter { it.id in favIds }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     } else {
         MutableStateFlow(emptyList())
     }

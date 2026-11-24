@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
@@ -91,25 +92,25 @@ class NowPlayingScreenUiTest {
         }
 
         // Assert track title and artist are displayed
-        composeTestRule.onNodeWithText("Stairway to Heaven").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Led Zeppelin").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Stairway to Heaven").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Led Zeppelin").performScrollTo().assertIsDisplayed()
 
         // Click Play button
-        composeTestRule.onNodeWithContentDescription("Play").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Play").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("Play").performClick()
         assertTrue(repository.calls.contains("togglePlayPause"))
 
         // Click Favorite button
-        composeTestRule.onNodeWithTag("favorite_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("favorite_button").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("favorite_button").performClick()
         assertTrue(favoriteToggled)
 
         // Click Next button
-        composeTestRule.onNodeWithContentDescription("Next").performClick()
+        composeTestRule.onNodeWithContentDescription("Next").performScrollTo().performClick()
         assertTrue(repository.calls.contains("skipNext"))
 
         // Click Previous button
-        composeTestRule.onNodeWithContentDescription("Previous").performClick()
+        composeTestRule.onNodeWithContentDescription("Previous").performScrollTo().performClick()
         assertTrue(repository.calls.contains("skipPrevious"))
     }
 
@@ -130,25 +131,25 @@ class NowPlayingScreenUiTest {
         }
 
         // Initial state: not favorite, not playing
-        composeTestRule.onNodeWithContentDescription("Favorite").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Play").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Favorite").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Play").performScrollTo().assertIsDisplayed()
 
         // Tap Favorite
-        composeTestRule.onNodeWithContentDescription("Favorite").performClick()
+        composeTestRule.onNodeWithContentDescription("Favorite").performScrollTo().performClick()
 
         // State changes: now favorite
-        composeTestRule.onNodeWithContentDescription("Favorite active").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Favorite active").performScrollTo().assertIsDisplayed()
 
         // Tap Favorite again
-        composeTestRule.onNodeWithContentDescription("Favorite active").performClick()
+        composeTestRule.onNodeWithContentDescription("Favorite active").performScrollTo().performClick()
 
         // Restores inactive favorite state
-        composeTestRule.onNodeWithContentDescription("Favorite").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Favorite").performScrollTo().assertIsDisplayed()
 
         // Tap Play
-        composeTestRule.onNodeWithContentDescription("Play").performClick()
+        composeTestRule.onNodeWithContentDescription("Play").performScrollTo().performClick()
 
         // Now playing: Pause button should be visible
-        composeTestRule.onNodeWithContentDescription("Pause").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Pause").performScrollTo().assertIsDisplayed()
     }
 }

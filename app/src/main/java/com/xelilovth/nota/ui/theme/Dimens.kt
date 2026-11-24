@@ -22,5 +22,11 @@ object AppDimens {
     val DialogPadding = 24.dp
     val TabSpacing = 4.dp
     val DividerThickness = 1.dp
+    val CoverSizeSmall = 48.dp
+    val CoverSizeMedium = 56.dp
+    val CoverSizeLarge = 220.dp
+    val CoverIconSizeSmall = 24.dp
+    val CoverIconSizeMedium = 28.dp
+    val CoverIconSizeLarge = 64.dp
 }
 

@@ -2,6 +2,8 @@ package com.xelilovth.nota.presentation
 
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -108,8 +110,8 @@ class HomeAndLibraryUiTest {
         composeTestRule.onNodeWithText("2 tracks in your library").assertIsDisplayed()
 
         // Simulate touch on Play button
-        composeTestRule.onNodeWithText("Play").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Play").performClick()
+        composeTestRule.onNode(hasText("Play") and hasClickAction()).assertIsDisplayed()
+        composeTestRule.onNode(hasText("Play") and hasClickAction()).performClick()
         assertTrue(playFirstInvoked)
 
         // Simulate touch on Shuffle button

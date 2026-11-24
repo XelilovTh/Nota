@@ -1,22 +1,17 @@
 package com.xelilovth.nota.presentation.player
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -39,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
+import com.xelilovth.nota.ui.components.TrackCover
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
@@ -108,21 +104,11 @@ fun NowPlayingContent(
             Text("Now Playing", style = MaterialTheme.typography.headlineMedium)
         }
 
-        Box(
-            modifier = Modifier.size(AppDimens.PlayerArtworkSize)
-                .background(
-                    MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(AppDimens.ShapeLarge),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Filled.MusicNote,
-                contentDescription = "Album art placeholder",
-                modifier = Modifier.size(AppDimens.PlayerArtworkIconSize),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        TrackCover(
+            track = state.track,
+            size = AppDimens.CoverSizeLarge,
+            contentDescription = "Album art placeholder",
+        )
 
         Row(
             Modifier.fillMaxWidth(),

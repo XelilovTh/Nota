@@ -20,8 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.filterTracks
-import com.xelilovth.nota.presentation.home.CompactTrackRow
 import com.xelilovth.nota.presentation.home.HomeViewModel
+import com.xelilovth.nota.ui.components.TrackRow
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
@@ -61,7 +61,7 @@ fun SearchScreen(
                 verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
                 items(results, key = { it.id }) { track ->
-                    CompactTrackRow(track) { onPlayWithNotificationPermission { viewModel.play(track) } }
+                    TrackRow(track = track, onPlay = { onPlayWithNotificationPermission { viewModel.play(track) } })
                 }
             }
         }

@@ -45,6 +45,7 @@ import com.xelilovth.nota.domain.model.Playlist
 import com.xelilovth.nota.domain.model.PlaylistGroupType
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
+import com.xelilovth.nota.ui.components.TrackCover
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
@@ -242,10 +243,9 @@ private fun MyPlaylistsContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                     ) {
-                        Icon(
-                            Icons.Outlined.MusicNote,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                        TrackCover(
+                            artworkUri = null,
+                            size = AppDimens.CoverSizeMedium,
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(playlist.name, style = MaterialTheme.typography.titleMedium)
@@ -343,7 +343,12 @@ private fun CustomPlaylistDetail(
                         .clickable { onPlayWithNotificationPermission { viewModel.playFromPlaylist(track, playlistTracks) } }
                         .padding(vertical = AppDimens.ElementSpacing),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                 ) {
+                    TrackCover(
+                        track = track,
+                        size = AppDimens.CoverSizeMedium,
+                    )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(track.title, style = MaterialTheme.typography.titleMedium)
                         Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -415,6 +420,10 @@ private fun CollectionRow(group: AutoPlaylist, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
         ) {
+            TrackCover(
+                track = group.tracks.firstOrNull(),
+                size = AppDimens.CoverSizeMedium,
+            )
             Column(Modifier.weight(1f)) {
                 Text(group.title, style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -472,7 +481,12 @@ private fun CollectionDetail(
             Row(
                 Modifier.fillMaxWidth().clickable { onTrackClick(track) }.padding(vertical = AppDimens.ElementSpacing),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
+                TrackCover(
+                    track = track,
+                    size = AppDimens.CoverSizeMedium,
+                )
                 Column(Modifier.weight(1f)) {
                     Text(track.title, style = MaterialTheme.typography.titleMedium)
                     Text(track.artist, color = MaterialTheme.colorScheme.onSurfaceVariant)

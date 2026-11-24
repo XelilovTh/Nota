@@ -115,4 +115,26 @@ class PlaybackRepositoryImplTest {
         assertFalse(repository.playbackState.value.isPlaying)
         assertEquals("decoder exploded", repository.playbackState.value.errorMessage)
     }
+
+    @Test
+    fun playTrackPreservesArtworkUriInMediaMetadata() {
+        val context = RecordingContext(RuntimeEnvironment.getApplication())
+        val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository())
+        val artworkUri = Uri.parse("content://media/external/audio/albumart/99")
+        val track = Track(
+            99L,
+            Uri.parse("content://audio/99"),
+            "Artwork Song",
+            "Artist",
+            "Album",
+            1_000L,
+            "Music",
+            albumId = 99L,
+            artworkUri = artworkUri,
+        )
+
+        repository.playTrack(track, listOf(track))
+
+        assertEquals(artworkUri, player.currentMediaItem?.mediaMetadata?.artworkUri)
+    }
 }

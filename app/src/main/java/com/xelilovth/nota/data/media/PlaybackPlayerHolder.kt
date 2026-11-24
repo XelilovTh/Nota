@@ -13,13 +13,11 @@ object PlaybackPlayerHolder {
 
     fun get(context: Context): ExoPlayer = instance ?: synchronized(this) {
         instance ?: ExoPlayer.Builder(context.applicationContext).build().apply {
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                true,
-            )
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .build()
+            setAudioAttributes(audioAttributes, true)
             setHandleAudioBecomingNoisy(true)
         }.also { instance = it }
     }

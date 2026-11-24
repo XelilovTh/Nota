@@ -10,7 +10,12 @@ import com.xelilovth.nota.domain.repository.LibraryRepository
 import com.xelilovth.nota.domain.usecase.ObserveTracksUseCase
 import com.xelilovth.nota.domain.usecase.PlayTrackUseCase
 import com.xelilovth.nota.domain.usecase.ToggleShuffleUseCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -135,28 +140,35 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun playFavoritesPlaysFirstFavoriteAndQueuesAllFavorites() {
-        val repository = FakeRepository()
-        val libraryTracks = listOf(track(10), track(20), track(30))
-        val library = object : LibraryRepository {
-            override val tracks = MutableStateFlow(libraryTracks)
-            override suspend fun scan() = libraryTracks
+    fun playFavoritesPlaysFirstFavoriteAndQueuesAllFavorites() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val libraryTracks = listOf(track(10), track(20), track(30))
+            val library = object : LibraryRepository {
+                override val tracks = MutableStateFlow(libraryTracks)
+                override suspend fun scan() = libraryTracks
+            }
+            val favoritesRepo = object : com.xelilovth.nota.domain.repository.FavoritesRepository {
+                override fun observeFavoriteTrackIds() = MutableStateFlow(setOf(20L, 30L))
+                override suspend fun toggleFavorite(trackId: Long) = Unit
+                override suspend fun isFavorite(trackId: Long) = true
+            }
+
+            val viewModel = HomeViewModel(
+                ObserveTracksUseCase(library), repository,
+                PlayTrackUseCase(repository), ToggleShuffleUseCase(repository),
+                observeFavoritesUseCase = com.xelilovth.nota.domain.usecase.ObserveFavoritesUseCase(favoritesRepo),
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            viewModel.playFavorites(shuffle = false)
+
+            assertEquals(listOf(20L), repository.played)
+            assertEquals(listOf(20L, 30L), repository.queues.single())
+        } finally {
+            Dispatchers.resetMain()
         }
-        val favoritesRepo = object : com.xelilovth.nota.domain.repository.FavoritesRepository {
-            override fun observeFavoriteTrackIds() = MutableStateFlow(setOf(20L, 30L))
-            override suspend fun toggleFavorite(trackId: Long) = Unit
-            override suspend fun isFavorite(trackId: Long) = true
-        }
-
-        val viewModel = HomeViewModel(
-            ObserveTracksUseCase(library), repository,
-            PlayTrackUseCase(repository), ToggleShuffleUseCase(repository),
-            observeFavoritesUseCase = com.xelilovth.nota.domain.usecase.ObserveFavoritesUseCase(favoritesRepo),
-        )
-
-        viewModel.playFavorites(shuffle = false)
-
-        assertEquals(listOf(20L), repository.played)
-        assertEquals(listOf(20L, 30L), repository.queues.single())
     }
 }

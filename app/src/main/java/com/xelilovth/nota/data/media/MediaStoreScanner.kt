@@ -29,6 +29,7 @@ class MediaStoreScanner @Inject constructor(
                 val titleColumn = result.getColumnIndex(MediaStore.Audio.Media.TITLE)
                 val artistColumn = result.getColumnIndex(MediaStore.Audio.Media.ARTIST)
                 val albumColumn = result.getColumnIndex(MediaStore.Audio.Media.ALBUM)
+                val albumIdColumn = result.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
                 val durationColumn = result.getColumnIndex(MediaStore.Audio.Media.DURATION)
                 val relativePathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     result.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
@@ -47,6 +48,17 @@ class MediaStoreScanner @Inject constructor(
                             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                             id,
                         )
+                        val albumId = if (albumIdColumn >= 0 && !result.isNull(albumIdColumn)) {
+                            result.getLong(albumIdColumn)
+                        } else {
+                            null
+                        }
+                        val artworkUri = albumId?.let {
+                            ContentUris.withAppendedId(
+                                Uri.parse("content://media/external/audio/albumart"),
+                                it,
+                            )
+                        }
                         val pathFolder = if (dataColumn >= 0) {
                             result.getString(dataColumn)?.substringBeforeLast('/', "")
                                 ?.substringAfterLast('/', "")
@@ -68,6 +80,8 @@ class MediaStoreScanner @Inject constructor(
                                 album = result.stringOrFallback(albumColumn, "Unknown album"),
                                 durationMs = if (durationColumn >= 0) result.getLong(durationColumn) else 0L,
                                 folder = folder,
+                                albumId = albumId,
+                                artworkUri = artworkUri,
                             ),
                         )
                     } while (result.moveToNext())

@@ -106,6 +106,7 @@ class PlaybackRepositoryImpl @Inject constructor(
                 .setTitle(track.title)
                 .setArtist(track.artist)
                 .setAlbumTitle(track.album)
+                .setArtworkUri(track.artworkUri)
                 .build(),
         )
         .build()
