@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
-import androidx.compose.material.icons.outlined.PlaylistPlay
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -42,7 +42,7 @@ private data class TabItem(
 
 private val tabItems = listOf(
     TabItem(AppRoute.HOME, "Home", Icons.Outlined.Home),
-    TabItem(AppRoute.PLAYLISTS, "Playlists", Icons.AutoMirrored.Outlined.PlaylistPlay),
+    TabItem(AppRoute.PLAYLISTS, "Playlists", Icons.Outlined.MusicNote),
     TabItem(AppRoute.SEARCH, "Search", Icons.Outlined.Search),
     TabItem(AppRoute.LIBRARY, "Library", Icons.Outlined.LibraryMusic),
 )
