@@ -6,6 +6,7 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -41,22 +42,29 @@ class PlaybackRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressJob: Job? = null
-    private val listener = object : Player.Listener {
+    internal val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = publishState()
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) startProgressUpdates() else progressJob?.cancel()
             publishState()
         }
+        override fun onPlayerError(error: PlaybackException) = handlePlayerError(error)
     }
 
     init { player.addListener(listener); publishState() }
 
     override fun playTrack(track: Track, queue: List<Track>) {
-        ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java))
+        if (queue.isEmpty()) return
+
         val selectedIndex = queue.indexOfFirst { it.id == track.id }
         val tracks = if (selectedIndex >= 0) queue else listOf(track)
+        val mediaItems = tracks.map(::toMediaItem)
+        if (mediaItems.isEmpty()) return
+
+        ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java))
         val index = if (selectedIndex >= 0) selectedIndex else 0
-        player.setMediaItems(tracks.map(::toMediaItem), index, 0L)
+        _playbackState.value = _playbackState.value.copy(errorMessage = null)
+        player.setMediaItems(mediaItems, index, 0L)
         player.prepare()
         player.play()
         publishState()
@@ -102,6 +110,14 @@ class PlaybackRepositoryImpl @Inject constructor(
         )
         .build()
 
+    internal fun handlePlayerError(error: PlaybackException) {
+        progressJob?.cancel()
+        _playbackState.value = _playbackState.value.copy(
+            isPlaying = false,
+            errorMessage = error.message ?: "Playback failed (${error.errorCode})",
+        )
+    }
+
     private fun publishState() {
         val mediaId = player.currentMediaItem?.mediaId?.toLongOrNull()
         val track = libraryRepository.tracks.value.firstOrNull { it.id == mediaId }
@@ -113,6 +129,6 @@ class PlaybackRepositoryImpl @Inject constructor(
             track = track,
             shuffle = player.shuffleModeEnabled,
             repeatMode = player.repeatMode,
-        )
+        ).copy(errorMessage = _playbackState.value.errorMessage)
     }
 }

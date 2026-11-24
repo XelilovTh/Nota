@@ -7,6 +7,7 @@ data class PlaybackState(
     val durationMs: Long = 0L,
     val shuffle: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
+    val errorMessage: String? = null,
 )
 
 enum class RepeatMode { OFF, ALL, ONE }
