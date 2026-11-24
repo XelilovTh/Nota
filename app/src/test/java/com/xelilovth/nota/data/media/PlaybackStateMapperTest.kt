@@ -4,14 +4,18 @@ import android.net.Uri
 import androidx.media3.common.Player
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class PlaybackStateMapperTest {
-    @Test fun mapsReadyPlayingAndRepeatOne() {
+    @Test
+    fun mapsReadyPlayingAndRepeatOne() {
         val track = Track(3L, Uri.parse("content://audio/3"), "Song", "Artist", "Album", 900L, "Music")
         val state = PlaybackStateMapper.map(Player.STATE_READY, true, 120L, 900L, track, true, Player.REPEAT_MODE_ONE)
         assertEquals(track, state.track)
@@ -22,11 +26,23 @@ class PlaybackStateMapperTest {
         assertEquals(RepeatMode.ONE, state.repeatMode)
     }
 
-    @Test fun endedPlayerIsNotReportedAsPlayingAndUnknownRepeatMapsOff() {
+    @Test
+    fun endedPlayerIsNotReportedAsPlayingAndUnknownRepeatMapsOff() {
         val state = PlaybackStateMapper.map(Player.STATE_ENDED, true, -1L, -1L, null, false, 99)
         assertFalse(state.isPlaying)
         assertEquals(0L, state.positionMs)
         assertEquals(0L, state.durationMs)
+        assertEquals(RepeatMode.OFF, state.repeatMode)
+    }
+
+    @Test
+    fun mapsNullValuesSafelyWithoutThrowing() {
+        val state = PlaybackStateMapper.map(null, null, null, null, null, null, null)
+        assertNull(state.track)
+        assertFalse(state.isPlaying)
+        assertEquals(0L, state.positionMs)
+        assertEquals(0L, state.durationMs)
+        assertFalse(state.shuffle)
         assertEquals(RepeatMode.OFF, state.repeatMode)
     }
 }

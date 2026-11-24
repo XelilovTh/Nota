@@ -1,7 +1,6 @@
 package com.xelilovth.nota.di
 
 import android.content.Context
-import androidx.room.Room
 import com.xelilovth.nota.data.local.FavoriteDao
 import com.xelilovth.nota.data.local.HistoryDao
 import com.xelilovth.nota.data.local.NotaDatabase
@@ -22,11 +21,7 @@ object DatabaseModule {
     fun provideNotaDatabase(
         @ApplicationContext context: Context,
     ): NotaDatabase {
-        return Room.databaseBuilder(
-            context,
-            NotaDatabase::class.java,
-            NotaDatabase.DATABASE_NAME,
-        ).fallbackToDestructiveMigration().build()
+        return NotaDatabase.create(context)
     }
 
     @Provides

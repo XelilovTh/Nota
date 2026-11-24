@@ -17,8 +17,8 @@ import com.xelilovth.nota.domain.repository.LibraryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -29,12 +29,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @OptIn(UnstableApi::class)
 class PlaybackRepositoryImplTest {
-    private class RecordingContext(base: Context) : ContextWrapper(base) {
+    private class RecordingContext(
+        base: Context,
+        private val throwOnForegroundStart: Boolean = false,
+    ) : ContextWrapper(base) {
         var startedService: Intent? = null
+        var startedNormalService: Intent? = null
 
         override fun startForegroundService(service: Intent): ComponentName {
+            if (throwOnForegroundStart) {
+                throw IllegalStateException("Foreground service start not allowed")
+            }
             startedService = service
             return ComponentName(packageName, PlaybackService::class.java.name)
+        }
+
+        override fun startService(service: Intent): ComponentName? {
+            startedNormalService = service
+            return super.startService(service)
         }
     }
 
@@ -136,5 +148,42 @@ class PlaybackRepositoryImplTest {
         repository.playTrack(track, listOf(track))
 
         assertEquals(artworkUri, player.currentMediaItem?.mediaMetadata?.artworkUri)
+    }
+
+    @Test
+    fun emptyPlayerSeekOperationsDoNotThrowOrCrash() {
+        val context = RecordingContext(RuntimeEnvironment.getApplication())
+        val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository())
+
+        // Ensure these operations on empty player do not throw any exception
+        repository.seekTo(5000L)
+        repository.skipNext()
+        repository.skipPrevious()
+        repository.togglePlayPause()
+        repository.toggleShuffle()
+        repository.cycleRepeatMode()
+
+        assertEquals(0, player.mediaItemCount)
+    }
+
+    @Test
+    fun foregroundServiceStartExceptionFallsBackToStartService() {
+        val context = RecordingContext(RuntimeEnvironment.getApplication(), throwOnForegroundStart = true)
+        val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository())
+        val track = Track(
+            5L,
+            Uri.parse("content://audio/5"),
+            "Fallback Song",
+            "Artist",
+            "Album",
+            1_000L,
+            "Music",
+        )
+
+        repository.playTrack(track, listOf(track))
+
+        assertNull(context.startedService)
+        assertEquals(PlaybackService::class.java.name, context.startedNormalService?.component?.className)
+        assertEquals("5", player.currentMediaItem?.mediaId)
     }
 }

@@ -20,4 +20,19 @@ class PlaybackServiceTest {
 
         assertEquals(listOf("startForeground", "stopSelf"), calls)
     }
+
+    @Test
+    fun playerErrorHandlesStartForegroundExceptionGracefully() {
+        val calls = mutableListOf<String>()
+
+        PlaybackService().handlePlayerError(
+            startForegroundAction = {
+                calls += "startForeground"
+                throw IllegalStateException("Background start forbidden")
+            },
+            stopServiceAction = { calls += "stopSelf" },
+        )
+
+        assertEquals(listOf("startForeground", "stopSelf"), calls)
+    }
 }
