@@ -25,7 +25,10 @@ import com.xelilovth.nota.presentation.home.HomeViewModel
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
-fun SearchScreen(viewModel: HomeViewModel = hiltViewModel()) {
+fun SearchScreen(
+    viewModel: HomeViewModel = hiltViewModel(),
+    onPlayWithNotificationPermission: (() -> Unit) -> Unit,
+) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     val results = remember(tracks, query) { filterTracks(tracks, query) }
@@ -58,7 +61,7 @@ fun SearchScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
                 items(results, key = { it.id }) { track ->
-                    CompactTrackRow(track) { viewModel.play(track) }
+                    CompactTrackRow(track) { onPlayWithNotificationPermission { viewModel.play(track) } }
                 }
             }
         }

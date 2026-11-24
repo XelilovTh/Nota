@@ -1,9 +1,11 @@
 package com.xelilovth.nota.data.repository
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.PlaybackException
@@ -21,6 +23,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @OptIn(UnstableApi::class)
@@ -64,6 +68,33 @@ class PlaybackRepositoryImplTest {
 
         assertNull(context.startedService)
         assertEquals(0, player.mediaItemCount)
+    }
+
+    @Test
+    @Config(sdk = [33])
+    fun deniedNotificationPermissionDoesNotPreventStartingPlayback() {
+        val application = RuntimeEnvironment.getApplication()
+        shadowOf(application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val context = RecordingContext(application)
+        val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository())
+        val track = Track(
+            2L,
+            Uri.parse("content://audio/2"),
+            "Allowed Song",
+            "Artist",
+            "Album",
+            1_000L,
+            "Music",
+        )
+
+        repository.playTrack(track, listOf(track))
+
+        assertEquals(
+            PackageManager.PERMISSION_DENIED,
+            application.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
+        )
+        assertEquals(PlaybackService::class.java.name, context.startedService?.component?.className)
+        assertEquals("2", player.currentMediaItem?.mediaId)
     }
 
     @Test

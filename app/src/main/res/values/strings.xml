@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nota</string>
+    <string name="notification_channel_playback">Music playback</string>
+    <string name="playback_error_notification">Playback stopped because of an audio error</string>
+</resources>

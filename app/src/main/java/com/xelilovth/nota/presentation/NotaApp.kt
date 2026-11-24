@@ -12,9 +12,20 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -49,6 +60,44 @@ private val tabItems = listOf(
 
 @Composable
 fun NotaApp() {
+    val context = LocalContext.current
+    var notificationPermissionRequested by remember { mutableStateOf(false) }
+    var pendingPlaybackAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) {
+            Toast.makeText(
+                context,
+                "Bildiriş icazəsi olmadan arxa planda idarəetmə işləməyəcək",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+        val action = pendingPlaybackAction
+        pendingPlaybackAction = null
+        action?.invoke()
+    }
+    val requestPlaybackPermission: (() -> Unit) -> Unit = { action ->
+        val permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+        if (permissionGranted) {
+            action()
+        } else if (!notificationPermissionRequested) {
+            notificationPermissionRequested = true
+            pendingPlaybackAction = action
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            Toast.makeText(
+                context,
+                "Bildiriş icazəsi olmadan arxa planda idarəetmə işləməyəcək",
+                Toast.LENGTH_LONG,
+            ).show()
+            action()
+        }
+    }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -90,10 +139,10 @@ fun NotaApp() {
             startDestination = AppRoute.HOME,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(AppRoute.HOME) { HomeScreen(navController) }
+            composable(AppRoute.HOME) { HomeScreen(navController, onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.PLAYLISTS) { PlaylistsScreen() }
-            composable(AppRoute.SEARCH) { SearchScreen() }
-            composable(AppRoute.LIBRARY) { LibraryScreen() }
+            composable(AppRoute.SEARCH) { SearchScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
+            composable(AppRoute.LIBRARY) { LibraryScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.SETTINGS) {
                 ComingSoonScreen(
                     title = "Settings",

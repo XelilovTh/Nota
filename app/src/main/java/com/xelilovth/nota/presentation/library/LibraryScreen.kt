@@ -37,7 +37,10 @@ import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
-fun LibraryScreen(viewModel: LibraryViewModel = hiltViewModel()) {
+fun LibraryScreen(
+    viewModel: LibraryViewModel = hiltViewModel(),
+    onPlayWithNotificationPermission: (() -> Unit) -> Unit,
+) {
     val context = LocalContext.current
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -90,7 +93,7 @@ fun LibraryScreen(viewModel: LibraryViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
                 items(tracks, key = Track::id) { track ->
-                    TrackRow(track) { viewModel.onTrackSelected(track) }
+                    TrackRow(track) { onPlayWithNotificationPermission { viewModel.onTrackSelected(track) } }
                 }
             }
         }

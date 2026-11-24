@@ -53,6 +53,7 @@ fun HomeScreen(
     navController: NavController,
     viewModel: HomeViewModel = hiltViewModel(),
     libraryViewModel: LibraryViewModel = hiltViewModel(),
+    onPlayWithNotificationPermission: (() -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_AUDIO
@@ -99,10 +100,10 @@ fun HomeScreen(
                     Text(if (tracks.isEmpty()) "Your music will appear here after scanning." else "${tracks.size} tracks in your library",
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
-                        Button(onClick = viewModel::playFirstTrack, enabled = tracks.isNotEmpty()) {
+                        Button(onClick = { onPlayWithNotificationPermission(viewModel::playFirstTrack) }, enabled = tracks.isNotEmpty()) {
                             Icon(Icons.Filled.PlayArrow, null); Text("Play")
                         }
-                        OutlinedButton(onClick = viewModel::playShuffledLibrary, enabled = tracks.isNotEmpty()) {
+                        OutlinedButton(onClick = { onPlayWithNotificationPermission(viewModel::playShuffledLibrary) }, enabled = tracks.isNotEmpty()) {
                             Icon(Icons.Filled.Shuffle, null); Text("Shuffle")
                         }
                     }
@@ -118,7 +119,7 @@ fun HomeScreen(
         } else {
             if (recentlyPlayed.isNotEmpty()) {
                 item { SectionHeading("Recently Played") }
-                items(recentlyPlayed, key = { "recent:${it.id}" }) { track -> CompactTrackRow(track) { viewModel.play(track) } }
+                items(recentlyPlayed, key = { "recent:${it.id}" }) { track -> CompactTrackRow(track) { onPlayWithNotificationPermission { viewModel.play(track) } } }
             }
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
