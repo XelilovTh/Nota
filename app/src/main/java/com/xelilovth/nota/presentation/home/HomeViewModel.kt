@@ -2,6 +2,7 @@ package com.xelilovth.nota.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.PlaybackRepository
@@ -47,6 +48,18 @@ class HomeViewModel @Inject constructor(
         if (!playbackState.value.shuffle) toggleShuffle()
         playTrack(library.random(), library)
     }
+    fun playCollection(group: AutoPlaylist, shuffle: Boolean = false) {
+        if (group.tracks.isEmpty()) return
+        val queue = if (shuffle) group.tracks.shuffled() else group.tracks
+        playTrack(queue.first(), queue)
+    }
+
+    fun playFromCollection(track: Track, group: AutoPlaylist) {
+        val selectedIndex = group.tracks.indexOfFirst { it.id == track.id }
+        val queue = if (selectedIndex >= 0) group.tracks.drop(selectedIndex) else listOf(track)
+        playTrack(track, queue)
+    }
+
     fun play(track: Track) {
         val library = tracks.value
         val selectedIndex = library.indexOfFirst { it.id == track.id }
