@@ -1,7 +1,6 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class)
-
 package com.xelilovth.nota.data.repository
 
+import androidx.annotation.OptIn
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
@@ -31,6 +30,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
+@OptIn(UnstableApi::class)
 class PlaybackRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val player: ExoPlayer,
