@@ -88,7 +88,7 @@ fun LibraryScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(AppDimens.ScreenPadding),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                 ) {
-                    items(tracks, key = Track::id) { track -> TrackRow(track) { playerViewModel.play(track) } }
+                    items(tracks, key = Track::id) { track -> TrackRow(track) { playerViewModel.play(track, tracks) } }
                 }
             }
         }
@@ -108,18 +108,28 @@ private fun PlaybackControls(state: PlaybackState, viewModel: PlayerViewModel) {
                 valueRange = 0f..state.durationMs.toFloat(),
             )
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            Text(if (state.shuffle) "Shuffle on" else "Shuffle off", modifier = Modifier.padding(horizontal = AppDimens.ElementSpacing))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             IconButton(onClick = viewModel::previous) { Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous") }
             IconButton(onClick = viewModel::togglePlayPause) {
                 Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = "Play or pause")
             }
             IconButton(onClick = viewModel::next) { Icon(Icons.Filled.SkipNext, contentDescription = "Next") }
-            Text(state.repeatMode.name, modifier = Modifier.padding(horizontal = AppDimens.ElementSpacing))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
-            Button(onClick = viewModel::toggleShuffle) { Text("Shuffle") }
-            Button(onClick = viewModel::cycleRepeatMode) { Text("Repeat") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(onClick = viewModel::toggleShuffle) {
+                Text(if (state.shuffle) "Shuffle ON" else "Shuffle OFF")
+            }
+            Button(onClick = viewModel::cycleRepeatMode) {
+                Text("Repeat ${state.repeatMode.name}")
+            }
         }
     }
 }

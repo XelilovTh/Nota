@@ -27,7 +27,11 @@ class PlayerViewModel @Inject constructor(
     private val cycleRepeatModeUseCase: CycleRepeatModeUseCase,
 ) : ViewModel() {
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
-    fun play(track: Track) = playTrack(track)
+    fun play(track: Track, libraryTracks: List<Track>) {
+        val selectedIndex = libraryTracks.indexOfFirst { it.id == track.id }
+        val queue = if (selectedIndex >= 0) libraryTracks.drop(selectedIndex) else listOf(track)
+        playTrack(track, queue)
+    }
     fun togglePlayPause() = togglePlayPauseUseCase()
     fun next() = skipNextUseCase()
     fun previous() = skipPreviousUseCase()
