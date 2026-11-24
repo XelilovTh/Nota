@@ -15,7 +15,7 @@ class PlaybackUseCasesTest {
     private class FakeRepository : PlaybackRepository {
         override val playbackState = MutableStateFlow(PlaybackState())
         val calls = mutableListOf<String>()
-        override fun playTrack(track: Track) { calls += "play:${track.id}" }
+        override fun playTrack(track: Track, queue: List<Track>) { calls += "play:${track.id}:${queue.joinToString(",") { it.id.toString() }}" }
         override fun togglePlayPause() { calls += "toggle" }
         override fun skipNext() { calls += "next" }
         override fun skipPrevious() { calls += "previous" }
@@ -27,13 +27,13 @@ class PlaybackUseCasesTest {
     @Test fun eachUseCaseDelegatesItsOperation() {
         val repository = FakeRepository()
         val track = Track(11L, Uri.parse("content://audio/11"), "Song", "Artist", "Album", 1L, "Music")
-        PlayTrackUseCase(repository)(track)
+        PlayTrackUseCase(repository)(track, listOf(track))
         TogglePlayPauseUseCase(repository)()
         SkipNextUseCase(repository)()
         SkipPreviousUseCase(repository)()
         SeekToUseCase(repository)(250L)
         ToggleShuffleUseCase(repository)()
         CycleRepeatModeUseCase(repository)()
-        assertEquals(listOf("play:11", "toggle", "next", "previous", "seek:250", "shuffle", "repeat"), repository.calls)
+        assertEquals(listOf("play:11:11", "toggle", "next", "previous", "seek:250", "shuffle", "repeat"), repository.calls)
     }
 }
