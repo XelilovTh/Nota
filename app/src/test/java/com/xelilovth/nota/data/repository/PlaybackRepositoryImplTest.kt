@@ -52,7 +52,7 @@ class PlaybackRepositoryImplTest {
 
     private class FakeLibraryRepository : LibraryRepository {
         override val tracks = MutableStateFlow(emptyList<Track>())
-        override suspend fun scan(): List<Track> = tracks.value
+        override suspend fun scan(force: Boolean): List<Track> = tracks.value
     }
 
     private val player: ExoPlayer = ExoPlayer.Builder(RuntimeEnvironment.getApplication()).build()

@@ -126,7 +126,7 @@ class HomeViewModelTest {
         val repository = FakeRepository()
         val library = object : LibraryRepository {
             override val tracks = MutableStateFlow(emptyList<Track>())
-            override suspend fun scan() = emptyList<Track>()
+            override suspend fun scan(force: Boolean) = emptyList<Track>()
         }
         val viewModel = HomeViewModel(
             ObserveTracksUseCase(library), repository,
@@ -147,7 +147,7 @@ class HomeViewModelTest {
             val libraryTracks = listOf(track(10), track(20), track(30))
             val library = object : LibraryRepository {
                 override val tracks = MutableStateFlow(libraryTracks)
-                override suspend fun scan() = libraryTracks
+                override suspend fun scan(force: Boolean) = libraryTracks
             }
             val favoritesRepo = object : com.xelilovth.nota.domain.repository.FavoritesRepository {
                 override fun observeFavoriteTrackIds() = MutableStateFlow(setOf(20L, 30L))
