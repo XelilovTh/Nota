@@ -1,6 +1,8 @@
 package com.xelilovth.nota.presentation.home
 
 import android.net.Uri
+import com.xelilovth.nota.domain.model.AutoPlaylist
+import com.xelilovth.nota.domain.model.PlaylistGroupType
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.PlaybackRepository
@@ -50,6 +52,68 @@ class HomeViewModelTest {
 
         assertEquals(listOf(11L), repository.played)
         assertEquals(listOf(11L, 12L), repository.queues.single())
+    }
+
+    @Test
+    fun playCollectionQueuesOnlyTracksFromSelectedCollection() {
+        val repository = FakeRepository()
+        val libraryTracks = listOf(track(11), track(12), track(13))
+        val library = object : LibraryRepository {
+            override val tracks = MutableStateFlow(libraryTracks)
+            override suspend fun scan() = libraryTracks
+        }
+        val viewModel = HomeViewModel(
+            ObserveTracksUseCase(library), repository,
+            PlayTrackUseCase(repository), ToggleShuffleUseCase(repository),
+        )
+        val collection = AutoPlaylist("album:test", "Test album", PlaylistGroupType.ALBUM, listOf(track(12), track(13)))
+
+        viewModel.playCollection(collection)
+
+        assertEquals(listOf(12L), repository.played)
+        assertEquals(listOf(12L, 13L), repository.queues.single())
+    }
+
+    @Test
+    fun playFromCollectionStartsAtSelectedTrackAndKeepsOnlyFollowingCollectionTracks() {
+        val repository = FakeRepository()
+        val libraryTracks = listOf(track(11), track(12), track(13))
+        val library = object : LibraryRepository {
+            override val tracks = MutableStateFlow(libraryTracks)
+            override suspend fun scan() = libraryTracks
+        }
+        val viewModel = HomeViewModel(
+            ObserveTracksUseCase(library), repository,
+            PlayTrackUseCase(repository), ToggleShuffleUseCase(repository),
+        )
+        val collection = AutoPlaylist("album:test", "Test album", PlaylistGroupType.ALBUM, listOf(track(11), track(12), track(13)))
+
+        viewModel.playFromCollection(track(12), collection)
+
+        assertEquals(listOf(12L), repository.played)
+        assertEquals(listOf(12L, 13L), repository.queues.single())
+    }
+
+    @Test
+    fun playCollectionWithShuffleUsesOnlyCollectionTracks() {
+        val repository = FakeRepository()
+        val libraryTracks = listOf(track(11), track(12), track(13))
+        val library = object : LibraryRepository {
+            override val tracks = MutableStateFlow(libraryTracks)
+            override suspend fun scan() = libraryTracks
+        }
+        val viewModel = HomeViewModel(
+            ObserveTracksUseCase(library), repository,
+            PlayTrackUseCase(repository), ToggleShuffleUseCase(repository),
+        )
+        val collection = AutoPlaylist("album:test", "Test album", PlaylistGroupType.ALBUM, listOf(track(12), track(13)))
+
+        viewModel.playCollection(collection, shuffle = true)
+
+        assertEquals(1, repository.played.size)
+        assertEquals(setOf(12L, 13L), repository.queues.single().toSet())
+        assertEquals(2, repository.queues.single().size)
+        assertEquals(repository.queues.single().first(), repository.played.single())
     }
 
     @Test

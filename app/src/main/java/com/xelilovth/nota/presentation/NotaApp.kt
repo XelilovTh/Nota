@@ -140,7 +140,7 @@ fun NotaApp() {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(AppRoute.HOME) { HomeScreen(navController, onPlayWithNotificationPermission = requestPlaybackPermission) }
-            composable(AppRoute.PLAYLISTS) { PlaylistsScreen() }
+            composable(AppRoute.PLAYLISTS) { PlaylistsScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.SEARCH) { SearchScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.LIBRARY) { LibraryScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.SETTINGS) {
