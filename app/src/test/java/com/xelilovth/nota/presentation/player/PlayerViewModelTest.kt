@@ -62,11 +62,30 @@ class PlayerViewModelTest {
         val libraryTracks = listOf(track(1L), track(2L), track(3L), track(4L))
         val selectedTrack = libraryTracks[2]
 
-        viewModel.play(selectedTrack, libraryTracks)
+        viewModel.onRowClick(selectedTrack, libraryTracks)
 
         assertEquals(selectedTrack, repository.playedTrack)
         assertEquals(listOf(3L, 4L), repository.playedQueue.map(Track::id))
         assertEquals("play:3:3,4", repository.calls.single())
+    }
+
+    @Test fun rowAndPlayIconSelectionProduceTheSamePlaybackStateAndQueue() {
+        val rowRepository = FakeRepository()
+        val iconRepository = FakeRepository()
+        val rowViewModel = viewModel(rowRepository)
+        val iconViewModel = viewModel(iconRepository)
+        val libraryTracks = listOf(track(1L), track(2L), track(3L), track(4L))
+        val selectedTrack = libraryTracks[2]
+
+        rowViewModel.onRowClick(selectedTrack, libraryTracks)
+        iconViewModel.onPlayIconClick(selectedTrack, libraryTracks)
+
+        assertEquals(rowRepository.playbackState.value, iconRepository.playbackState.value)
+        assertEquals(rowRepository.playedTrack, iconRepository.playedTrack)
+        assertEquals(rowRepository.playedQueue, iconRepository.playedQueue)
+        assertEquals(selectedTrack, rowRepository.playedQueue.first())
+        assertEquals(selectedTrack, iconRepository.playedQueue.first())
+        assertEquals(listOf(3L, 4L), rowRepository.playedQueue.map(Track::id))
     }
 
     @Test fun shuffleButtonTogglesOnAndOff() {

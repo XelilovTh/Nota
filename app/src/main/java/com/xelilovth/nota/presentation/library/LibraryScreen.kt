@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,7 +89,7 @@ fun LibraryScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(AppDimens.ScreenPadding),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                 ) {
-                    items(tracks, key = Track::id) { track -> TrackRow(track) { playerViewModel.play(track, tracks) } }
+                    items(tracks, key = Track::id) { track -> TrackRow(track) { playerViewModel.onRowClick(track, tracks) } }
                 }
             }
         }
@@ -149,13 +150,16 @@ private fun PermissionRequired(denied: Boolean, onRetry: () -> Unit) {
 
 @Composable
 private fun TrackRow(track: Track, onPlay: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.ElementSpacing)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onPlay).padding(vertical = AppDimens.ElementSpacing),
+    ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(track.title, style = MaterialTheme.typography.titleMedium)
             Text("${track.artist} · ${track.album}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             Text(track.folder, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         }
-        IconButton(onClick = onPlay) { Icon(Icons.Filled.PlayArrow, contentDescription = "Play ${track.title}") }
+        Icon(Icons.Filled.PlayArrow, contentDescription = "Play ${track.title}")
     }
 }
 
