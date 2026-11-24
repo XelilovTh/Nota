@@ -22,6 +22,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.xelilovth.nota.ui.components.PlaceholderScreen
+import com.xelilovth.nota.presentation.library.LibraryScreen
 
 private data class TabItem(
     val route: String,
@@ -72,7 +73,7 @@ fun NotaApp() {
                 PlaceholderScreen("Home", "Your music experience starts here.")
             }
             composable(AppRoute.LIBRARY) {
-                PlaceholderScreen("Library", "Your local music library will appear here.")
+                LibraryScreen()
             }
             composable(AppRoute.SEARCH) {
                 PlaceholderScreen("Search", "Find music in your collection.")
