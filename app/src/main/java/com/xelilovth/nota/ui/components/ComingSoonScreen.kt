@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import com.xelilovth.nota.ui.theme.AppDimens
 
 data class PlaceholderAction(val label: String, val onClick: () -> Unit)
