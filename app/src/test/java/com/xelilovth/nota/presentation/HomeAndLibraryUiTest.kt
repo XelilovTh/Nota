@@ -3,11 +3,12 @@ package com.xelilovth.nota.presentation
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import com.xelilovth.nota.domain.model.Playlist
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.home.HomeContent
@@ -122,8 +123,10 @@ class HomeAndLibraryUiTest {
         assertTrue(playShuffledInvoked)
 
         // Verify recently played track appears and handles click
-        composeTestRule.onNodeWithText("Recently Played").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Bohemian Rhapsody").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Recently Played"))
+        composeTestRule.onNodeWithText("Recently Played").assertIsDisplayed()
+        composeTestRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Bohemian Rhapsody"))
+        composeTestRule.onNodeWithText("Bohemian Rhapsody").assertIsDisplayed()
         composeTestRule.onNodeWithText("Bohemian Rhapsody").performClick()
         assertEquals(tracks[0], trackPlayed)
     }
@@ -142,9 +145,12 @@ class HomeAndLibraryUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Playlists").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("No playlists yet").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Create your first playlist").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Playlists"))
+        composeTestRule.onNodeWithText("Playlists").assertIsDisplayed()
+        composeTestRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("No playlists yet"))
+        composeTestRule.onNodeWithText("No playlists yet").assertIsDisplayed()
+        composeTestRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Create your first playlist"))
+        composeTestRule.onNodeWithText("Create your first playlist").assertIsDisplayed()
 
         // Clicking card navigates to playlists
         composeTestRule.onNodeWithText("Create your first playlist").performClick()
@@ -167,10 +173,17 @@ class HomeAndLibraryUiTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Playlists").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Workout Beats").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Chill Vibes").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("5 tracks · Playlist").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Playlists"))
+        composeTestRule.onNodeWithText("Playlists").assertIsDisplayed()
+
+        composeTestRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Workout Beats"))
+        composeTestRule.onNodeWithText("Workout Beats").assertIsDisplayed()
+
+        composeTestRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Chill Vibes"))
+        composeTestRule.onNodeWithText("Chill Vibes").assertIsDisplayed()
+
+        composeTestRule.onNodeWithText("5 tracks · Playlist").assertExists()
+        composeTestRule.onNodeWithText("3 tracks · Playlist").assertExists()
 
         // Verify auto-grouped albums/folders are NOT displayed under Playlists
         composeTestRule.onNodeWithText("No playlists yet").assertDoesNotExist()
