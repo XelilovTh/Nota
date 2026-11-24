@@ -15,16 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,7 +33,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.player.PlayerViewModel
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -58,7 +52,6 @@ fun LibraryScreen(
     var permissionDenied by remember { mutableStateOf(false) }
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
-    val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
@@ -91,45 +84,6 @@ fun LibraryScreen(
                 ) {
                     items(tracks, key = Track::id) { track -> TrackRow(track) { playerViewModel.onRowClick(track, tracks) } }
                 }
-            }
-        }
-        if (playbackState.track != null) PlaybackControls(playbackState, playerViewModel)
-    }
-}
-
-@Composable
-private fun PlaybackControls(state: PlaybackState, viewModel: PlayerViewModel) {
-    Column(modifier = Modifier.fillMaxWidth().padding(AppDimens.ScreenPadding)) {
-        Text(state.track?.title.orEmpty(), style = MaterialTheme.typography.titleMedium)
-        Text(state.track?.artist.orEmpty(), style = MaterialTheme.typography.bodySmall)
-        if (state.durationMs > 0L) {
-            Slider(
-                value = state.positionMs.coerceIn(0L, state.durationMs).toFloat(),
-                onValueChange = { viewModel.seek(it.toLong()) },
-                valueRange = 0f..state.durationMs.toFloat(),
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = viewModel::previous) { Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous") }
-            IconButton(onClick = viewModel::togglePlayPause) {
-                Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = "Play or pause")
-            }
-            IconButton(onClick = viewModel::next) { Icon(Icons.Filled.SkipNext, contentDescription = "Next") }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Button(onClick = viewModel::toggleShuffle) {
-                Text(if (state.shuffle) "Shuffle ON" else "Shuffle OFF")
-            }
-            Button(onClick = viewModel::cycleRepeatMode) {
-                Text("Repeat ${state.repeatMode.name}")
             }
         }
     }
