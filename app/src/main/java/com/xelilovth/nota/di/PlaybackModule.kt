@@ -1,10 +1,9 @@
 package com.xelilovth.nota.di
 
 import android.content.Context
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import com.xelilovth.nota.data.media.PlaybackPlayerHolder
 import com.xelilovth.nota.data.repository.PlaybackRepositoryImpl
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import dagger.Binds
@@ -21,12 +20,7 @@ import javax.inject.Singleton
 object PlaybackPlayerModule {
     @Provides
     @Singleton
-    @UnstableApi
-    fun provideExoPlayer(@ApplicationContext context: Context): ExoPlayer =
-        ExoPlayer.Builder(context).build().apply {
-            setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
-            setHandleAudioBecomingNoisy(true)
-        }
+    fun provideExoPlayer(@ApplicationContext context: Context): ExoPlayer = PlaybackPlayerHolder.get(context)
 }
 
 @UnstableApi
