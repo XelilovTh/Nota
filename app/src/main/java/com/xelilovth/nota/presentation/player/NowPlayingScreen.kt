@@ -1,27 +1,38 @@
 package com.xelilovth.nota.presentation.player
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.xelilovth.nota.domain.model.PlaybackState
+import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
@@ -32,41 +43,120 @@ fun NowPlayingScreen(
     onEqualizer: () -> Unit,
     onSleepTimer: () -> Unit,
     onLyrics: () -> Unit,
+    onSettings: () -> Unit,
 ) {
+    val duration = state.durationMs.coerceAtLeast(0L)
+    val sliderMax = duration.coerceAtLeast(1L).toFloat()
+    val position = state.positionMs.coerceIn(0L, duration)
+
     Column(
-        Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(AppDimens.ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
             Text("Now Playing", style = MaterialTheme.typography.headlineMedium)
         }
-        Text(state.track?.title ?: "No track selected", style = MaterialTheme.typography.headlineSmall)
-        Text(state.track?.artist.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (state.durationMs > 0L) {
-            Slider(
-                value = state.positionMs.coerceIn(0L, state.durationMs).toFloat(),
-                onValueChange = { viewModel.seek(it.toLong()) },
-                valueRange = 0f..state.durationMs.toFloat(),
+
+        Box(
+            modifier = Modifier.size(AppDimens.PlayerArtworkSize)
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(AppDimens.ShapeLarge),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.MusicNote,
+                contentDescription = "Album art placeholder",
+                modifier = Modifier.size(AppDimens.PlayerArtworkIconSize),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = viewModel::previous) { Icon(Icons.Filled.SkipPrevious, "Previous") }
-            IconButton(onClick = viewModel::togglePlayPause) {
-                Icon(if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    if (state.isPlaying) "Pause" else "Play")
+
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+        ) {
+            Text(
+                state.track?.title ?: "No track selected",
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+            )
+            Text(
+                state.track?.artist.orEmpty(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+
+        Column(Modifier.fillMaxWidth()) {
+            Slider(
+                value = position.toFloat(),
+                onValueChange = { viewModel.seek(it.toLong()) },
+                valueRange = 0f..sliderMax,
+                enabled = duration > 0L,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatPlaybackTime(position), style = MaterialTheme.typography.labelMedium)
+                Text(formatPlaybackTime(duration), style = MaterialTheme.typography.labelMedium)
             }
-            IconButton(onClick = viewModel::next) { Icon(Icons.Filled.SkipNext, "Next") }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Button(onClick = viewModel::toggleShuffle) { Text(if (state.shuffle) "Shuffle ON" else "Shuffle OFF") }
-            Button(onClick = viewModel::cycleRepeatMode) { Text("Repeat ${state.repeatMode.name}") }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.PlayerControlSpacing, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = viewModel::toggleShuffle) {
+                Icon(
+                    Icons.Filled.Shuffle,
+                    contentDescription = if (state.shuffle) "Shuffle on" else "Shuffle off",
+                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            IconButton(onClick = viewModel::previous) {
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous")
+            }
+            IconButton(onClick = viewModel::togglePlayPause) {
+                Icon(
+                    if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (state.isPlaying) "Pause" else "Play",
+                )
+            }
+            IconButton(onClick = viewModel::next) {
+                Icon(Icons.Filled.SkipNext, contentDescription = "Next")
+            }
+            IconButton(onClick = viewModel::cycleRepeatMode) {
+                Icon(
+                    if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                    contentDescription = "Repeat ${state.repeatMode.name.lowercase()}",
+                    tint = if (state.repeatMode == RepeatMode.OFF) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.primary,
+                )
+            }
         }
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Button(onClick = onEqualizer) { Text("Equalizer") }
-            Button(onClick = onSleepTimer) { Text("Sleep Timer") }
-            Button(onClick = onLyrics) { Text("Lyrics") }
+            TextButton(onClick = onLyrics, modifier = Modifier.weight(1f)) { Text("Lyrics") }
+            TextButton(onClick = onEqualizer, modifier = Modifier.weight(1f)) { Text("EQ") }
+            TextButton(
+                onClick = onSleepTimer,
+                modifier = Modifier.weight(1f),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = AppDimens.PlayerActionHorizontalPadding),
+            ) { Text("Sleep Timer", maxLines = 1) }
+            TextButton(onClick = onSettings, modifier = Modifier.weight(1f)) { Text("Settings") }
         }
     }
+}
+
+private fun formatPlaybackTime(positionMs: Long): String {
+    val totalSeconds = positionMs.coerceAtLeast(0L) / 1_000L
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
 }

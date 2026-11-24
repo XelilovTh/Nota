@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xelilovth.nota.domain.model.filterTracks
 import com.xelilovth.nota.presentation.home.CompactTrackRow
 import com.xelilovth.nota.presentation.home.HomeViewModel
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -27,16 +28,39 @@ import com.xelilovth.nota.ui.theme.AppDimens
 fun SearchScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
-    val results = remember(tracks, query) {
-        tracks.filter { it.title.contains(query, true) || it.artist.contains(query, true) ||
-            it.album.contains(query, true) || it.folder.contains(query, true) }
-    }
-    Column(Modifier.fillMaxSize().padding(AppDimens.ScreenPadding), verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
+    val results = remember(tracks, query) { filterTracks(tracks, query) }
+
+    Column(
+        Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+    ) {
         Text("Search", style = MaterialTheme.typography.headlineMedium)
-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), label = { Text("Search your music") }, singleLine = true)
-        LazyColumn(contentPadding = PaddingValues(vertical = AppDimens.ElementSpacing),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
-            items(results, key = { it.id }) { track -> CompactTrackRow(track) { viewModel.play(track) } }
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Search title, artist or album") },
+            singleLine = true,
+        )
+        when {
+            tracks.isEmpty() -> Text(
+                "Your library is empty",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            results.isEmpty() -> Text(
+                "No results found",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            else -> LazyColumn(
+                contentPadding = PaddingValues(vertical = AppDimens.ElementSpacing),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+            ) {
+                items(results, key = { it.id }) { track ->
+                    CompactTrackRow(track) { viewModel.play(track) }
+                }
+            }
         }
     }
 }

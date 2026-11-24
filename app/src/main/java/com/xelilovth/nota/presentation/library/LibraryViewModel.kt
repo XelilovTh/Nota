@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.usecase.ObserveTracksUseCase
+import com.xelilovth.nota.domain.usecase.PlayTrackUseCase
 import com.xelilovth.nota.domain.usecase.ScanLibraryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -16,6 +17,7 @@ import kotlinx.coroutines.launch
 class LibraryViewModel @Inject constructor(
     observeTracks: ObserveTracksUseCase,
     private val scanLibrary: ScanLibraryUseCase,
+    private val playTrack: PlayTrackUseCase,
 ) : ViewModel() {
     val tracks: StateFlow<List<Track>> = observeTracks()
 
@@ -32,5 +34,12 @@ class LibraryViewModel @Inject constructor(
                 _isScanning.value = false
             }
         }
+    }
+
+    fun onTrackSelected(track: Track) {
+        val libraryTracks = tracks.value
+        val selectedIndex = libraryTracks.indexOfFirst { it.id == track.id }
+        val queue = if (selectedIndex >= 0) libraryTracks.drop(selectedIndex) else listOf(track)
+        playTrack(track, queue)
     }
 }

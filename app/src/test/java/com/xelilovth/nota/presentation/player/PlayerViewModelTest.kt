@@ -30,7 +30,7 @@ class PlayerViewModelTest {
         override fun togglePlayPause() { calls += "toggle" }
         override fun skipNext() { calls += "next" }
         override fun skipPrevious() { calls += "previous" }
-        override fun seekTo(positionMs: Long) { calls += "seek:$positionMs" }
+        override fun seekTo(positionMs: Long) { playbackState.value = playbackState.value.copy(positionMs = positionMs); calls += "seek:$positionMs" }
         override fun toggleShuffle() {
             playbackState.value = playbackState.value.copy(shuffle = !playbackState.value.shuffle)
             calls += "shuffle"
@@ -122,6 +122,7 @@ class PlayerViewModelTest {
         viewModel.seek(420L)
 
         assertEquals(listOf("toggle", "next", "previous", "seek:420"), repository.calls)
+        assertEquals(420L, viewModel.playbackState.value.positionMs)
         assertEquals(repository.playbackState, viewModel.playbackState)
     }
 }

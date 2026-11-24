@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -32,7 +33,6 @@ import com.xelilovth.nota.presentation.player.PlayerViewModel
 import com.xelilovth.nota.presentation.search.SearchScreen
 import com.xelilovth.nota.ui.components.ComingSoonScreen
 import com.xelilovth.nota.ui.components.PlaceholderAction
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private data class TabItem(
     val route: String,
@@ -122,6 +122,7 @@ fun NotaApp() {
                     onEqualizer = { navController.navigate(AppRoute.EQUALIZER) },
                     onSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
                     onLyrics = { navController.navigate(AppRoute.LYRICS) },
+                    onSettings = { navController.navigate(AppRoute.SETTINGS) },
                 )
             }
         }
