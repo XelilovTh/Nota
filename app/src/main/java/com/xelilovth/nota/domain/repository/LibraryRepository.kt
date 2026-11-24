@@ -5,5 +5,5 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface LibraryRepository {
     val tracks: StateFlow<List<Track>>
-    suspend fun scan(): List<Track>
+    suspend fun scan(force: Boolean = false): List<Track>
 }

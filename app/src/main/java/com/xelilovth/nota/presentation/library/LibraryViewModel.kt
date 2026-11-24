@@ -45,12 +45,13 @@ class LibraryViewModel @Inject constructor(
         ?.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         ?: MutableStateFlow(emptyList())
 
-    fun scan() {
+    fun scan(force: Boolean = false) {
         if (_isScanning.value) return
+        if (!force && tracks.value.isNotEmpty()) return
         viewModelScope.launch {
             _isScanning.value = true
             try {
-                scanLibrary()
+                scanLibrary(force)
             } finally {
                 _isScanning.value = false
             }

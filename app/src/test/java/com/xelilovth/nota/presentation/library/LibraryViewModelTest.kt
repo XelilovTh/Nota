@@ -18,7 +18,13 @@ import org.robolectric.RobolectricTestRunner
 class LibraryViewModelTest {
     private class FakeLibraryRepository(initialTracks: List<Track>) : LibraryRepository {
         override val tracks = MutableStateFlow(initialTracks)
-        override suspend fun scan(): List<Track> = tracks.value
+        var scanCallCount = 0
+        var lastForce: Boolean? = null
+        override suspend fun scan(force: Boolean): List<Track> {
+            scanCallCount++
+            lastForce = force
+            return tracks.value
+        }
     }
 
     private class FakePlaybackRepository : PlaybackRepository {
@@ -112,5 +118,24 @@ class LibraryViewModelTest {
 
         assertEquals(listOf(1L), favCalls)
         assertEquals(listOf("add:10:1"), playlistCalls)
+    }
+
+    @Test
+    fun scanSkipsWhenAlreadyHasTracksAndNotForced() {
+        val libraryTracks = listOf(track(1L))
+        val libraryRepository = FakeLibraryRepository(libraryTracks)
+        val playbackRepository = FakePlaybackRepository()
+        val viewModel = LibraryViewModel(
+            ObserveTracksUseCase(libraryRepository),
+            ScanLibraryUseCase(libraryRepository),
+            PlayTrackUseCase(playbackRepository),
+        )
+
+        viewModel.scan(force = false)
+        assertEquals(0, libraryRepository.scanCallCount)
+
+        viewModel.scan(force = true)
+        assertEquals(1, libraryRepository.scanCallCount)
+        assertEquals(true, libraryRepository.lastForce)
     }
 }

@@ -34,7 +34,7 @@ object AppDimens {
     val TransportIconSize = 32.dp
     val LargeIconControlSize = 48.dp
     val MiniPlayerProgressBarHeight = 3.dp
-    val MiniPlayerElevation = 4.dp
+    val MiniPlayerElevation = 6.dp
     val QueueItemPadding = 8.dp
     val ElevationNone = 0.dp
     val ElevationSmall = 4.dp

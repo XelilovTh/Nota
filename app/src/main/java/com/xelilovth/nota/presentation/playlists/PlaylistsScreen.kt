@@ -106,13 +106,11 @@ fun PlaylistsContent(
     var customNames by remember(initialPlaylists) { mutableStateOf(initialPlaylists) }
 
     val displayPlaylists = remember(playlists, customNames) {
-        if (playlists.isNotEmpty()) {
-            playlists
-        } else {
-            customNames.mapIndexed { index, name ->
-                Playlist(id = (index + 1).toLong(), name = name, trackCount = 0)
+        val customOnly = customNames.filter { cn -> playlists.none { it.name == cn } }
+            .mapIndexed { index, name ->
+                Playlist(id = -(index + 1).toLong(), name = name, trackCount = 0)
             }
-        }
+        playlists + customOnly
     }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -129,7 +127,7 @@ fun PlaylistsContent(
             Tab(
                 selected = selectedTabIndex == 1,
                 onClick = { selectedTabIndex = 1 },
-                text = { Text("Collections") },
+                text = { Text("Albums & Folders") },
             )
         }
 
@@ -384,7 +382,7 @@ private fun CollectionsContent(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("No collections yet", style = MaterialTheme.typography.titleLarge)
+            Text("No albums or folders yet", style = MaterialTheme.typography.titleLarge)
             Text(
                 "Albums and folders from your local music library will appear here.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -398,7 +396,7 @@ private fun CollectionsContent(
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
-                    Text("Collections", style = MaterialTheme.typography.headlineMedium)
+                    Text("Albums & Folders", style = MaterialTheme.typography.headlineMedium)
                     Text(
                         "Albums and folders found in your music library",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -453,7 +451,7 @@ private fun CollectionDetail(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to collections")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to albums and folders")
                 }
                 Column(Modifier.weight(1f)) {
                     Text(group.title, style = MaterialTheme.typography.headlineSmall)

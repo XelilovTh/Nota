@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
     ) { /* Permission result callback */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.Theme_Nota)
         super.onCreate(savedInstanceState)
         requestNotificationPermission()
         setContent { NotaTheme { NotaApp() } }

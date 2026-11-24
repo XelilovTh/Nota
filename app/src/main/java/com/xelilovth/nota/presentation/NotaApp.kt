@@ -43,7 +43,7 @@ import com.xelilovth.nota.presentation.player.NowPlayingScreen
 import com.xelilovth.nota.presentation.player.PlayerViewModel
 import com.xelilovth.nota.presentation.search.SearchScreen
 import com.xelilovth.nota.ui.components.ComingSoonScreen
-import com.xelilovth.nota.ui.components.PlaceholderAction
+import com.xelilovth.nota.presentation.settings.SettingsScreen
 
 private data class TabItem(
     val route: String,
@@ -144,14 +144,11 @@ fun NotaApp() {
             composable(AppRoute.SEARCH) { SearchScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.LIBRARY) { LibraryScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.SETTINGS) {
-                ComingSoonScreen(
-                    title = "Settings",
+                SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    actions = listOf(
-                        PlaceholderAction("Equalizer") { navController.navigate(AppRoute.EQUALIZER) },
-                        PlaceholderAction("Sleep Timer") { navController.navigate(AppRoute.SLEEP_TIMER) },
-                        PlaceholderAction("Lyrics") { navController.navigate(AppRoute.LYRICS) },
-                    ),
+                    onNavigateToEqualizer = { navController.navigate(AppRoute.EQUALIZER) },
+                    onNavigateToSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
+                    onNavigateToLyrics = { navController.navigate(AppRoute.LYRICS) },
                 )
             }
             composable(AppRoute.EQUALIZER) {
@@ -168,6 +165,7 @@ fun NotaApp() {
                     state = playbackState,
                     viewModel = playerViewModel,
                     onBack = { navController.popBackStack() },
+                    onSearch = { navController.navigate(AppRoute.SEARCH) },
                     onEqualizer = { navController.navigate(AppRoute.EQUALIZER) },
                     onSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
                     onLyrics = { navController.navigate(AppRoute.LYRICS) },

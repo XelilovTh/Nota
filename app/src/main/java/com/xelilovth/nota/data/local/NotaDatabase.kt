@@ -11,14 +11,16 @@ import androidx.room.RoomDatabase
         PlaylistTrackCrossRef::class,
         FavoriteEntity::class,
         PlayHistoryEntity::class,
+        TrackEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class NotaDatabase : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
     abstract fun favoriteDao(): FavoriteDao
     abstract fun historyDao(): HistoryDao
+    abstract fun trackDao(): TrackDao
 
     companion object {
         const val DATABASE_NAME = "nota.db"

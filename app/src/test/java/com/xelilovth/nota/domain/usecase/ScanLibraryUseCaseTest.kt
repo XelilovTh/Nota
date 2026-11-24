@@ -27,18 +27,21 @@ class ScanLibraryUseCaseTest {
             ),
         )
         var scanCalled = false
+        var passedForce: Boolean? = null
         val repository = object : LibraryRepository {
             override val tracks = MutableStateFlow(emptyList<Track>())
-            override suspend fun scan(): List<Track> {
+            override suspend fun scan(force: Boolean): List<Track> {
                 scanCalled = true
+                passedForce = force
                 tracks.value = expected
                 return expected
             }
         }
 
-        val result = ScanLibraryUseCase(repository)()
+        val result = ScanLibraryUseCase(repository)(force = true)
 
         assertTrue(scanCalled)
+        assertEquals(true, passedForce)
         assertEquals(expected, result)
         assertEquals(expected, repository.tracks.value)
     }

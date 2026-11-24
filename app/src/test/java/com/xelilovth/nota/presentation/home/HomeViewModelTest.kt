@@ -44,7 +44,7 @@ class HomeViewModelTest {
         val libraryTracks = listOf(track(11), track(12))
         val library = object : LibraryRepository {
             override val tracks = MutableStateFlow(libraryTracks)
-            override suspend fun scan() = libraryTracks
+            override suspend fun scan(force: Boolean) = libraryTracks
         }
         val viewModel = HomeViewModel(
             ObserveTracksUseCase(library),
@@ -65,7 +65,7 @@ class HomeViewModelTest {
         val libraryTracks = listOf(track(11), track(12), track(13))
         val library = object : LibraryRepository {
             override val tracks = MutableStateFlow(libraryTracks)
-            override suspend fun scan() = libraryTracks
+            override suspend fun scan(force: Boolean) = libraryTracks
         }
         val viewModel = HomeViewModel(
             ObserveTracksUseCase(library), repository,
@@ -85,7 +85,7 @@ class HomeViewModelTest {
         val libraryTracks = listOf(track(11), track(12), track(13))
         val library = object : LibraryRepository {
             override val tracks = MutableStateFlow(libraryTracks)
-            override suspend fun scan() = libraryTracks
+            override suspend fun scan(force: Boolean) = libraryTracks
         }
         val viewModel = HomeViewModel(
             ObserveTracksUseCase(library), repository,
@@ -105,7 +105,7 @@ class HomeViewModelTest {
         val libraryTracks = listOf(track(11), track(12), track(13))
         val library = object : LibraryRepository {
             override val tracks = MutableStateFlow(libraryTracks)
-            override suspend fun scan() = libraryTracks
+            override suspend fun scan(force: Boolean) = libraryTracks
         }
         val viewModel = HomeViewModel(
             ObserveTracksUseCase(library), repository,

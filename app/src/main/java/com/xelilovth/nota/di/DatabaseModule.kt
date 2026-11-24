@@ -5,6 +5,7 @@ import com.xelilovth.nota.data.local.FavoriteDao
 import com.xelilovth.nota.data.local.HistoryDao
 import com.xelilovth.nota.data.local.NotaDatabase
 import com.xelilovth.nota.data.local.PlaylistDao
+import com.xelilovth.nota.data.local.TrackDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -40,5 +41,11 @@ object DatabaseModule {
     @Singleton
     fun provideHistoryDao(database: NotaDatabase): HistoryDao {
         return database.historyDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTrackDao(database: NotaDatabase): TrackDao {
+        return database.trackDao()
     }
 }

@@ -68,10 +68,14 @@ fun LibraryScreen(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
         permissionDenied = !granted
-        if (granted) viewModel.scan()
+        if (granted) viewModel.scan(force = false)
     }
-    LaunchedEffect(Unit) {
-        if (hasPermission) viewModel.scan() else permissionLauncher.launch(permission)
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) {
+            viewModel.scan(force = false)
+        } else {
+            permissionLauncher.launch(permission)
+        }
     }
 
     LibraryContent(
@@ -81,7 +85,7 @@ fun LibraryScreen(
         permissionDenied = permissionDenied,
         favoriteTrackIds = favoriteTrackIds,
         onTrackClick = { track -> onPlayWithNotificationPermission { viewModel.onTrackSelected(track) } },
-        onScanAgain = viewModel::scan,
+        onScanAgain = { viewModel.scan(force = true) },
         onRequestPermission = { permissionLauncher.launch(permission) },
         onToggleFavorite = viewModel::toggleFavorite,
         onAddToPlaylist = { trackToAddToPlaylist = it },

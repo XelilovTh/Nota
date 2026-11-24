@@ -88,7 +88,7 @@ class PlaylistsViewModelTest {
 
     private class FakeLibraryRepository(initialTracks: List<Track>) : LibraryRepository {
         override val tracks = MutableStateFlow(initialTracks)
-        override suspend fun scan(): List<Track> = tracks.value
+        override suspend fun scan(force: Boolean): List<Track> = tracks.value
     }
 
     private fun track(id: Long) = Track(

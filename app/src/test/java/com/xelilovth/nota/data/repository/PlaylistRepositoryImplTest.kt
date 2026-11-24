@@ -27,7 +27,7 @@ class PlaylistRepositoryImplTest {
 
     private val fakeLibraryRepository = object : LibraryRepository {
         override val tracks: StateFlow<List<Track>> = tracksState
-        override suspend fun scan(): List<Track> = tracksState.value
+        override suspend fun scan(force: Boolean): List<Track> = tracksState.value
     }
 
     @Before

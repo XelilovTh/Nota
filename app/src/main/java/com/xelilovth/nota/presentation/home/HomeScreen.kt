@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
@@ -43,10 +44,8 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.Playlist
 import com.xelilovth.nota.domain.model.Track
-import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
 import com.xelilovth.nota.presentation.AppRoute
 import com.xelilovth.nota.presentation.library.LibraryViewModel
 import com.xelilovth.nota.ui.components.TrackCover
@@ -73,10 +72,14 @@ fun HomeScreen(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
         permissionDenied = !granted
-        if (granted) libraryViewModel.scan()
+        if (granted) libraryViewModel.scan(force = false)
     }
-    LaunchedEffect(Unit) {
-        if (hasPermission) libraryViewModel.scan() else permissionLauncher.launch(permission)
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) {
+            libraryViewModel.scan(force = false)
+        } else {
+            permissionLauncher.launch(permission)
+        }
     }
 
     HomeContent(
@@ -94,7 +97,7 @@ fun HomeScreen(
         onNavigateToSearch = { navController.navigate(AppRoute.homeActionRoute("search") ?: AppRoute.SEARCH) },
         onNavigateToSettings = { navController.navigate(AppRoute.homeActionRoute("settings") ?: AppRoute.SETTINGS) },
         onNavigateToPlaylists = { navController.navigate(AppRoute.PLAYLISTS) },
-        onScanAgain = libraryViewModel::scan,
+        onScanAgain = { libraryViewModel.scan(force = true) },
         onRequestPermission = { permissionLauncher.launch(permission) },
     )
 }
@@ -118,8 +121,6 @@ fun HomeContent(
     onScanAgain: () -> Unit = {},
     onRequestPermission: () -> Unit = {},
 ) {
-    val groups = remember(tracks) { groupTracksIntoPlaylists(tracks) }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(AppDimens.ScreenPadding),
@@ -219,13 +220,48 @@ fun HomeContent(
                 }
             }
 
-            if (playlists.isNotEmpty()) {
-                items(playlists.take(3), key = { "custom_playlist:${it.id}" }) { playlist ->
+            if (playlists.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToPlaylists() },
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(AppDimens.CardPadding),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                            ) {
+                                Text(
+                                    "No playlists yet",
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    "Create your first playlist",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(onClick = onNavigateToPlaylists) {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = "Create playlist",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                items(playlists.take(5), key = { "custom_playlist:${it.id}" }) { playlist ->
                     CustomPlaylistRow(playlist) { onNavigateToPlaylists() }
                 }
-            }
-            items(groups.take(3), key = AutoPlaylist::id) { group ->
-                PlaylistGroupRow(group) { onNavigateToPlaylists() }
             }
         }
     }
@@ -295,26 +331,3 @@ internal fun CustomPlaylistRow(playlist: Playlist, onClick: () -> Unit) {
     }
 }
 
-@Composable
-internal fun PlaylistGroupRow(group: AutoPlaylist, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(
-            Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-        ) {
-            TrackCover(
-                track = group.tracks.firstOrNull(),
-                size = AppDimens.CoverSizeMedium,
-            )
-            Column(Modifier.weight(1f)) {
-                Text(group.title, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "${group.tracks.size} tracks · ${group.type.name.lowercase()}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-    }
-}

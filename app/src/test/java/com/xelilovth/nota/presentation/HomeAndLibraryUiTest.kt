@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.xelilovth.nota.domain.model.Playlist
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.home.HomeContent
 import com.xelilovth.nota.presentation.library.LibraryContent
@@ -124,5 +125,53 @@ class HomeAndLibraryUiTest {
         composeTestRule.onNodeWithText("Bohemian Rhapsody").assertIsDisplayed()
         composeTestRule.onNodeWithText("Bohemian Rhapsody").performClick()
         assertEquals(tracks[0], trackPlayed)
+    }
+
+    @Test
+    fun homeContent_emptyPlaylists_showsEncouragingCardAndNavigates() {
+        val tracks = sampleTracks()
+        var navigatedToPlaylists = false
+
+        composeTestRule.setContent {
+            HomeContent(
+                tracks = tracks,
+                playlists = emptyList(),
+                hasPermission = true,
+                onNavigateToPlaylists = { navigatedToPlaylists = true },
+            )
+        }
+
+        composeTestRule.onNodeWithText("Playlists").assertIsDisplayed()
+        composeTestRule.onNodeWithText("No playlists yet").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Create your first playlist").assertIsDisplayed()
+
+        // Clicking card navigates to playlists
+        composeTestRule.onNodeWithText("Create your first playlist").performClick()
+        assertTrue(navigatedToPlaylists)
+    }
+
+    @Test
+    fun homeContent_withPlaylists_showsOnlyUserPlaylists() {
+        val tracks = sampleTracks()
+        val playlists = listOf(
+            Playlist(id = 1L, name = "Workout Beats", trackCount = 5),
+            Playlist(id = 2L, name = "Chill Vibes", trackCount = 3),
+        )
+
+        composeTestRule.setContent {
+            HomeContent(
+                tracks = tracks,
+                playlists = playlists,
+                hasPermission = true,
+            )
+        }
+
+        composeTestRule.onNodeWithText("Playlists").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Workout Beats").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Chill Vibes").assertIsDisplayed()
+        composeTestRule.onNodeWithText("5 tracks · Playlist").assertIsDisplayed()
+
+        // Verify auto-grouped albums/folders are NOT displayed under Playlists
+        composeTestRule.onNodeWithText("No playlists yet").assertDoesNotExist()
     }
 }

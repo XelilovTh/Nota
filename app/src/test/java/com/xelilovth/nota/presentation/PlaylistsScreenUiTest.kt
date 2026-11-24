@@ -98,4 +98,33 @@ class PlaylistsScreenUiTest {
         composeTestRule.onNodeWithText("Never Created").assertDoesNotExist()
         assertNull(createdPlaylistName)
     }
+
+    @Test
+    fun albumsAndFoldersTab_displaysDeviceAlbumsAndFolders() {
+        val tracks = listOf(
+            com.xelilovth.nota.domain.model.Track(
+                id = 1L,
+                uri = android.net.Uri.parse("content://audio/1"),
+                title = "Song A",
+                artist = "Artist A",
+                album = "Greatest Hits",
+                durationMs = 200000L,
+                folder = "Music",
+            )
+        )
+
+        composeTestRule.setContent {
+            PlaylistsContent(
+                tracks = tracks,
+                initialPlaylists = emptyList(),
+            )
+        }
+
+        // Tap Albums & Folders tab
+        composeTestRule.onNodeWithText("Albums & Folders").performClick()
+
+        // Assert Albums & Folders content
+        composeTestRule.onNodeWithText("Greatest Hits").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1 tracks · Album").assertIsDisplayed()
+    }
 }

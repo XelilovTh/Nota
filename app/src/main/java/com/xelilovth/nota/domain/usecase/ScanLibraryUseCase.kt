@@ -7,5 +7,5 @@ import javax.inject.Inject
 class ScanLibraryUseCase @Inject constructor(
     private val repository: LibraryRepository,
 ) {
-    suspend operator fun invoke(): List<Track> = repository.scan()
+    suspend operator fun invoke(force: Boolean = false): List<Track> = repository.scan(force)
 }

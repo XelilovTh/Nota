@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#DCD2C4</color>
+    <color name="nota_warm_beige">#DCD2C4</color>
+    <color name="nota_terracotta">#DE6B48</color>
+    <color name="nota_surface">#ECE4D8</color>
+    <color name="nota_surface_variant">#D6CBC0</color>
+    <color name="nota_primary_container">#F6D4CA</color>
+    <color name="nota_dark">#2B2621</color>
+    <color name="nota_white">#FFFFFF</color>
+</resources>
