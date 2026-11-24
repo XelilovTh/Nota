@@ -29,6 +29,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: Build, lint and test
         run: ./gradlew --no-daemon assembleDebug lint testDebugUnitTest
+      - name: Test failure diagnostics
+        if: failure()
+        run: ./gradlew --no-daemon testDebugUnitTest --stacktrace --info
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
