@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -21,8 +24,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.filterTracks
 import com.xelilovth.nota.presentation.home.CompactTrackRow
 import com.xelilovth.nota.presentation.home.HomeViewModel
@@ -70,12 +75,20 @@ fun SearchScreen(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            else -> LazyColumn(
-                contentPadding = PaddingValues(vertical = AppDimens.ElementSpacing),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-            ) {
-                items(results, key = { it.id }, contentType = { "track" }) { track ->
-                    CompactTrackRow(track) { onPlayWithNotificationPermission { viewModel.play(track) } }
+            else -> {
+                val listState = rememberLazyListState()
+                val playIconPainter = rememberVectorPainter(Icons.Filled.PlayArrow)
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(vertical = AppDimens.ElementSpacing),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    items(results, key = Track::id, contentType = { "track" }) { track ->
+                        CompactTrackRow(
+                            track = track,
+                            playIconPainter = playIconPainter,
+                        ) { onPlayWithNotificationPermission { viewModel.play(track) } }
+                    }
                 }
             }
         }

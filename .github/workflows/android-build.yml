@@ -28,7 +28,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
       - name: Build, lint and test
-        run: ./gradlew --no-daemon assembleDebug lint testDebugUnitTest
+        run: ./gradlew --no-daemon assembleDebug assembleRelease lint testDebugUnitTest
       - name: Test failure diagnostics
         if: failure()
         run: ./gradlew --no-daemon testDebugUnitTest --stacktrace --info
@@ -48,5 +48,12 @@ jobs:
         with:
           name: nota-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nota-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14

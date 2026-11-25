@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -29,7 +30,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -87,13 +91,22 @@ fun LibraryScreen(
                     Text("Scan again")
                 }
             }
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(AppDimens.ScreenPadding),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-            ) {
-                items(tracks, key = Track::id, contentType = { "track" }) { track ->
-                    TrackRow(track) { onPlayWithNotificationPermission { viewModel.onTrackSelected(track) } }
+            else -> {
+                val listState = rememberLazyListState()
+                val playIconPainter = rememberVectorPainter(Icons.Filled.PlayArrow)
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    items(tracks, key = Track::id, contentType = { "track" }) { track ->
+                        TrackRow(
+                            track = track,
+                            playIconPainter = playIconPainter,
+                            onPlay = { onPlayWithNotificationPermission { viewModel.onTrackSelected(track) } },
+                        )
+                    }
                 }
             }
         }
@@ -101,7 +114,11 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun TrackRow(track: Track, onPlay: () -> Unit) {
+private fun TrackRow(
+    track: Track,
+    playIconPainter: Painter,
+    onPlay: () -> Unit,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
@@ -109,15 +126,28 @@ private fun TrackRow(track: Track, onPlay: () -> Unit) {
             .padding(vertical = AppDimens.ElementSpacing),
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(track.title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                track.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 "${track.artist} · ${track.album}",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Text(track.folder, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+            Text(
+                track.folder,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        Icon(Icons.Filled.PlayArrow, contentDescription = "Play ${track.title}")
+        Icon(painter = playIconPainter, contentDescription = null)
     }
 }
 

@@ -3,24 +3,39 @@ package com.xelilovth.nota.data.media
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.xelilovth.nota.MainActivity
 import com.xelilovth.nota.R
 
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
-    private val playerErrorListener = object : Player.Listener {
+    private val playerListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            refreshMediaNotification(startInForegroundRequired = isPlaying)
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            refreshMediaNotification(startInForegroundRequired = mediaSession?.player?.playWhenReady == true)
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            refreshMediaNotification(startInForegroundRequired = mediaSession?.player?.playWhenReady == true)
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             handlePlayerError()
         }
@@ -37,13 +52,25 @@ class PlaybackService : MediaSessionService() {
                 .build(),
         )
         val player = PlaybackPlayerHolder.get(applicationContext)
-        player.addListener(playerErrorListener)
-        mediaSession = MediaSession.Builder(this, player).build()
+        player.addListener(playerListener)
+        val sessionActivityIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        mediaSession = MediaSession.Builder(this, player)
+            .setSessionActivity(sessionActivityIntent)
+            .build()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundCompat(buildNotification(getString(R.string.notification_channel_playback)))
-        return super.onStartCommand(intent, flags, startId)
+        val result = super.onStartCommand(intent, flags, startId)
+        refreshMediaNotification(startInForegroundRequired = true)
+        return result
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
@@ -101,8 +128,15 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    private fun refreshMediaNotification(startInForegroundRequired: Boolean) {
+        val session = mediaSession ?: return
+        if (session.player.mediaItemCount > 0) {
+            onUpdateNotification(session, startInForegroundRequired)
+        }
+    }
+
     override fun onDestroy() {
-        PlaybackPlayerHolder.get(applicationContext).removeListener(playerErrorListener)
+        PlaybackPlayerHolder.get(applicationContext).removeListener(playerListener)
         mediaSession?.release()
         mediaSession = null
         // The application-scoped player is shared with PlaybackRepositoryImpl.
