@@ -2,6 +2,7 @@ package com.xelilovth.nota.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.PlaybackRepository
