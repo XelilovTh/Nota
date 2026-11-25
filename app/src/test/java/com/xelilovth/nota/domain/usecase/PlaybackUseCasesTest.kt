@@ -22,6 +22,7 @@ class PlaybackUseCasesTest {
         override fun seekTo(positionMs: Long) { calls += "seek:$positionMs" }
         override fun toggleShuffle() { calls += "shuffle" }
         override fun cycleRepeatMode() { calls += "repeat" }
+        override fun stopPlayback() { calls += "stop" }
     }
 
     @Test fun eachUseCaseDelegatesItsOperation() {
