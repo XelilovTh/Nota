@@ -12,10 +12,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,7 +35,17 @@ fun SearchScreen(
 ) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
-    val results = remember(tracks, query) { filterTracks(tracks, query) }
+    var results by remember(tracks) { mutableStateOf(tracks) }
+    LaunchedEffect(tracks, query) {
+        if (query.isBlank()) {
+            results = tracks
+        } else {
+            delay(80L)
+            results = withContext(Dispatchers.Default) {
+                filterTracks(tracks, query)
+            }
+        }
+    }
 
     Column(
         Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
@@ -60,7 +74,7 @@ fun SearchScreen(
                 contentPadding = PaddingValues(vertical = AppDimens.ElementSpacing),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
-                items(results, key = { it.id }) { track ->
+                items(results, key = { it.id }, contentType = { "track" }) { track ->
                     CompactTrackRow(track) { onPlayWithNotificationPermission { viewModel.play(track) } }
                 }
             }

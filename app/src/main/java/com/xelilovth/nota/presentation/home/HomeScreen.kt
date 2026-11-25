@@ -69,7 +69,7 @@ fun HomeScreen(
         if (granted) libraryViewModel.scan()
     }
     LaunchedEffect(Unit) {
-        if (hasPermission) libraryViewModel.scan() else permissionLauncher.launch(permission)
+        if (hasPermission) libraryViewModel.scanIfEmpty() else permissionLauncher.launch(permission)
     }
     val groups = remember(tracks) { groupTracksIntoPlaylists(tracks) }
 

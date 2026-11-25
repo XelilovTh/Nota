@@ -115,4 +115,27 @@ class PlaybackRepositoryImplTest {
         assertFalse(repository.playbackState.value.isPlaying)
         assertEquals("decoder exploded", repository.playbackState.value.errorMessage)
     }
+
+    @Test
+    fun startForegroundServiceIllegalStateDoesNotCrashPlayTrack() {
+        val throwingContext = object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+            override fun startForegroundService(service: Intent): ComponentName {
+                throw IllegalStateException("Background start not allowed")
+            }
+        }
+        val repository = PlaybackRepositoryImpl(throwingContext, player, FakeLibraryRepository())
+        val track = Track(
+            3L,
+            Uri.parse("content://audio/3"),
+            "Resilient Song",
+            "Artist",
+            "Album",
+            1_000L,
+            "Music",
+        )
+
+        repository.playTrack(track, listOf(track))
+
+        assertEquals("3", player.currentMediaItem?.mediaId)
+    }
 }

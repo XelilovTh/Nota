@@ -77,25 +77,27 @@ fun NotaApp() {
         pendingPlaybackAction = null
         action?.invoke()
     }
-    val requestPlaybackPermission: (() -> Unit) -> Unit = { action ->
-        val permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) == PackageManager.PERMISSION_GRANTED
-        if (permissionGranted) {
-            action()
-        } else if (!notificationPermissionRequested) {
-            notificationPermissionRequested = true
-            pendingPlaybackAction = action
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            Toast.makeText(
-                context,
-                "Bildiriş icazəsi olmadan arxa planda idarəetmə işləməyəcək",
-                Toast.LENGTH_LONG,
-            ).show()
-            action()
+    val requestPlaybackPermission: (() -> Unit) -> Unit = remember(context) {
+        { action ->
+            val permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+            if (permissionGranted) {
+                action()
+            } else if (!notificationPermissionRequested) {
+                notificationPermissionRequested = true
+                pendingPlaybackAction = action
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                Toast.makeText(
+                    context,
+                    "Bildiriş icazəsi olmadan arxa planda idarəetmə işləməyəcək",
+                    Toast.LENGTH_LONG,
+                ).show()
+                action()
+            }
         }
     }
     val navController = rememberNavController()
@@ -103,15 +105,16 @@ fun NotaApp() {
     val currentDestination = backStackEntry?.destination
     val currentRoute = currentDestination?.route
     val playerViewModel: PlayerViewModel = hiltViewModel()
-    val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
     val showTabs = currentRoute in AppRoute.bottomTabs
 
     Scaffold(
         bottomBar = {
             Column {
-                if (playbackState.track != null && currentRoute != AppRoute.NOW_PLAYING) {
-                    MiniPlayer(playbackState, playerViewModel) { navController.navigate(AppRoute.NOW_PLAYING) }
-                }
+                MiniPlayerHost(
+                    playerViewModel = playerViewModel,
+                    visible = currentRoute != AppRoute.NOW_PLAYING,
+                    onOpen = { navController.navigate(AppRoute.NOW_PLAYING) },
+                )
                 if (showTabs) {
                     NavigationBar {
                         tabItems.forEach { tab ->
@@ -164,6 +167,7 @@ fun NotaApp() {
                 ComingSoonScreen("Lyrics", onBack = { navController.popBackStack() })
             }
             composable(AppRoute.NOW_PLAYING) {
+                val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
                 NowPlayingScreen(
                     state = playbackState,
                     viewModel = playerViewModel,
@@ -175,5 +179,18 @@ fun NotaApp() {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun MiniPlayerHost(
+    playerViewModel: PlayerViewModel,
+    visible: Boolean,
+    onOpen: () -> Unit,
+) {
+    if (!visible) return
+    val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
+    if (playbackState.track != null) {
+        MiniPlayer(playbackState, playerViewModel, onOpen)
     }
 }

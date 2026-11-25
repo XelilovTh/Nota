@@ -60,7 +60,7 @@ fun LibraryScreen(
         if (granted) viewModel.scan()
     }
     LaunchedEffect(Unit) {
-        if (hasPermission) viewModel.scan() else permissionLauncher.launch(permission)
+        if (hasPermission) viewModel.scanIfEmpty() else permissionLauncher.launch(permission)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -92,7 +92,7 @@ fun LibraryScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(AppDimens.ScreenPadding),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
-                items(tracks, key = Track::id) { track ->
+                items(tracks, key = Track::id, contentType = { "track" }) { track ->
                     TrackRow(track) { onPlayWithNotificationPermission { viewModel.onTrackSelected(track) } }
                 }
             }

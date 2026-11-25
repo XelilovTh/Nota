@@ -18,7 +18,11 @@ import org.robolectric.RobolectricTestRunner
 class LibraryViewModelTest {
     private class FakeLibraryRepository(initialTracks: List<Track>) : LibraryRepository {
         override val tracks = MutableStateFlow(initialTracks)
-        override suspend fun scan(): List<Track> = tracks.value
+        var scanCalls = 0
+        override suspend fun scan(): List<Track> {
+            scanCalls++
+            return tracks.value
+        }
     }
 
     private class FakePlaybackRepository : PlaybackRepository {
@@ -73,5 +77,30 @@ class LibraryViewModelTest {
         viewModel.onTrackSelected(track(9L))
 
         assertEquals(listOf(9L), playbackRepository.queue.map(Track::id))
+    }
+
+    @Test
+    fun scanIfEmptyDoesNotRescanWhenAlreadyPopulatedOrAttempted() {
+        val populatedRepo = FakeLibraryRepository(listOf(track(1L)))
+        val populatedVm = LibraryViewModel(
+            ObserveTracksUseCase(populatedRepo),
+            ScanLibraryUseCase(populatedRepo),
+            PlayTrackUseCase(FakePlaybackRepository()),
+        )
+
+        populatedVm.scanIfEmpty()
+        assertEquals(0, populatedRepo.scanCalls)
+
+        val emptyRepo = FakeLibraryRepository(emptyList())
+        val emptyVm = LibraryViewModel(
+            ObserveTracksUseCase(emptyRepo),
+            ScanLibraryUseCase(emptyRepo),
+            PlayTrackUseCase(FakePlaybackRepository()),
+        )
+
+        emptyVm.scanIfEmpty()
+        emptyVm.scanIfEmpty()
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        assertEquals(1, emptyRepo.scanCalls)
     }
 }

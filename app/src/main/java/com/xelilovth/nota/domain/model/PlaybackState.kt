@@ -1,5 +1,8 @@
 package com.xelilovth.nota.domain.model
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class PlaybackState(
     val track: Track? = null,
     val isPlaying: Boolean = false,

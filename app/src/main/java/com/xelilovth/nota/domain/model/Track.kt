@@ -1,7 +1,9 @@
 package com.xelilovth.nota.domain.model
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 
+@Immutable
 data class Track(
     val id: Long,
     val uri: Uri,

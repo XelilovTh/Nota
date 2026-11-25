@@ -1,7 +1,9 @@
 package com.xelilovth.nota.data.media
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.annotation.OptIn
@@ -39,7 +41,20 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player).build()
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForegroundCompat(buildNotification(getString(R.string.notification_channel_playback)))
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val player = mediaSession?.player
+        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
+    }
 
     internal fun handlePlayerError(
         startForegroundAction: () -> Unit = { startForegroundForError() },
@@ -50,13 +65,19 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun startForegroundForError() {
-        val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        startForegroundCompat(buildNotification(getString(R.string.playback_error_notification)))
+    }
+
+    private fun buildNotification(contentText: String): Notification =
+        NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(R.string.playback_error_notification))
+            .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(false)
             .build()
+
+    private fun startForegroundCompat(notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceCompat.startForeground(
                 this,

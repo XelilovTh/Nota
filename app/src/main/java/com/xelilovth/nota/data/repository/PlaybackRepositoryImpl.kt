@@ -42,6 +42,8 @@ class PlaybackRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressJob: Job? = null
+    private var cachedMediaId: Long? = null
+    private var cachedTrack: Track? = null
     internal val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = publishState()
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -61,7 +63,7 @@ class PlaybackRepositoryImpl @Inject constructor(
         val mediaItems = tracks.map(::toMediaItem)
         if (mediaItems.isEmpty()) return
 
-        ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java))
+        ensurePlaybackServiceStarted()
         val index = if (selectedIndex >= 0) selectedIndex else 0
         _playbackState.value = _playbackState.value.copy(errorMessage = null)
         player.setMediaItems(mediaItems, index, 0L)
@@ -71,7 +73,12 @@ class PlaybackRepositoryImpl @Inject constructor(
     }
 
     override fun togglePlayPause() {
-        if (player.isPlaying) player.pause() else if (player.mediaItemCount > 0) player.play()
+        if (player.isPlaying) {
+            player.pause()
+        } else if (player.mediaItemCount > 0) {
+            ensurePlaybackServiceStarted()
+            player.play()
+        }
         publishState()
     }
 
@@ -118,9 +125,24 @@ class PlaybackRepositoryImpl @Inject constructor(
         )
     }
 
+    private fun ensurePlaybackServiceStarted() {
+        try {
+            ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java))
+        } catch (_: IllegalStateException) {
+            // Avoid crashing with ForegroundServiceStartNotAllowedException if called from background.
+        }
+    }
+
     private fun publishState() {
         val mediaId = player.currentMediaItem?.mediaId?.toLongOrNull()
-        val track = libraryRepository.tracks.value.firstOrNull { it.id == mediaId }
+        val track = when {
+            mediaId == null -> null
+            mediaId == cachedMediaId && cachedTrack != null -> cachedTrack
+            else -> libraryRepository.tracks.value.firstOrNull { it.id == mediaId }.also { found ->
+                cachedMediaId = mediaId
+                cachedTrack = found
+            }
+        }
         _playbackState.value = PlaybackStateMapper.map(
             playerState = player.playbackState,
             isPlaying = player.isPlaying,

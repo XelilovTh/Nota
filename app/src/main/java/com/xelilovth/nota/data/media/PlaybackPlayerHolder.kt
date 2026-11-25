@@ -12,7 +12,10 @@ object PlaybackPlayerHolder {
     @Volatile private var instance: ExoPlayer? = null
 
     fun get(context: Context): ExoPlayer = instance ?: synchronized(this) {
-        instance ?: ExoPlayer.Builder(context.applicationContext).build().apply {
+        instance ?: ExoPlayer.Builder(context.applicationContext)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
+            .build()
+            .apply {
             setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)

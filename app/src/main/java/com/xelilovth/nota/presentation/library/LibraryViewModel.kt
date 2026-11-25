@@ -23,9 +23,17 @@ class LibraryViewModel @Inject constructor(
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+    private var hasAttemptedScan = false
+
+    fun scanIfEmpty() {
+        if (tracks.value.isEmpty() && !hasAttemptedScan) {
+            scan()
+        }
+    }
 
     fun scan() {
         if (_isScanning.value) return
+        hasAttemptedScan = true
         viewModelScope.launch {
             _isScanning.value = true
             try {
