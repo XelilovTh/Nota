@@ -22,7 +22,10 @@ import com.xelilovth.nota.presentation.home.PlaylistGroupRow
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
-fun PlaylistsScreen(viewModel: HomeViewModel = hiltViewModel()) {
+fun PlaylistsScreen(
+    viewModel: HomeViewModel = hiltViewModel(),
+    onPlayWithNotificationPermission: (() -> Unit) -> Unit = {},
+) {
     val tracks = viewModel.tracks.collectAsStateWithLifecycle().value
     val groups = remember(tracks) { groupTracksIntoPlaylists(tracks) }
     if (groups.isEmpty()) {
@@ -35,7 +38,11 @@ fun PlaylistsScreen(viewModel: HomeViewModel = hiltViewModel()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(AppDimens.ScreenPadding),
             verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
             item { Text("Playlists", style = MaterialTheme.typography.headlineMedium) }
-            items(groups, key = AutoPlaylist::id) { group -> PlaylistGroupRow(group) {} }
+            items(groups, key = AutoPlaylist::id) { group ->
+                PlaylistGroupRow(group) {
+                    onPlayWithNotificationPermission { viewModel.playPlaylist(group) }
+                }
+            }
         }
     }
 }

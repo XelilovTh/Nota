@@ -69,4 +69,32 @@ class HomeViewModelTest {
         assertEquals(emptyList<Track>(), viewModel.tracks.value)
         assertEquals(emptyList<Long>(), repository.played)
     }
+
+    @Test
+    fun playPlaylistStartsFirstTrackAndSetsQueue() {
+        val repository = FakeRepository()
+        val track1 = track(101)
+        val track2 = track(102)
+        val library = object : LibraryRepository {
+            override val tracks = MutableStateFlow(listOf(track1, track2))
+            override suspend fun scan() = listOf(track1, track2)
+        }
+        val viewModel = HomeViewModel(
+            ObserveTracksUseCase(library),
+            repository,
+            PlayTrackUseCase(repository),
+            ToggleShuffleUseCase(repository),
+        )
+        val playlist = com.xelilovth.nota.domain.model.AutoPlaylist(
+            id = "album:test",
+            title = "Test Album",
+            type = com.xelilovth.nota.domain.model.PlaylistGroupType.ALBUM,
+            tracks = listOf(track1, track2),
+        )
+
+        viewModel.playPlaylist(playlist)
+
+        assertEquals(listOf(101L), repository.played)
+        assertEquals(listOf(101L, 102L), repository.queues.single())
+    }
 }

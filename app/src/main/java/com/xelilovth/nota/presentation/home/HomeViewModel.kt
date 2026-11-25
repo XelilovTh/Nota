@@ -53,4 +53,9 @@ class HomeViewModel @Inject constructor(
         val queue = if (selectedIndex >= 0) library.drop(selectedIndex) else listOf(track)
         playTrack(track, queue)
     }
+
+    fun playPlaylist(playlist: AutoPlaylist) {
+        val firstTrack = playlist.tracks.firstOrNull() ?: return
+        playTrack(firstTrack, playlist.tracks)
+    }
 }
