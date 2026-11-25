@@ -95,6 +95,24 @@ class PlaybackRepositoryImpl @Inject constructor(
         publishState()
     }
 
+    override fun stopPlayback() {
+        progressJob?.cancel()
+        cachedMediaId = null
+        cachedTrack = null
+        player.stop()
+        player.clearMediaItems()
+        _playbackState.value = _playbackState.value.copy(errorMessage = null)
+        publishState()
+        try {
+            val stopIntent = Intent(context, PlaybackService::class.java).apply {
+                action = PlaybackService.ACTION_STOP
+            }
+            context.startService(stopIntent)
+        } catch (_: IllegalStateException) {
+            // Ignore if background service start is restricted
+        }
+    }
+
     private fun startProgressUpdates() {
         if (progressJob?.isActive == true) return
         progressJob = scope.launch {

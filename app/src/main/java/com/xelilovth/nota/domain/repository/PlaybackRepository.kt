@@ -13,4 +13,5 @@ interface PlaybackRepository {
     fun seekTo(positionMs: Long)
     fun toggleShuffle()
     fun cycleRepeatMode()
+    fun stopPlayback()
 }

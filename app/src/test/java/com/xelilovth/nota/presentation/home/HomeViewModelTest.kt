@@ -27,6 +27,7 @@ class HomeViewModelTest {
         override fun seekTo(positionMs: Long) = Unit
         override fun toggleShuffle() { playbackState.value = playbackState.value.copy(shuffle = !playbackState.value.shuffle) }
         override fun cycleRepeatMode() = Unit
+        override fun stopPlayback() { playbackState.value = PlaybackState() }
     }
 
     private fun track(id: Long) = Track(id, Uri.parse("content://audio/$id"), "Track", "Artist", "Album", 1000L, "Music")

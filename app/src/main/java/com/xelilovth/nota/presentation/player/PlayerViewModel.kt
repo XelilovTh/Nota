@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
-    repository: PlaybackRepository,
+    private val repository: PlaybackRepository,
     private val playTrack: PlayTrackUseCase,
     private val togglePlayPauseUseCase: TogglePlayPauseUseCase,
     private val skipNextUseCase: SkipNextUseCase,
@@ -40,4 +40,5 @@ class PlayerViewModel @Inject constructor(
     fun seek(positionMs: Long) = seekToUseCase(positionMs)
     fun toggleShuffle() = toggleShuffleUseCase()
     fun cycleRepeatMode() = cycleRepeatModeUseCase()
+    fun dismiss() = repository.stopPlayback()
 }

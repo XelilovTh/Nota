@@ -44,6 +44,10 @@ class PlayerViewModelTest {
             playbackState.value = playbackState.value.copy(repeatMode = nextMode)
             calls += "repeat:${nextMode.name}"
         }
+        override fun stopPlayback() {
+            playbackState.value = PlaybackState()
+            calls += "stop"
+        }
     }
 
     private fun track(id: Long) = Track(
@@ -120,8 +124,9 @@ class PlayerViewModelTest {
         viewModel.next()
         viewModel.previous()
         viewModel.seek(420L)
+        viewModel.dismiss()
 
-        assertEquals(listOf("toggle", "next", "previous", "seek:420"), repository.calls)
+        assertEquals(listOf("toggle", "next", "previous", "seek:420", "stop"), repository.calls)
         assertEquals(420L, viewModel.playbackState.value.positionMs)
         assertEquals(repository.playbackState, viewModel.playbackState)
     }

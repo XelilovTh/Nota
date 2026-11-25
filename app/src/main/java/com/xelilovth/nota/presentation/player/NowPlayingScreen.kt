@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
@@ -58,6 +59,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -91,6 +93,7 @@ fun NowPlayingScreen(
 
     var showRemaining by remember { mutableStateOf(false) }
     var showQueueSheet by remember { mutableStateOf(false) }
+    var showAddToPlaylist by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
@@ -115,6 +118,11 @@ fun NowPlayingScreen(
                 modifier = Modifier.weight(1f).padding(horizontal = AppDimens.ElementSpacing),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
+            if (state.track != null) {
+                IconButton(onClick = { showAddToPlaylist = true }) {
+                    Icon(Icons.AutoMirrored.Outlined.PlaylistAdd, contentDescription = "Add to playlist")
+                }
+            }
             IconButton(onClick = onSettings) {
                 Icon(Icons.Outlined.Settings, contentDescription = "Settings")
             }
@@ -319,6 +327,14 @@ fun NowPlayingScreen(
                 }
             }
         }
+    }
+
+    val activeTrack = state.track
+    if (showAddToPlaylist && activeTrack != null) {
+        AddToPlaylistSheet(
+            track = activeTrack,
+            onDismiss = { showAddToPlaylist = false },
+        )
     }
 }
 

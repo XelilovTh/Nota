@@ -31,6 +31,7 @@ class SettingsViewModelTest {
         override fun seekTo(positionMs: Long) = Unit
         override fun toggleShuffle() = Unit
         override fun cycleRepeatMode() = Unit
+        override fun stopPlayback() = Unit
     }
 
     private class FakeLibraryRepository : LibraryRepository {

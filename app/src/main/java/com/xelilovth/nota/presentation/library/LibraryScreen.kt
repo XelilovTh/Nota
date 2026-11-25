@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.GraphicEq
@@ -46,6 +47,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 
@@ -70,6 +72,7 @@ fun LibraryScreen(
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var playlistTargetTrack by remember { mutableStateOf<Track?>(null) }
 
     val sortedTracks = remember(tracks, sortOrder) {
         when (sortOrder) {
@@ -186,11 +189,19 @@ fun LibraryScreen(
                             isCurrent = track.id == activeTrackId,
                             isPlaying = track.id == activeTrackId && isPlaying,
                             onPlay = { onPlayTrack(track) },
+                            onAddToPlaylist = { playlistTargetTrack = track },
                         )
                     }
                 }
             }
         }
+    }
+
+    playlistTargetTrack?.let { target ->
+        AddToPlaylistSheet(
+            track = target,
+            onDismiss = { playlistTargetTrack = null },
+        )
     }
 }
 
@@ -200,6 +211,7 @@ private fun TrackRow(
     isCurrent: Boolean,
     isPlaying: Boolean,
     onPlay: () -> Unit,
+    onAddToPlaylist: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -234,6 +246,13 @@ private fun TrackRow(
                 formatDuration(track.durationMs),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = onAddToPlaylist) {
+            Icon(
+                Icons.AutoMirrored.Outlined.PlaylistAdd,
+                contentDescription = "Add to playlist",
+                modifier = Modifier.size(AppDimens.IconSizeSmall),
             )
         }
     }
