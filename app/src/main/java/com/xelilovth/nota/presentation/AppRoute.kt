@@ -6,7 +6,6 @@ object AppRoute {
     const val SEARCH = "search"
     const val LIBRARY = "library"
     const val SETTINGS = "settings"
-    const val EQUALIZER = "equalizer"
     const val SLEEP_TIMER = "sleep_timer"
     const val LYRICS = "lyrics"
     const val NOW_PLAYING = "now_playing"

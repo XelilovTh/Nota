@@ -1,15 +1,17 @@
 package com.xelilovth.nota.presentation.player
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,15 +24,18 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -40,7 +45,6 @@ fun NowPlayingScreen(
     state: PlaybackState,
     viewModel: PlayerViewModel,
     onBack: () -> Unit,
-    onEqualizer: () -> Unit,
     onSleepTimer: () -> Unit,
     onLyrics: () -> Unit,
     onSettings: () -> Unit,
@@ -54,27 +58,34 @@ fun NowPlayingScreen(
         verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
-            Text("Now Playing", style = MaterialTheme.typography.headlineMedium)
+            Text("Now Playing", style = MaterialTheme.typography.titleLarge)
+            IconButton(onClick = onSettings) {
+                Icon(Icons.Outlined.Settings, contentDescription = "Settings")
+            }
         }
 
-        Box(
-            modifier = Modifier.size(AppDimens.PlayerArtworkSize)
-                .background(
-                    MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(AppDimens.ShapeLarge),
-                ),
-            contentAlignment = Alignment.Center,
+        Surface(
+            modifier = Modifier.size(AppDimens.PlayerArtworkSize),
+            shape = RoundedCornerShape(AppDimens.ShapeLarge),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
         ) {
-            Icon(
-                Icons.Filled.MusicNote,
-                contentDescription = "Album art placeholder",
-                modifier = Modifier.size(AppDimens.PlayerArtworkIconSize),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.MusicNote,
+                    contentDescription = "Album art placeholder",
+                    modifier = Modifier.size(AppDimens.PlayerArtworkIconSize),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         Column(
@@ -86,11 +97,14 @@ fun NowPlayingScreen(
                 state.track?.title ?: "No track selected",
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 state.track?.artist.orEmpty(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
@@ -116,26 +130,35 @@ fun NowPlayingScreen(
                 Icon(
                     Icons.Filled.Shuffle,
                     contentDescription = if (state.shuffle) "Shuffle on" else "Shuffle off",
-                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = viewModel::previous) {
-                Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous")
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(AppDimens.IconSizeLarge))
             }
-            IconButton(onClick = viewModel::togglePlayPause) {
-                Icon(
-                    if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (state.isPlaying) "Pause" else "Play",
-                )
+            Surface(
+                onClick = viewModel::togglePlayPause,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(AppDimens.PlayButtonSize),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (state.isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(AppDimens.IconSizeLarge),
+                    )
+                }
             }
             IconButton(onClick = viewModel::next) {
-                Icon(Icons.Filled.SkipNext, contentDescription = "Next")
+                Icon(Icons.Filled.SkipNext, contentDescription = "Next", modifier = Modifier.size(AppDimens.IconSizeLarge))
             }
             IconButton(onClick = viewModel::cycleRepeatMode) {
                 Icon(
                     if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
                     contentDescription = "Repeat ${state.repeatMode.name.lowercase()}",
-                    tint = if (state.repeatMode == RepeatMode.OFF) MaterialTheme.colorScheme.onSurface
+                    tint = if (state.repeatMode == RepeatMode.OFF) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.primary,
                 )
             }
@@ -143,13 +166,11 @@ fun NowPlayingScreen(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             TextButton(onClick = onLyrics, modifier = Modifier.weight(1f)) { Text("Lyrics") }
-            TextButton(onClick = onEqualizer, modifier = Modifier.weight(1f)) { Text("EQ") }
             TextButton(
                 onClick = onSleepTimer,
                 modifier = Modifier.weight(1f),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = AppDimens.PlayerActionHorizontalPadding),
+                contentPadding = PaddingValues(horizontal = AppDimens.PlayerActionHorizontalPadding),
             ) { Text("Sleep Timer", maxLines = 1) }
-            TextButton(onClick = onSettings, modifier = Modifier.weight(1f)) { Text("Settings") }
         }
     }
 }

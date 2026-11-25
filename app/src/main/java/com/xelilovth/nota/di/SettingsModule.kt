@@ -1,0 +1,17 @@
+package com.xelilovth.nota.di
+
+import com.xelilovth.nota.data.repository.SettingsRepositoryImpl
+import com.xelilovth.nota.domain.repository.SettingsRepository
+import dagger.Binds
+import dagger.Module
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class SettingsModule {
+    @Binds
+    @Singleton
+    abstract fun bindSettingsRepository(implementation: SettingsRepositoryImpl): SettingsRepository
+}

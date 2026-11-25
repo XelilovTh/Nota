@@ -1,5 +1,11 @@
 package com.xelilovth.nota.presentation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -7,23 +13,20 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -37,18 +40,19 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.xelilovth.nota.presentation.home.HomeScreen
 import com.xelilovth.nota.presentation.library.LibraryScreen
-import com.xelilovth.nota.presentation.playlists.PlaylistsScreen
 import com.xelilovth.nota.presentation.player.MiniPlayer
 import com.xelilovth.nota.presentation.player.NowPlayingScreen
 import com.xelilovth.nota.presentation.player.PlayerViewModel
+import com.xelilovth.nota.presentation.playlists.PlaylistsScreen
 import com.xelilovth.nota.presentation.search.SearchScreen
+import com.xelilovth.nota.presentation.settings.SettingsScreen
+import com.xelilovth.nota.presentation.settings.SleepTimerScreen
 import com.xelilovth.nota.ui.components.ComingSoonScreen
-import com.xelilovth.nota.ui.components.PlaceholderAction
 
 private data class TabItem(
     val route: String,
     val label: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val icon: ImageVector,
 )
 
 private val tabItems = listOf(
@@ -108,6 +112,7 @@ fun NotaApp() {
     val showTabs = currentRoute in AppRoute.bottomTabs
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             Column {
                 MiniPlayerHost(
@@ -116,7 +121,8 @@ fun NotaApp() {
                     onOpen = { navController.navigate(AppRoute.NOW_PLAYING) },
                 )
                 if (showTabs) {
-                    NavigationBar {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                         tabItems.forEach { tab ->
                             val selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true
                             NavigationBarItem(
@@ -147,21 +153,13 @@ fun NotaApp() {
             composable(AppRoute.SEARCH) { SearchScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.LIBRARY) { LibraryScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
             composable(AppRoute.SETTINGS) {
-                ComingSoonScreen(
-                    title = "Settings",
+                SettingsScreen(
                     onBack = { navController.popBackStack() },
-                    actions = listOf(
-                        PlaceholderAction("Equalizer") { navController.navigate(AppRoute.EQUALIZER) },
-                        PlaceholderAction("Sleep Timer") { navController.navigate(AppRoute.SLEEP_TIMER) },
-                        PlaceholderAction("Lyrics") { navController.navigate(AppRoute.LYRICS) },
-                    ),
+                    onOpenSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
                 )
             }
-            composable(AppRoute.EQUALIZER) {
-                ComingSoonScreen("Equalizer", onBack = { navController.popBackStack() })
-            }
             composable(AppRoute.SLEEP_TIMER) {
-                ComingSoonScreen("Sleep Timer", onBack = { navController.popBackStack() })
+                SleepTimerScreen(onBack = { navController.popBackStack() })
             }
             composable(AppRoute.LYRICS) {
                 ComingSoonScreen("Lyrics", onBack = { navController.popBackStack() })
@@ -172,7 +170,6 @@ fun NotaApp() {
                     state = playbackState,
                     viewModel = playerViewModel,
                     onBack = { navController.popBackStack() },
-                    onEqualizer = { navController.navigate(AppRoute.EQUALIZER) },
                     onSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
                     onLyrics = { navController.navigate(AppRoute.LYRICS) },
                     onSettings = { navController.navigate(AppRoute.SETTINGS) },

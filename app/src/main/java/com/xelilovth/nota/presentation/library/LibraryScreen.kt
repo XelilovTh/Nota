@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,9 +18,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -100,9 +103,28 @@ fun LibraryScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(AppDimens.ScreenPadding),
+                    contentPadding = PaddingValues(AppDimens.ScreenPadding),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                 ) {
+                    item(key = "library_header") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = AppDimens.ElementSpacing),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column {
+                                Text("Library", style = MaterialTheme.typography.headlineMedium)
+                                Text(
+                                    "${tracks.size} tracks",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(onClick = viewModel::scan, enabled = !isScanning) {
+                                Icon(Icons.Outlined.Refresh, contentDescription = "Rescan library")
+                            }
+                        }
+                    }
                     items(tracks, key = Track::id, contentType = { "track" }) { track ->
                         TrackRow(
                             track = track,
@@ -126,7 +148,7 @@ private fun TrackRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
             .clickable(onClick = onPlay)
-            .padding(vertical = AppDimens.ElementSpacing),
+            .padding(vertical = AppDimens.RowVerticalPadding),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -139,13 +161,6 @@ private fun TrackRow(
                 "${track.artist} · ${track.album}",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                track.folder,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

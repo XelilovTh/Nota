@@ -1,18 +1,23 @@
 package com.xelilovth.nota.ui.theme
+
 import androidx.compose.ui.graphics.Color
+
 object AppColors {
-    val LightPrimary = Color(0xFF455A64)
+    val LightPrimary = Color(0xFF111111)
     val LightOnPrimary = Color(0xFFFFFFFF)
-    val LightBackground = Color(0xFFF8F9FA)
+    val LightBackground = Color(0xFFFFFFFF)
     val LightSurface = Color(0xFFFFFFFF)
-    val LightOnSurface = Color(0xFF191C1E)
-    val LightSurfaceVariant = Color(0xFFE1E5E7)
-    val LightOnSurfaceVariant = Color(0xFF43494D)
-    val DarkPrimary = Color(0xFFB0C9D4)
-    val DarkOnPrimary = Color(0xFF1B343D)
-    val DarkBackground = Color(0xFF111416)
-    val DarkSurface = Color(0xFF191D1F)
-    val DarkOnSurface = Color(0xFFE1E3E5)
-    val DarkSurfaceVariant = Color(0xFF3F484C)
-    val DarkOnSurfaceVariant = Color(0xFFC0C8CC)
+    val LightOnSurface = Color(0xFF111111)
+    val LightSurfaceVariant = Color(0xFFF3F3F3)
+    val LightOnSurfaceVariant = Color(0xFF666666)
+    val LightOutline = Color(0xFFE5E5E5)
+
+    val DarkPrimary = Color(0xFFFFFFFF)
+    val DarkOnPrimary = Color(0xFF0A0A0A)
+    val DarkBackground = Color(0xFF0A0A0A)
+    val DarkSurface = Color(0xFF121212)
+    val DarkOnSurface = Color(0xFFFAFAFA)
+    val DarkSurfaceVariant = Color(0xFF1C1C1C)
+    val DarkOnSurfaceVariant = Color(0xFFA0A0A0)
+    val DarkOutline = Color(0xFF262626)
 }

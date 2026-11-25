@@ -3,15 +3,22 @@ package com.xelilovth.nota.ui.theme
 import androidx.compose.ui.unit.dp
 
 object AppDimens {
-    val ScreenPadding = 24.dp
+    val ScreenPadding = 20.dp
     val ElementSpacing = 8.dp
     val SectionSpacing = 16.dp
-    val CardPadding = 20.dp
+    val CardPadding = 16.dp
     val MiniPlayerPadding = 16.dp
-    val PlayerArtworkSize = 220.dp
+    val BorderWidth = 1.dp
+    val RowVerticalPadding = 10.dp
+    val ArtworkSmallSize = 44.dp
+    val PlayButtonSize = 60.dp
+    val IconSizeSmall = 18.dp
+    val IconSizeMedium = 24.dp
+    val IconSizeLarge = 28.dp
+    val PlayerArtworkSize = 240.dp
     val PlayerArtworkIconSize = 64.dp
     val PlayerControlSpacing = 12.dp
-    val PlayerActionHorizontalPadding = 2.dp
+    val PlayerActionHorizontalPadding = 4.dp
     val ShapeExtraSmall = 4.dp
     val ShapeSmall = 8.dp
     val ShapeMedium = 12.dp
