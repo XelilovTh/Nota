@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.ThemeMode
@@ -97,6 +98,9 @@ fun SettingsScreen(
                                             ThemeMode.LIGHT -> "Light"
                                             ThemeMode.DARK -> "Dark"
                                         },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
                                     )
                                 },
                                 colors = FilterChipDefaults.filterChipColors(

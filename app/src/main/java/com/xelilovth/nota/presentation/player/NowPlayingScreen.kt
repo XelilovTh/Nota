@@ -99,7 +99,15 @@ fun NowPlayingScreen(
     var showAddToPlaylist by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxSize().navigationBarsPadding().padding(AppDimens.ScreenPadding),
+        Modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+            .padding(
+                start = AppDimens.ScreenPadding,
+                top = AppDimens.ScreenPadding,
+                end = AppDimens.ScreenPadding,
+                bottom = AppDimens.PlayerBottomSafePadding,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
@@ -131,7 +139,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.3f))
+        Spacer(modifier = Modifier.weight(0.22f))
 
         Column(
             Modifier.fillMaxWidth(),
@@ -202,7 +210,7 @@ fun NowPlayingScreen(
             modifier = Modifier.fillMaxWidth(AppDimens.PlayerArtworkFraction).aspectRatio(1f),
         )
 
-        Spacer(modifier = Modifier.weight(0.5f))
+        Spacer(modifier = Modifier.weight(0.28f))
 
         GlassSurface(
             shape = CircleShape,
@@ -256,7 +264,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
+        Spacer(modifier = Modifier.weight(0.25f))
 
         Row(
             modifier = Modifier.fillMaxWidth(),

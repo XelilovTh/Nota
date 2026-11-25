@@ -47,4 +47,6 @@ object AppDimens {
     val FloatingMiniPlayerGap = 8.dp
     val FloatingBottomClearance = 164.dp
     val FloatingNavOnlyClearance = 96.dp
+    val PlayerBottomSafePadding = 32.dp
+    val Zero = 0.dp
 }

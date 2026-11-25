@@ -8,5 +8,5 @@ enum class ThemeMode {
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val hideShortTracks: Boolean = false,
+    val hideShortTracks: Boolean = true,
 )

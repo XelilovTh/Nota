@@ -130,6 +130,8 @@ fun MiniPlayer(
                         .clip(CircleShape),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+                    gapSize = AppDimens.Zero,
+                    drawStopIndicator = {},
                 )
             }
         }

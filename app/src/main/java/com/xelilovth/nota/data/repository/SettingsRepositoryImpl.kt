@@ -18,6 +18,8 @@ class SettingsRepositoryImpl @Inject constructor(
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val _settings = MutableStateFlow(loadSettings())
     override val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+    private val _recentTrackIds = MutableStateFlow(loadRecentTrackIds())
+    override val recentTrackIds: StateFlow<List<Long>> = _recentTrackIds.asStateFlow()
 
     override fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
@@ -29,16 +31,31 @@ class SettingsRepositoryImpl @Inject constructor(
         _settings.value = _settings.value.copy(hideShortTracks = hide)
     }
 
+    override fun addRecentTrack(trackId: Long) {
+        val updated = (listOf(trackId) + _recentTrackIds.value.filterNot { it == trackId }).take(10)
+        prefs.edit().putString(KEY_RECENT_TRACK_IDS, updated.joinToString(",")).apply()
+        _recentTrackIds.value = updated
+    }
+
     private fun loadSettings(): AppSettings {
         val themeName = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name)
         val themeMode = ThemeMode.entries.firstOrNull { it.name == themeName } ?: ThemeMode.SYSTEM
-        val hideShort = prefs.getBoolean(KEY_HIDE_SHORT_TRACKS, false)
+        val hideShort = prefs.getBoolean(KEY_HIDE_SHORT_TRACKS, true)
         return AppSettings(themeMode = themeMode, hideShortTracks = hideShort)
+    }
+
+    private fun loadRecentTrackIds(): List<Long> {
+        val raw = prefs.getString(KEY_RECENT_TRACK_IDS, null) ?: return emptyList()
+        return raw.split(",")
+            .mapNotNull { it.trim().toLongOrNull() }
+            .distinct()
+            .take(10)
     }
 
     private companion object {
         const val PREFS_NAME = "nota_settings"
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_HIDE_SHORT_TRACKS = "hide_short_tracks"
+        const val KEY_RECENT_TRACK_IDS = "recent_track_ids"
     }
 }
