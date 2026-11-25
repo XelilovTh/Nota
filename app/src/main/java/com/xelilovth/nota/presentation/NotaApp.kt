@@ -2,8 +2,9 @@ package com.xelilovth.nota.presentation
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -176,8 +177,9 @@ fun NotaApp() {
                 arguments = listOf(navArgument("playlistId") { type = NavType.StringType }),
             ) { entry ->
                 val rawId = entry.arguments?.getString("playlistId").orEmpty()
+                val decodedId = URLDecoder.decode(rawId, StandardCharsets.UTF_8.name())
                 PlaylistDetailScreen(
-                    playlistId = Uri.decode(rawId),
+                    playlistId = decodedId,
                     onBack = { navController.popBackStack() },
                     onPlayWithNotificationPermission = requestPlaybackPermission,
                 )

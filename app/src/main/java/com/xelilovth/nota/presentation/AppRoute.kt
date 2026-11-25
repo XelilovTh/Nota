@@ -1,6 +1,7 @@
 package com.xelilovth.nota.presentation
 
-import android.net.Uri
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 object AppRoute {
     const val HOME = "home"
@@ -15,7 +16,10 @@ object AppRoute {
 
     val bottomTabs = listOf(HOME, PLAYLISTS, SEARCH, LIBRARY)
 
-    fun playlistDetail(playlistId: String): String = "playlist/${Uri.encode(playlistId)}"
+    fun playlistDetail(playlistId: String): String {
+        val encoded = URLEncoder.encode(playlistId, StandardCharsets.UTF_8.name()).replace("+", "%20")
+        return "playlist/$encoded"
+    }
 
     fun homeActionRoute(action: String): String? = when (action) {
         "search" -> SEARCH
