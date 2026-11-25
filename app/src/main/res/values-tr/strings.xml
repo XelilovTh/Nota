@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lyrics_title">ŞARKI SÖZLERİ</string>
+    <string name="lyrics_word_synced">%1$s · Kelime senkronlu</string>
+    <string name="lyrics_line_synced">%1$s · Senkronlu</string>
+    <string name="lyrics_plain">%1$s · Düz metin</string>
+    <string name="lyrics_loading">Şarkı sözleri aranıyor…</string>
+    <string name="lyrics_not_available">Şarkı sözleri bulunamadı</string>
+    <string name="lyrics_not_found_description">Bu parça için eşleşen şarkı sözü bulamadık</string>
+    <string name="lyrics_instrumental">Enstrümantal parça</string>
+    <string name="lyrics_instrumental_description">Bu parçanın sözleri yok</string>
+    <string name="lyrics_search_genius">Genius'ta ara</string>
+    <string name="lyrics_swipe_hint">ŞARKI SÖZLERİ İÇİN YUKARI KAYDIR</string>
+</resources>

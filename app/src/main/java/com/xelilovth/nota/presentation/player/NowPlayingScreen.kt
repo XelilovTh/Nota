@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,15 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,7 +52,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +68,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
@@ -95,6 +110,14 @@ fun NowPlayingScreen(
     val displayPositionMs = if (isDragging && duration > 0L) (dragProgress * duration).toLong() else position
 
     var showRemaining by remember { mutableStateOf(false) }
+    var lyricsExpanded by remember { mutableStateOf(false) }
+    val lyricsUiState by viewModel.lyricsState.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
+
+    LaunchedEffect(state.track?.id) {
+        val track = state.track
+        if (track != null) viewModel.loadLyrics(track) else lyricsExpanded = false
+    }
     var showQueueSheet by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
 
@@ -164,53 +187,117 @@ fun NowPlayingScreen(
 
         Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable { showRemaining = !showRemaining },
+        AnimatedVisibility(
+            visible = !lyricsExpanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
         ) {
-            Text(
-                formatDuration(displayPositionMs),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                "|",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
-            val rightTime = if (showRemaining && duration > 0L) {
-                "-${formatDuration((duration - displayPositionMs).coerceAtLeast(0L))}"
-            } else {
-                formatDuration(duration)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { showRemaining = !showRemaining },
+                ) {
+                    Text(
+                        formatDuration(displayPositionMs),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "|",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                    val rightTime = if (showRemaining && duration > 0L) {
+                        "-${formatDuration((duration - displayPositionMs).coerceAtLeast(0L))}"
+                    } else {
+                        formatDuration(duration)
+                    }
+                    Text(
+                        rightTime,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
+
+                CircularArcPlayerArt(
+                    track = state.track,
+                    progress = displayProgress,
+                    enabled = duration > 0L,
+                    onProgressChange = { next ->
+                        isDragging = true
+                        dragProgress = next
+                    },
+                    onSeekFinish = { finalProgress ->
+                        isDragging = false
+                        if (duration > 0L) {
+                            viewModel.seek((finalProgress * duration).toLong())
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(AppDimens.PlayerArtworkFraction).aspectRatio(1f),
+                )
             }
-            Text(
-                rightTime,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
 
-        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
-
-        CircularArcPlayerArt(
-            track = state.track,
-            progress = displayProgress,
-            enabled = duration > 0L,
-            onProgressChange = { next ->
-                isDragging = true
-                dragProgress = next
-            },
-            onSeekFinish = { finalProgress ->
-                isDragging = false
-                if (duration > 0L) {
-                    viewModel.seek((finalProgress * duration).toLong())
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(if (lyricsExpanded) 0.72f else 0.28f)
+                .pointerInput(lyricsExpanded, state.track?.id) {
+                    if (!lyricsExpanded && state.track != null) {
+                        var dragDistance = 0f
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { change, dragAmount ->
+                                dragDistance += dragAmount
+                                change.consume()
+                            },
+                            onDragEnd = {
+                                if (dragDistance < -48.dp.toPx()) lyricsExpanded = true
+                                dragDistance = 0f
+                            },
+                            onDragCancel = { dragDistance = 0f },
+                        )
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedContent(
+                targetState = lyricsExpanded,
+                transitionSpec = {
+                    if (targetState) {
+                        (fadeIn() + slideInVertically { it / 5 }) togetherWith
+                            (fadeOut() + slideOutVertically { -it / 5 })
+                    } else {
+                        (fadeIn() + slideInVertically { -it / 5 }) togetherWith
+                            (fadeOut() + slideOutVertically { it / 5 })
+                    }
+                },
+                label = "player-lyrics-transition",
+            ) { expanded ->
+                if (expanded) {
+                    LyricsPanel(
+                        state = lyricsUiState,
+                        positionMs = position,
+                        onCollapse = { lyricsExpanded = false },
+                        onOpenGenius = {
+                            val track = state.track
+                            if (track != null) {
+                                val query = Uri.encode("${track.artist} ${track.title}")
+                                runCatching { uriHandler.openUri("https://genius.com/search?q=$query") }
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    LyricsSwipeHint(modifier = Modifier.fillMaxSize())
                 }
-            },
-            modifier = Modifier.fillMaxWidth(AppDimens.PlayerArtworkFraction).aspectRatio(1f),
-        )
-
-        Spacer(modifier = Modifier.weight(0.28f))
+            }
+        }
 
         GlassSurface(
             shape = CircleShape,

@@ -29,8 +29,8 @@ android {
         applicationId = "com.xelilovth.nota"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
@@ -90,6 +90,7 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.haze)
+    implementation(libs.snakeyaml)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

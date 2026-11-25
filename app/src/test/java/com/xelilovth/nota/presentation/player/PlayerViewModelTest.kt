@@ -4,6 +4,8 @@ import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.PlaybackRepository
+import com.xelilovth.nota.domain.repository.LyricsRepository
+import com.xelilovth.nota.domain.model.TrackLyrics
 import com.xelilovth.nota.domain.usecase.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
@@ -53,8 +55,12 @@ class PlayerViewModelTest {
         id, "content://audio/$id", "Track $id", "Artist", "Album", 1000L, "Music",
     )
 
+    private class FakeLyricsRepository : LyricsRepository {
+        override suspend fun getLyrics(track: Track): TrackLyrics? = null
+    }
+
     private fun viewModel(repository: FakeRepository) = PlayerViewModel(
-        repository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+        repository, FakeLyricsRepository(), PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
         SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
         ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
     )
