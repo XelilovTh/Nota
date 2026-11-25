@@ -38,7 +38,7 @@ internal object LyricsParser {
         .lineSequence()
         .map(String::trim)
         .filter(String::isNotBlank)
-        .map(::LyricLine)
+        .map { LyricLine(it) }
         .toList()
 
     fun fromLyricsFile(value: String): List<LyricLine> {
