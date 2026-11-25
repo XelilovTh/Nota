@@ -64,7 +64,8 @@ jobs:
         run: ./gradlew --no-daemon assembleRelease
 
       - name: Verify release APK signature
-        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+        run: >-
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
 
       - name: Publish Release
         env:
