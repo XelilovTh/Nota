@@ -142,7 +142,7 @@ class HomeViewModelTest {
         repository.playbackState.value = PlaybackState(track = track3, isPlaying = true)
         ShadowLooper.idleMainLooper()
 
-        assertEquals(listOf(3L, 2L, 1L), settingsRepository.recentTrackIds.value)
+        assertEquals(listOf(3L, 2L, 999L, 1L), settingsRepository.recentTrackIds.value)
         assertEquals(listOf(track3, track2, track1), viewModel.recentlyPlayed.value)
     }
 }
