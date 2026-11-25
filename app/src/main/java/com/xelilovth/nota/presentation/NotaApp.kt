@@ -187,7 +187,7 @@ fun NotaApp() {
             composable(AppRoute.SEARCH) {
                 val activeTrackId by remember(playerViewModel) {
                     playerViewModel.playbackState.map { it.track?.id }.distinctUntilChanged()
-                }.collectAsStateWithLifecycle(initialValue = playerViewModel.playbackState.value.track?.id)
+                }.collectAsStateWithLifecycle(initialValue = null)
                 SearchScreen(
                     activeTrackId = activeTrackId,
                     onPlayWithNotificationPermission = requestPlaybackPermission,
@@ -196,7 +196,7 @@ fun NotaApp() {
             composable(AppRoute.LIBRARY) {
                 val activeTrackId by remember(playerViewModel) {
                     playerViewModel.playbackState.map { it.track?.id }.distinctUntilChanged()
-                }.collectAsStateWithLifecycle(initialValue = playerViewModel.playbackState.value.track?.id)
+                }.collectAsStateWithLifecycle(initialValue = null)
                 LibraryScreen(
                     activeTrackId = activeTrackId,
                     onPlayWithNotificationPermission = requestPlaybackPermission,

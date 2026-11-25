@@ -16,8 +16,12 @@ object AppDimens {
     val IconSizeSmall = 18.dp
     val IconSizeMedium = 24.dp
     val IconSizeLarge = 28.dp
-    val PlayerArtworkFraction = 0.78f
+    val PlayerArtworkFraction = 0.72f
     val PlayerArtworkSize = 240.dp
+    val CircularSeekbarStroke = 3.dp
+    val CircularSeekbarThumbRadius = 6.dp
+    val CircularSeekbarRingGap = 14.dp
+    val PlaylistHeaderArtworkSize = 132.dp
     val PlayerArtworkIconSize = 64.dp
     val PlayerControlSpacing = 12.dp
     val PlayerActionHorizontalPadding = 4.dp

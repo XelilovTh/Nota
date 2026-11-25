@@ -1,7 +1,10 @@
 package com.xelilovth.nota.presentation.player
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,10 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -35,18 +37,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
@@ -55,6 +61,13 @@ import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
+
+private const val ARC_START_ANGLE = 135f
+private const val ARC_SWEEP_ANGLE = 270f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,8 +81,14 @@ fun NowPlayingScreen(
     onSettings: () -> Unit,
 ) {
     val duration = state.durationMs.coerceAtLeast(0L)
-    val sliderMax = duration.coerceAtLeast(1L).toFloat()
     val position = state.positionMs.coerceIn(0L, duration)
+    val playerProgress = if (duration > 0L) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+
+    var isDragging by remember { mutableStateOf(false) }
+    var dragProgress by remember { mutableFloatStateOf(0f) }
+    val displayProgress = if (isDragging) dragProgress else playerProgress
+    val displayPositionMs = if (isDragging && duration > 0L) (dragProgress * duration).toLong() else position
+
     var showRemaining by remember { mutableStateOf(false) }
     var showQueueSheet by remember { mutableStateOf(false) }
 
@@ -83,32 +102,25 @@ fun NowPlayingScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Back")
             }
-            Text("Now Playing", style = MaterialTheme.typography.titleLarge)
+            Text(
+                state.track?.album?.takeIf {
+                    it.isNotBlank() && !it.equals("Unknown album", ignoreCase = true)
+                } ?: "Now Playing",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = AppDimens.ElementSpacing),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
             IconButton(onClick = onSettings) {
                 Icon(Icons.Outlined.Settings, contentDescription = "Settings")
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.6f))
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(AppDimens.PlayerArtworkFraction).aspectRatio(1f),
-            shape = RoundedCornerShape(AppDimens.ShapeLarge),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-        ) {
-            TrackArtwork(
-                trackId = state.track?.id,
-                trackUri = state.track?.uri,
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(AppDimens.ShapeLarge),
-                iconPadding = AppDimens.ScreenPadding,
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(0.6f))
+        Spacer(modifier = Modifier.weight(0.4f))
 
         Column(
             Modifier.fillMaxWidth(),
@@ -121,15 +133,8 @@ fun NowPlayingScreen(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val subtitle = state.track?.let { track ->
-                if (track.album.isNotBlank() && !track.album.equals("Unknown album", ignoreCase = true)) {
-                    "${track.artist} · ${track.album}"
-                } else {
-                    track.artist
-                }
-            }.orEmpty()
             Text(
-                subtitle,
+                state.track?.artist.orEmpty(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
@@ -137,36 +142,55 @@ fun NowPlayingScreen(
             )
         }
 
-        Spacer(modifier = Modifier.weight(0.4f))
+        Spacer(modifier = Modifier.weight(0.35f))
 
-        Column(Modifier.fillMaxWidth()) {
-            Slider(
-                value = position.toFloat(),
-                onValueChange = { viewModel.seek(it.toLong()) },
-                valueRange = 0f..sliderMax,
-                enabled = duration > 0L,
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = MaterialTheme.colorScheme.outline,
-                ),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable { showRemaining = !showRemaining },
+        ) {
+            Text(
+                formatDuration(displayPositionMs),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatDuration(position), style = MaterialTheme.typography.labelMedium)
-                val endTimeLabel = if (showRemaining && duration > 0L) {
-                    "-${formatDuration((duration - position).coerceAtLeast(0L))}"
-                } else {
-                    formatDuration(duration)
-                }
-                Text(
-                    endTimeLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.clickable { showRemaining = !showRemaining },
-                )
+            Text(
+                "|",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.outline,
+            )
+            val rightTime = if (showRemaining && duration > 0L) {
+                "-${formatDuration((duration - displayPositionMs).coerceAtLeast(0L))}"
+            } else {
+                formatDuration(duration)
             }
+            Text(
+                rightTime,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
-        Spacer(modifier = Modifier.weight(0.3f))
+        Spacer(modifier = Modifier.weight(0.35f))
+
+        CircularArcPlayerArt(
+            track = state.track,
+            progress = displayProgress,
+            enabled = duration > 0L,
+            onProgressChange = { next ->
+                isDragging = true
+                dragProgress = next
+            },
+            onSeekFinish = { finalProgress ->
+                isDragging = false
+                if (duration > 0L) {
+                    viewModel.seek((finalProgress * duration).toLong())
+                }
+            },
+            modifier = Modifier.fillMaxWidth(AppDimens.PlayerArtworkFraction).aspectRatio(1f),
+        )
+
+        Spacer(modifier = Modifier.weight(0.55f))
 
         Row(
             Modifier.fillMaxWidth(),
@@ -211,7 +235,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.3f))
+        Spacer(modifier = Modifier.weight(0.35f))
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             TextButton(onClick = { showQueueSheet = true }, modifier = Modifier.weight(1f)) {
@@ -295,5 +319,121 @@ fun NowPlayingScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CircularArcPlayerArt(
+    track: Track?,
+    progress: Float,
+    enabled: Boolean,
+    onProgressChange: (Float) -> Unit,
+    onSeekFinish: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val activeColor = MaterialTheme.colorScheme.primary
+    val trackColor = MaterialTheme.colorScheme.outline
+    var latestProgress by remember { mutableFloatStateOf(progress) }
+    latestProgress = progress
+
+    Box(
+        modifier = modifier
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures { offset ->
+                    val fraction = touchOffsetToArcProgress(offset, size.width.toFloat(), size.height.toFloat())
+                    onSeekFinish(fraction)
+                }
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val fraction = touchOffsetToArcProgress(offset, size.width.toFloat(), size.height.toFloat())
+                        latestProgress = fraction
+                        onProgressChange(fraction)
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val fraction = touchOffsetToArcProgress(change.position, size.width.toFloat(), size.height.toFloat())
+                        latestProgress = fraction
+                        onProgressChange(fraction)
+                    },
+                    onDragEnd = { onSeekFinish(latestProgress) },
+                    onDragCancel = { onSeekFinish(latestProgress) },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokePx = AppDimens.CircularSeekbarStroke.toPx()
+            val thumbRadiusPx = AppDimens.CircularSeekbarThumbRadius.toPx()
+            val inset = thumbRadiusPx + strokePx
+            val diameter = min(size.width, size.height) - inset * 2f
+            val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
+            val arcSize = Size(diameter, diameter)
+
+            drawArc(
+                color = trackColor,
+                startAngle = ARC_START_ANGLE,
+                sweepAngle = ARC_SWEEP_ANGLE,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokePx, cap = StrokeCap.Round),
+            )
+            val clamped = progress.coerceIn(0f, 1f)
+            if (clamped > 0f) {
+                drawArc(
+                    color = activeColor,
+                    startAngle = ARC_START_ANGLE,
+                    sweepAngle = ARC_SWEEP_ANGLE * clamped,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokePx, cap = StrokeCap.Round),
+                )
+            }
+            val radius = diameter / 2f
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val theta = Math.toRadians((ARC_START_ANGLE + ARC_SWEEP_ANGLE * clamped).toDouble())
+            val thumbCenter = Offset(
+                x = center.x + (radius * cos(theta)).toFloat(),
+                y = center.y + (radius * sin(theta)).toFloat(),
+            )
+            drawCircle(
+                color = activeColor,
+                radius = thumbRadiusPx,
+                center = thumbCenter,
+            )
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(AppDimens.CircularSeekbarRingGap + AppDimens.CircularSeekbarThumbRadius),
+            shape = CircleShape,
+            border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            TrackArtwork(
+                trackId = track?.id,
+                trackUri = track?.uri,
+                modifier = Modifier.fillMaxSize(),
+                shape = CircleShape,
+                iconPadding = AppDimens.ScreenPadding,
+            )
+        }
+    }
+}
+
+private fun touchOffsetToArcProgress(offset: Offset, width: Float, height: Float): Float {
+    val cx = width / 2f
+    val cy = height / 2f
+    val angleDeg = Math.toDegrees(atan2((offset.y - cy).toDouble(), (offset.x - cx).toDouble())).toFloat()
+    val normalized = (angleDeg + 360f) % 360f
+    val relative = (normalized - ARC_START_ANGLE + 360f) % 360f
+    return when {
+        relative <= ARC_SWEEP_ANGLE -> (relative / ARC_SWEEP_ANGLE).coerceIn(0f, 1f)
+        relative < ARC_SWEEP_ANGLE + 45f -> 1f
+        else -> 0f
     }
 }

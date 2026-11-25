@@ -1,5 +1,6 @@
 package com.xelilovth.nota.presentation.playlists
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -22,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
 import com.xelilovth.nota.presentation.home.HomeViewModel
+import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 
@@ -96,23 +100,43 @@ fun PlaylistDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
                 item(key = "playlist_actions") {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth().padding(bottom = AppDimens.ElementSpacing),
-                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
                     ) {
-                        Button(
-                            onClick = { onPlayWithNotificationPermission { viewModel.playPlaylist(playlist) } },
-                            modifier = Modifier.weight(1f),
+                        val coverTrack = playlist.tracks.firstOrNull()
+                        Surface(
+                            modifier = Modifier.size(AppDimens.PlaylistHeaderArtworkSize),
+                            shape = CircleShape,
+                            border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
                         ) {
-                            Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(AppDimens.IconSizeSmall))
-                            Text(" Play")
+                            TrackArtwork(
+                                trackId = coverTrack?.id,
+                                trackUri = coverTrack?.uri,
+                                modifier = Modifier.fillMaxSize(),
+                                shape = CircleShape,
+                                iconPadding = AppDimens.ScreenPadding,
+                            )
                         }
-                        OutlinedButton(
-                            onClick = { onPlayWithNotificationPermission { viewModel.playPlaylistShuffled(playlist) } },
-                            modifier = Modifier.weight(1f),
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                         ) {
-                            Icon(Icons.Filled.Shuffle, null, modifier = Modifier.size(AppDimens.IconSizeSmall))
-                            Text(" Shuffle")
+                            Button(
+                                onClick = { onPlayWithNotificationPermission { viewModel.playPlaylist(playlist) } },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(AppDimens.IconSizeSmall))
+                                Text(" Play")
+                            }
+                            OutlinedButton(
+                                onClick = { onPlayWithNotificationPermission { viewModel.playPlaylistShuffled(playlist) } },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Filled.Shuffle, null, modifier = Modifier.size(AppDimens.IconSizeSmall))
+                                Text(" Shuffle")
+                            }
                         }
                     }
                 }
