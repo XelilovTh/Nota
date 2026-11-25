@@ -9,6 +9,6 @@
     <string name="lyrics_not_found_description">Bu parça için eşleşen şarkı sözü bulamadık</string>
     <string name="lyrics_instrumental">Enstrümantal parça</string>
     <string name="lyrics_instrumental_description">Bu parçanın sözleri yok</string>
-    <string name="lyrics_search_genius">Genius'ta ara</string>
+    <string name="lyrics_search_genius">Genius üzerinde ara</string>
     <string name="lyrics_swipe_hint">ŞARKI SÖZLERİ İÇİN YUKARI KAYDIR</string>
 </resources>
