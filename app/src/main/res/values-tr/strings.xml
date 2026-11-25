@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Nota</string>
+    <string name="notification_channel_playback">Müzik çalma</string>
+    <string name="playback_error_notification">Ses hatası nedeniyle çalma durduruldu</string>
     <string name="lyrics_title">ŞARKI SÖZLERİ</string>
     <string name="lyrics_word_synced">%1$s · Kelime senkronlu</string>
     <string name="lyrics_line_synced">%1$s · Senkronlu</string>
