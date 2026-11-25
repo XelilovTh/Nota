@@ -124,10 +124,13 @@ class PlayerViewModelTest {
         viewModel.next()
         viewModel.previous()
         viewModel.seek(420L)
-        viewModel.dismiss()
 
-        assertEquals(listOf("toggle", "next", "previous", "seek:420", "stop"), repository.calls)
+        assertEquals(listOf("toggle", "next", "previous", "seek:420"), repository.calls)
         assertEquals(420L, viewModel.playbackState.value.positionMs)
         assertEquals(repository.playbackState, viewModel.playbackState)
+
+        viewModel.dismiss()
+        assertEquals("stop", repository.calls.last())
+        assertEquals(0L, viewModel.playbackState.value.positionMs)
     }
 }
