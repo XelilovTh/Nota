@@ -10,7 +10,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -20,11 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.Track
@@ -32,10 +31,14 @@ import com.xelilovth.nota.domain.model.filterTracks
 import com.xelilovth.nota.presentation.home.CompactTrackRow
 import com.xelilovth.nota.presentation.home.HomeViewModel
 import com.xelilovth.nota.ui.theme.AppDimens
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SearchScreen(
     viewModel: HomeViewModel = hiltViewModel(),
+    activeTrackId: Long? = null,
     onPlayWithNotificationPermission: (() -> Unit) -> Unit,
 ) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
@@ -62,6 +65,14 @@ fun SearchScreen(
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Search title, artist or album") },
+            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                    }
+                }
+            },
             singleLine = true,
         )
         when {
@@ -77,7 +88,6 @@ fun SearchScreen(
             )
             else -> {
                 val listState = rememberLazyListState()
-                val playIconPainter = rememberVectorPainter(Icons.Filled.PlayArrow)
                 val onPlayTrack: (Track) -> Unit = remember(viewModel, onPlayWithNotificationPermission) {
                     { track -> onPlayWithNotificationPermission { viewModel.play(track) } }
                 }
@@ -89,7 +99,7 @@ fun SearchScreen(
                     items(results, key = Track::id, contentType = { "track" }) { track ->
                         CompactTrackRow(
                             track = track,
-                            playIconPainter = playIconPainter,
+                            isCurrent = track.id == activeTrackId,
                             onClick = { onPlayTrack(track) },
                         )
                     }

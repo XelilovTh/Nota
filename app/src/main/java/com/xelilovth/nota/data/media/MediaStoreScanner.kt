@@ -78,6 +78,9 @@ class MediaStoreScanner @Inject constructor(
         }
     }
 
-    private fun Cursor.stringOrFallback(columnIndex: Int, fallback: String): String =
-        if (columnIndex >= 0) getString(columnIndex)?.takeIf(String::isNotBlank) ?: fallback else fallback
+    private fun Cursor.stringOrFallback(columnIndex: Int, fallback: String): String {
+        if (columnIndex < 0) return fallback
+        val value = getString(columnIndex)?.trim()
+        return if (value.isNullOrBlank() || value.equals("<unknown>", ignoreCase = true)) fallback else value
+    }
 }

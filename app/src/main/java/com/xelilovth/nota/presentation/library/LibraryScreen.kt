@@ -7,20 +7,26 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.outlined.Sort
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,19 +39,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
+    activeTrackId: Long? = null,
     onPlayWithNotificationPermission: (() -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
@@ -59,7 +66,17 @@ fun LibraryScreen(
     }
     var permissionDenied by remember { mutableStateOf(false) }
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
+    val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
+    var sortMenuExpanded by remember { mutableStateOf(false) }
+
+    val sortedTracks = remember(tracks, sortOrder) {
+        when (sortOrder) {
+            LibrarySort.TITLE -> tracks.sortedBy { it.title.lowercase() }
+            LibrarySort.ARTIST -> tracks.sortedBy { it.artist.lowercase() }
+            LibrarySort.DURATION -> tracks.sortedByDescending { it.durationMs }
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
@@ -96,9 +113,8 @@ fun LibraryScreen(
             }
             else -> {
                 val listState = rememberLazyListState()
-                val playIconPainter = rememberVectorPainter(Icons.Filled.PlayArrow)
-                val onPlayTrack: (Track) -> Unit = remember(viewModel, onPlayWithNotificationPermission) {
-                    { track -> onPlayWithNotificationPermission { viewModel.onTrackSelected(track) } }
+                val onPlayTrack: (Track) -> Unit = remember(viewModel, sortedTracks, onPlayWithNotificationPermission) {
+                    { track -> onPlayWithNotificationPermission { viewModel.onTrackSelected(track, sortedTracks) } }
                 }
                 LazyColumn(
                     state = listState,
@@ -112,23 +128,61 @@ fun LibraryScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text("Library", style = MaterialTheme.typography.headlineMedium)
                                 Text(
-                                    "${tracks.size} tracks",
+                                    "${sortedTracks.size} tracks",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            IconButton(onClick = viewModel::scan, enabled = !isScanning) {
-                                Icon(Icons.Outlined.Refresh, contentDescription = "Rescan library")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { onPlayWithNotificationPermission { viewModel.playShuffled(sortedTracks) } },
+                                ) {
+                                    Icon(Icons.Filled.Shuffle, contentDescription = "Shuffle library")
+                                }
+                                Box {
+                                    IconButton(onClick = { sortMenuExpanded = true }) {
+                                        Icon(Icons.AutoMirrored.Outlined.Sort, contentDescription = "Sort")
+                                    }
+                                    DropdownMenu(
+                                        expanded = sortMenuExpanded,
+                                        onDismissRequest = { sortMenuExpanded = false },
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Title") },
+                                            onClick = {
+                                                viewModel.setSortOrder(LibrarySort.TITLE)
+                                                sortMenuExpanded = false
+                                            },
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Artist") },
+                                            onClick = {
+                                                viewModel.setSortOrder(LibrarySort.ARTIST)
+                                                sortMenuExpanded = false
+                                            },
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Duration") },
+                                            onClick = {
+                                                viewModel.setSortOrder(LibrarySort.DURATION)
+                                                sortMenuExpanded = false
+                                            },
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = viewModel::scan, enabled = !isScanning) {
+                                    Icon(Icons.Outlined.Refresh, contentDescription = "Rescan library")
+                                }
                             }
                         }
                     }
-                    items(tracks, key = Track::id, contentType = { "track" }) { track ->
+                    items(sortedTracks, key = Track::id, contentType = { "track" }) { track ->
                         TrackRow(
                             track = track,
-                            playIconPainter = playIconPainter,
+                            isCurrent = track.id == activeTrackId,
                             onPlay = { onPlayTrack(track) },
                         )
                     }
@@ -141,7 +195,7 @@ fun LibraryScreen(
 @Composable
 private fun TrackRow(
     track: Track,
-    playIconPainter: Painter,
+    isCurrent: Boolean,
     onPlay: () -> Unit,
 ) {
     Row(
@@ -154,6 +208,7 @@ private fun TrackRow(
             Text(
                 track.title,
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -165,7 +220,19 @@ private fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(painter = playIconPainter, contentDescription = null)
+        if (isCurrent) {
+            Icon(
+                Icons.Outlined.GraphicEq,
+                contentDescription = "Playing",
+                modifier = Modifier.size(AppDimens.IconSizeSmall),
+            )
+        } else {
+            Text(
+                formatDuration(track.durationMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

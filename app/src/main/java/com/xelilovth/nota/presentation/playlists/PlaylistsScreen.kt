@@ -25,7 +25,7 @@ import com.xelilovth.nota.ui.theme.AppDimens
 @Composable
 fun PlaylistsScreen(
     viewModel: HomeViewModel = hiltViewModel(),
-    onPlayWithNotificationPermission: (() -> Unit) -> Unit = {},
+    onOpenPlaylist: (String) -> Unit = {},
 ) {
     val tracks = viewModel.tracks.collectAsStateWithLifecycle().value
     val groups = remember(tracks) { groupTracksIntoPlaylists(tracks) }
@@ -43,9 +43,6 @@ fun PlaylistsScreen(
         }
     } else {
         val listState = rememberLazyListState()
-        val onPlayGroup: (AutoPlaylist) -> Unit = remember(viewModel, onPlayWithNotificationPermission) {
-            { group -> onPlayWithNotificationPermission { viewModel.playPlaylist(group) } }
-        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -63,7 +60,7 @@ fun PlaylistsScreen(
                 }
             }
             items(groups, key = AutoPlaylist::id, contentType = { "playlist" }) { group ->
-                PlaylistGroupRow(group) { onPlayGroup(group) }
+                PlaylistGroupRow(group) { onOpenPlaylist(group.id) }
             }
         }
     }

@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -39,9 +41,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,6 +52,7 @@ import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.AppRoute
 import com.xelilovth.nota.presentation.library.LibraryViewModel
+import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
@@ -71,7 +73,9 @@ fun HomeScreen(
     }
     var permissionDenied by remember { mutableStateOf(false) }
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
+    val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
+    val activeTrackId = playbackState.track?.id
     val isScanning by libraryViewModel.isScanning.collectAsStateWithLifecycle()
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
@@ -81,8 +85,6 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         if (hasPermission) libraryViewModel.scanIfEmpty() else permissionLauncher.launch(permission)
     }
-
-    val playIconPainter = rememberVectorPainter(Icons.Filled.PlayArrow)
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -170,7 +172,7 @@ fun HomeScreen(
         } else if (recentlyPlayed.isNotEmpty()) {
             item { SectionHeading("Recently Played") }
             items(recentlyPlayed, key = { "recent:${it.id}" }, contentType = { "track" }) { track ->
-                CompactTrackRow(track = track, playIconPainter = playIconPainter) {
+                CompactTrackRow(track = track, isCurrent = track.id == activeTrackId) {
                     onPlayWithNotificationPermission { viewModel.play(track) }
                 }
             }
@@ -210,7 +212,7 @@ internal fun SectionHeading(title: String) {
 @Composable
 internal fun CompactTrackRow(
     track: Track,
-    playIconPainter: Painter = rememberVectorPainter(Icons.Filled.PlayArrow),
+    isCurrent: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
@@ -221,6 +223,7 @@ internal fun CompactTrackRow(
             Text(
                 track.title,
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -232,7 +235,19 @@ internal fun CompactTrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(painter = playIconPainter, contentDescription = null)
+        if (isCurrent) {
+            Icon(
+                Icons.Outlined.GraphicEq,
+                contentDescription = "Playing",
+                modifier = Modifier.size(AppDimens.IconSizeSmall),
+            )
+        } else {
+            Text(
+                formatDuration(track.durationMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -268,15 +283,21 @@ internal fun PlaylistGroupRow(group: AutoPlaylist, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                val count = group.tracks.size
+                val unit = if (count == 1) "track" else "tracks"
                 Text(
-                    "${group.tracks.size} tracks · ${group.type.name.lowercase()}",
+                    "$count $unit · ${group.type.name.lowercase()}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

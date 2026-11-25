@@ -17,4 +17,9 @@ class AppRouteTest {
         assertEquals(AppRoute.SETTINGS, AppRoute.homeActionRoute("settings"))
         assertNull(AppRoute.homeActionRoute("unknown"))
     }
+
+    @Test
+    fun playlistDetailEncodesPlaylistId() {
+        assertEquals("playlist/album%3Amy%20album", AppRoute.playlistDetail("album:my album"))
+    }
 }

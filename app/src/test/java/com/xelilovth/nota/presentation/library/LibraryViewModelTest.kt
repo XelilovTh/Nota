@@ -103,4 +103,22 @@ class LibraryViewModelTest {
         org.robolectric.shadows.ShadowLooper.idleMainLooper()
         assertEquals(1, emptyRepo.scanCalls)
     }
+
+    @Test
+    fun sortOrderAndPlayShuffledUpdateStateAndQueue() {
+        val libraryTracks = listOf(track(1L), track(2L), track(3L))
+        val libraryRepository = FakeLibraryRepository(libraryTracks)
+        val playbackRepository = FakePlaybackRepository()
+        val viewModel = LibraryViewModel(
+            ObserveTracksUseCase(libraryRepository),
+            ScanLibraryUseCase(libraryRepository),
+            PlayTrackUseCase(playbackRepository),
+        )
+
+        viewModel.setSortOrder(LibrarySort.DURATION)
+        assertEquals(LibrarySort.DURATION, viewModel.sortOrder.value)
+
+        viewModel.playShuffled(libraryTracks)
+        assertEquals(libraryTracks.map(Track::id).toSet(), playbackRepository.queue.map(Track::id).toSet())
+    }
 }

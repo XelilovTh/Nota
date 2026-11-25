@@ -11,7 +11,7 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = AppColors.LightOnPrimary,
     secondary = AppColors.LightPrimary,
     onSecondary = AppColors.LightOnPrimary,
-    secondaryContainer = AppColors.LightSurfaceVariant,
+    secondaryContainer = AppColors.LightSurfaceContainerHigh,
     onSecondaryContainer = AppColors.LightOnSurface,
     background = AppColors.LightBackground,
     onBackground = AppColors.LightOnSurface,
@@ -21,6 +21,11 @@ private val LightColorScheme = lightColorScheme(
     onSurfaceVariant = AppColors.LightOnSurfaceVariant,
     outline = AppColors.LightOutline,
     outlineVariant = AppColors.LightOutline,
+    surfaceContainerLowest = AppColors.LightSurfaceContainerLowest,
+    surfaceContainerLow = AppColors.LightSurfaceContainerLow,
+    surfaceContainer = AppColors.LightSurfaceContainer,
+    surfaceContainerHigh = AppColors.LightSurfaceContainerHigh,
+    surfaceContainerHighest = AppColors.LightSurfaceContainerHighest,
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -28,7 +33,7 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = AppColors.DarkOnPrimary,
     secondary = AppColors.DarkPrimary,
     onSecondary = AppColors.DarkOnPrimary,
-    secondaryContainer = AppColors.DarkSurfaceVariant,
+    secondaryContainer = AppColors.DarkSurfaceContainerHigh,
     onSecondaryContainer = AppColors.DarkOnSurface,
     background = AppColors.DarkBackground,
     onBackground = AppColors.DarkOnSurface,
@@ -38,6 +43,11 @@ private val DarkColorScheme = darkColorScheme(
     onSurfaceVariant = AppColors.DarkOnSurfaceVariant,
     outline = AppColors.DarkOutline,
     outlineVariant = AppColors.DarkOutline,
+    surfaceContainerLowest = AppColors.DarkSurfaceContainerLowest,
+    surfaceContainerLow = AppColors.DarkSurfaceContainerLow,
+    surfaceContainer = AppColors.DarkSurfaceContainer,
+    surfaceContainerHigh = AppColors.DarkSurfaceContainerHigh,
+    surfaceContainerHighest = AppColors.DarkSurfaceContainerHighest,
 )
 
 @Composable

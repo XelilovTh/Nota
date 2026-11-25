@@ -7,11 +7,13 @@ import com.xelilovth.nota.domain.usecase.ObserveTracksUseCase
 import com.xelilovth.nota.domain.usecase.PlayTrackUseCase
 import com.xelilovth.nota.domain.usecase.ScanLibraryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+enum class LibrarySort { TITLE, ARTIST, DURATION }
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -23,6 +25,10 @@ class LibraryViewModel @Inject constructor(
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+    private val _sortOrder = MutableStateFlow(LibrarySort.TITLE)
+    val sortOrder: StateFlow<LibrarySort> = _sortOrder.asStateFlow()
+
     private var hasAttemptedScan = false
 
     fun scanIfEmpty() {
@@ -44,10 +50,19 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    fun onTrackSelected(track: Track) {
-        val libraryTracks = tracks.value
-        val selectedIndex = libraryTracks.indexOfFirst { it.id == track.id }
-        val queue = if (selectedIndex >= 0) libraryTracks.drop(selectedIndex) else listOf(track)
+    fun setSortOrder(order: LibrarySort) {
+        _sortOrder.value = order
+    }
+
+    fun onTrackSelected(track: Track, orderedTracks: List<Track> = tracks.value) {
+        val selectedIndex = orderedTracks.indexOfFirst { it.id == track.id }
+        val queue = if (selectedIndex >= 0) orderedTracks.drop(selectedIndex) else listOf(track)
         playTrack(track, queue)
+    }
+
+    fun playShuffled(orderedTracks: List<Track> = tracks.value) {
+        if (orderedTracks.isEmpty()) return
+        val shuffled = orderedTracks.shuffled()
+        playTrack(shuffled.first(), shuffled)
     }
 }

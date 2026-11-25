@@ -1,22 +1,25 @@
 package com.xelilovth.nota.presentation.player
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -24,38 +27,54 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
+import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.ui.components.TrackArtwork
+import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
     state: PlaybackState,
     viewModel: PlayerViewModel,
+    queueTracks: List<Track> = emptyList(),
+    sleepTimerRemainingSeconds: Long? = null,
     onBack: () -> Unit,
     onSleepTimer: () -> Unit,
-    onLyrics: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val duration = state.durationMs.coerceAtLeast(0L)
     val sliderMax = duration.coerceAtLeast(1L).toFloat()
     val position = state.positionMs.coerceIn(0L, duration)
+    var showRemaining by remember { mutableStateOf(false) }
+    var showQueueSheet by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(AppDimens.ScreenPadding),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
+        Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
@@ -72,21 +91,24 @@ fun NowPlayingScreen(
             }
         }
 
+        Spacer(modifier = Modifier.weight(0.6f))
+
         Surface(
-            modifier = Modifier.size(AppDimens.PlayerArtworkSize),
+            modifier = Modifier.fillMaxWidth(AppDimens.PlayerArtworkFraction).aspectRatio(1f),
             shape = RoundedCornerShape(AppDimens.ShapeLarge),
             color = MaterialTheme.colorScheme.surfaceVariant,
             border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Filled.MusicNote,
-                    contentDescription = "Album art placeholder",
-                    modifier = Modifier.size(AppDimens.PlayerArtworkIconSize),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            TrackArtwork(
+                trackId = state.track?.id,
+                trackUri = state.track?.uri,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(AppDimens.ShapeLarge),
+                iconPadding = AppDimens.ScreenPadding,
+            )
         }
+
+        Spacer(modifier = Modifier.weight(0.6f))
 
         Column(
             Modifier.fillMaxWidth(),
@@ -99,8 +121,15 @@ fun NowPlayingScreen(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val subtitle = state.track?.let { track ->
+                if (track.album.isNotBlank() && !track.album.equals("Unknown album", ignoreCase = true)) {
+                    "${track.artist} · ${track.album}"
+                } else {
+                    track.artist
+                }
+            }.orEmpty()
             Text(
-                state.track?.artist.orEmpty(),
+                subtitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
@@ -108,18 +137,36 @@ fun NowPlayingScreen(
             )
         }
 
+        Spacer(modifier = Modifier.weight(0.4f))
+
         Column(Modifier.fillMaxWidth()) {
             Slider(
                 value = position.toFloat(),
                 onValueChange = { viewModel.seek(it.toLong()) },
                 valueRange = 0f..sliderMax,
                 enabled = duration > 0L,
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.outline,
+                ),
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatPlaybackTime(position), style = MaterialTheme.typography.labelMedium)
-                Text(formatPlaybackTime(duration), style = MaterialTheme.typography.labelMedium)
+                Text(formatDuration(position), style = MaterialTheme.typography.labelMedium)
+                val endTimeLabel = if (showRemaining && duration > 0L) {
+                    "-${formatDuration((duration - position).coerceAtLeast(0L))}"
+                } else {
+                    formatDuration(duration)
+                }
+                Text(
+                    endTimeLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.clickable { showRemaining = !showRemaining },
+                )
             }
         }
+
+        Spacer(modifier = Modifier.weight(0.3f))
 
         Row(
             Modifier.fillMaxWidth(),
@@ -164,20 +211,89 @@ fun NowPlayingScreen(
             }
         }
 
+        Spacer(modifier = Modifier.weight(0.3f))
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            TextButton(onClick = onLyrics, modifier = Modifier.weight(1f)) { Text("Lyrics") }
+            TextButton(onClick = { showQueueSheet = true }, modifier = Modifier.weight(1f)) {
+                Icon(Icons.AutoMirrored.Outlined.QueueMusic, contentDescription = null, modifier = Modifier.size(AppDimens.IconSizeSmall))
+                Text(" Queue (${queueTracks.size})", maxLines = 1)
+            }
             TextButton(
                 onClick = onSleepTimer,
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = AppDimens.PlayerActionHorizontalPadding),
-            ) { Text("Sleep Timer", maxLines = 1) }
+            ) {
+                Icon(Icons.Outlined.Bedtime, contentDescription = null, modifier = Modifier.size(AppDimens.IconSizeSmall))
+                val sleepLabel = if (sleepTimerRemainingSeconds != null) {
+                    " ${formatDuration(sleepTimerRemainingSeconds * 1_000L)}"
+                } else {
+                    " Sleep Timer"
+                }
+                Text(sleepLabel, maxLines = 1)
+            }
         }
     }
-}
 
-private fun formatPlaybackTime(positionMs: Long): String {
-    val totalSeconds = positionMs.coerceAtLeast(0L) / 1_000L
-    val minutes = totalSeconds / 60L
-    val seconds = totalSeconds % 60L
-    return "$minutes:${seconds.toString().padStart(2, '0')}"
+    if (showQueueSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showQueueSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
+                Text(
+                    "Up Next",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = AppDimens.ElementSpacing),
+                )
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    items(queueTracks, key = Track::id, contentType = { "queue_track" }) { track ->
+                        val isCurrent = track.id == state.track?.id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.onRowClick(track, queueTracks)
+                                    showQueueSheet = false
+                                }
+                                .padding(vertical = AppDimens.ElementSpacing),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    track.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    track.artist,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (isCurrent) {
+                                Icon(
+                                    Icons.Outlined.GraphicEq,
+                                    contentDescription = "Playing",
+                                    modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                )
+                            } else {
+                                Text(
+                                    formatDuration(track.durationMs),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

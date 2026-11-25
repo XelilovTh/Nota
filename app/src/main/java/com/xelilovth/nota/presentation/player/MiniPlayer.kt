@@ -5,15 +5,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,34 +24,36 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
+import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @Composable
 fun MiniPlayer(state: PlaybackState, viewModel: PlayerViewModel, onOpen: () -> Unit) {
     val track = state.track ?: return
+    val duration = state.durationMs.coerceAtLeast(0L)
+    val progress = if (duration > 0L) (state.positionMs.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(AppDimens.MiniPlayerProgressHeight),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.outline,
+            )
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = AppDimens.MiniPlayerPadding, vertical = AppDimens.ElementSpacing),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
-                Surface(
+                TrackArtwork(
+                    trackId = track.id,
+                    trackUri = track.uri,
                     modifier = Modifier.size(AppDimens.ArtworkSmallSize),
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surface,
-                ) {
-                    Icon(
-                        Icons.Outlined.MusicNote,
-                        contentDescription = null,
-                        modifier = Modifier.padding(AppDimens.ElementSpacing),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                )
                 Column(Modifier.weight(1f)) {
                     Text(
                         track.title,
@@ -65,11 +69,17 @@ fun MiniPlayer(state: PlaybackState, viewModel: PlayerViewModel, onOpen: () -> U
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                IconButton(onClick = viewModel::previous) {
+                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous")
+                }
                 IconButton(onClick = viewModel::togglePlayPause) {
                     Icon(
                         if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (state.isPlaying) "Pause" else "Play",
                     )
+                }
+                IconButton(onClick = viewModel::next) {
+                    Icon(Icons.Filled.SkipNext, contentDescription = "Next")
                 }
             }
         }

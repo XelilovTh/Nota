@@ -2,6 +2,7 @@ package com.xelilovth.nota.presentation
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,23 +33,29 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.navigation.navOptions
 import com.xelilovth.nota.presentation.home.HomeScreen
 import com.xelilovth.nota.presentation.library.LibraryScreen
+import com.xelilovth.nota.presentation.library.LibraryViewModel
 import com.xelilovth.nota.presentation.player.MiniPlayer
 import com.xelilovth.nota.presentation.player.NowPlayingScreen
 import com.xelilovth.nota.presentation.player.PlayerViewModel
+import com.xelilovth.nota.presentation.playlists.PlaylistDetailScreen
 import com.xelilovth.nota.presentation.playlists.PlaylistsScreen
 import com.xelilovth.nota.presentation.search.SearchScreen
 import com.xelilovth.nota.presentation.settings.SettingsScreen
+import com.xelilovth.nota.presentation.settings.SettingsViewModel
 import com.xelilovth.nota.presentation.settings.SleepTimerScreen
-import com.xelilovth.nota.ui.components.ComingSoonScreen
 
 private data class TabItem(
     val route: String,
@@ -109,6 +117,8 @@ fun NotaApp() {
     val currentDestination = backStackEntry?.destination
     val currentRoute = currentDestination?.route
     val playerViewModel: PlayerViewModel = hiltViewModel()
+    val libraryViewModel: LibraryViewModel = hiltViewModel()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
     val showTabs = currentRoute in AppRoute.bottomTabs
 
     Scaffold(
@@ -136,6 +146,13 @@ fun NotaApp() {
                                 },
                                 icon = { Icon(tab.icon, contentDescription = tab.label) },
                                 label = { Text(tab.label) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
                             )
                         }
                     }
@@ -149,9 +166,40 @@ fun NotaApp() {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(AppRoute.HOME) { HomeScreen(navController, onPlayWithNotificationPermission = requestPlaybackPermission) }
-            composable(AppRoute.PLAYLISTS) { PlaylistsScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
-            composable(AppRoute.SEARCH) { SearchScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
-            composable(AppRoute.LIBRARY) { LibraryScreen(onPlayWithNotificationPermission = requestPlaybackPermission) }
+            composable(AppRoute.PLAYLISTS) {
+                PlaylistsScreen(
+                    onOpenPlaylist = { playlistId -> navController.navigate(AppRoute.playlistDetail(playlistId)) },
+                )
+            }
+            composable(
+                route = AppRoute.PLAYLIST_DETAIL,
+                arguments = listOf(navArgument("playlistId") { type = NavType.StringType }),
+            ) { entry ->
+                val rawId = entry.arguments?.getString("playlistId").orEmpty()
+                PlaylistDetailScreen(
+                    playlistId = Uri.decode(rawId),
+                    onBack = { navController.popBackStack() },
+                    onPlayWithNotificationPermission = requestPlaybackPermission,
+                )
+            }
+            composable(AppRoute.SEARCH) {
+                val activeTrackId by remember(playerViewModel) {
+                    playerViewModel.playbackState.map { it.track?.id }.distinctUntilChanged()
+                }.collectAsStateWithLifecycle(initialValue = playerViewModel.playbackState.value.track?.id)
+                SearchScreen(
+                    activeTrackId = activeTrackId,
+                    onPlayWithNotificationPermission = requestPlaybackPermission,
+                )
+            }
+            composable(AppRoute.LIBRARY) {
+                val activeTrackId by remember(playerViewModel) {
+                    playerViewModel.playbackState.map { it.track?.id }.distinctUntilChanged()
+                }.collectAsStateWithLifecycle(initialValue = playerViewModel.playbackState.value.track?.id)
+                LibraryScreen(
+                    activeTrackId = activeTrackId,
+                    onPlayWithNotificationPermission = requestPlaybackPermission,
+                )
+            }
             composable(AppRoute.SETTINGS) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
@@ -161,17 +209,17 @@ fun NotaApp() {
             composable(AppRoute.SLEEP_TIMER) {
                 SleepTimerScreen(onBack = { navController.popBackStack() })
             }
-            composable(AppRoute.LYRICS) {
-                ComingSoonScreen("Lyrics", onBack = { navController.popBackStack() })
-            }
             composable(AppRoute.NOW_PLAYING) {
                 val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
+                val queueTracks by libraryViewModel.tracks.collectAsStateWithLifecycle()
+                val sleepSeconds by settingsViewModel.sleepTimerRemainingSeconds.collectAsStateWithLifecycle()
                 NowPlayingScreen(
                     state = playbackState,
                     viewModel = playerViewModel,
+                    queueTracks = queueTracks,
+                    sleepTimerRemainingSeconds = sleepSeconds,
                     onBack = { navController.popBackStack() },
                     onSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
-                    onLyrics = { navController.navigate(AppRoute.LYRICS) },
                     onSettings = { navController.navigate(AppRoute.SETTINGS) },
                 )
             }
