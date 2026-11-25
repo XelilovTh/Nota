@@ -39,6 +39,7 @@ import kotlinx.coroutines.withContext
 fun SearchScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     activeTrackId: Long? = null,
+    isPlaying: Boolean = false,
     onPlayWithNotificationPermission: (() -> Unit) -> Unit,
 ) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
@@ -100,6 +101,7 @@ fun SearchScreen(
                         CompactTrackRow(
                             track = track,
                             isCurrent = track.id == activeTrackId,
+                            isPlaying = track.id == activeTrackId && isPlaying,
                             onClick = { onPlayTrack(track) },
                         )
                     }

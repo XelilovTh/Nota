@@ -53,6 +53,7 @@ import com.xelilovth.nota.ui.theme.AppDimens
 fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
     activeTrackId: Long? = null,
+    isPlaying: Boolean = false,
     onPlayWithNotificationPermission: (() -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
@@ -183,6 +184,7 @@ fun LibraryScreen(
                         TrackRow(
                             track = track,
                             isCurrent = track.id == activeTrackId,
+                            isPlaying = track.id == activeTrackId && isPlaying,
                             onPlay = { onPlayTrack(track) },
                         )
                     }
@@ -196,6 +198,7 @@ fun LibraryScreen(
 private fun TrackRow(
     track: Track,
     isCurrent: Boolean,
+    isPlaying: Boolean,
     onPlay: () -> Unit,
 ) {
     Row(
@@ -220,7 +223,7 @@ private fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (isCurrent) {
+        if (isCurrent && isPlaying) {
             Icon(
                 Icons.Outlined.GraphicEq,
                 contentDescription = "Playing",

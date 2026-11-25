@@ -22,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -52,6 +51,7 @@ import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.AppRoute
 import com.xelilovth.nota.presentation.library.LibraryViewModel
+import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 
@@ -172,7 +172,11 @@ fun HomeScreen(
         } else if (recentlyPlayed.isNotEmpty()) {
             item { SectionHeading("Recently Played") }
             items(recentlyPlayed, key = { "recent:${it.id}" }, contentType = { "track" }) { track ->
-                CompactTrackRow(track = track, isCurrent = track.id == activeTrackId) {
+                CompactTrackRow(
+                    track = track,
+                    isCurrent = track.id == activeTrackId,
+                    isPlaying = track.id == activeTrackId && playbackState.isPlaying,
+                ) {
                     onPlayWithNotificationPermission { viewModel.play(track) }
                 }
             }
@@ -213,6 +217,7 @@ internal fun SectionHeading(title: String) {
 internal fun CompactTrackRow(
     track: Track,
     isCurrent: Boolean = false,
+    isPlaying: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
@@ -235,7 +240,7 @@ internal fun CompactTrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (isCurrent) {
+        if (isCurrent && isPlaying) {
             Icon(
                 Icons.Outlined.GraphicEq,
                 contentDescription = "Playing",
@@ -253,6 +258,7 @@ internal fun CompactTrackRow(
 
 @Composable
 internal fun PlaylistGroupRow(group: AutoPlaylist, onClick: () -> Unit) {
+    val coverTrack = group.tracks.firstOrNull()
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
@@ -264,18 +270,11 @@ internal fun PlaylistGroupRow(group: AutoPlaylist, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
         ) {
-            Surface(
+            TrackArtwork(
+                trackId = coverTrack?.id,
+                trackUri = coverTrack?.uri,
                 modifier = Modifier.size(AppDimens.ArtworkSmallSize),
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-            ) {
-                Icon(
-                    Icons.Outlined.MusicNote,
-                    contentDescription = null,
-                    modifier = Modifier.padding(AppDimens.ElementSpacing),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     group.title,

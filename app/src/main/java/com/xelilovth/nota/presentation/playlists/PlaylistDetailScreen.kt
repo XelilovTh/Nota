@@ -165,7 +165,7 @@ fun PlaylistDetailScreen(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        if (isCurrent) {
+                        if (isCurrent && playbackState.isPlaying) {
                             Icon(
                                 Icons.Outlined.GraphicEq,
                                 contentDescription = "Playing",
