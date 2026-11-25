@@ -48,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
+import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 
@@ -215,10 +216,16 @@ private fun TrackRow(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
         modifier = Modifier.fillMaxWidth()
             .clickable(onClick = onPlay)
             .padding(vertical = AppDimens.RowVerticalPadding),
     ) {
+        TrackArtwork(
+            trackId = track.id,
+            trackUri = track.uri,
+            modifier = Modifier.size(AppDimens.ArtworkSmallSize),
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 track.title,

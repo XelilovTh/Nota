@@ -56,6 +56,7 @@ fun PlaylistsScreen(
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<CustomPlaylist?>(null) }
+    var deleteTarget by remember { mutableStateOf<CustomPlaylist?>(null) }
 
     val listState = rememberLazyListState()
 
@@ -104,7 +105,7 @@ fun PlaylistsScreen(
                     trackCount = resolvedTracks.size,
                     onClick = { onOpenPlaylist(playlist.id) },
                     onRename = { renameTarget = playlist },
-                    onDelete = { viewModel.deletePlaylist(playlist.id) },
+                    onDelete = { deleteTarget = playlist },
                 )
             }
         }
@@ -160,6 +161,17 @@ fun PlaylistsScreen(
             onConfirm = { newName ->
                 viewModel.renamePlaylist(target.id, newName)
                 renameTarget = null
+            },
+        )
+    }
+
+    deleteTarget?.let { target ->
+        DeletePlaylistDialog(
+            playlistName = target.name,
+            onDismiss = { deleteTarget = null },
+            onConfirm = {
+                viewModel.deletePlaylist(target.id)
+                deleteTarget = null
             },
         )
     }

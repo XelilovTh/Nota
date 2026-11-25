@@ -157,3 +157,26 @@ fun PlaylistNameDialog(
         },
     )
 }
+
+@Composable
+fun DeletePlaylistDialog(
+    playlistName: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete playlist?") },
+        text = { Text("Remove \"$playlistName\" from your playlists?") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}

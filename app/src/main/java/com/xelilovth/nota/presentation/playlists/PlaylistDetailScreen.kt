@@ -88,6 +88,7 @@ fun PlaylistDetailScreen(
 
     var showAddSongsSheet by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -121,10 +122,7 @@ fun PlaylistDetailScreen(
                 IconButton(onClick = { showRenameDialog = true }) {
                     Icon(Icons.Outlined.Edit, contentDescription = "Rename playlist")
                 }
-                IconButton(onClick = {
-                    viewModel.deletePlaylist(customPlaylist.id)
-                    onBack()
-                }) {
+                IconButton(onClick = { showDeleteDialog = true }) {
                     Icon(Icons.Outlined.Delete, contentDescription = "Delete playlist")
                 }
             }
@@ -308,6 +306,18 @@ fun PlaylistDetailScreen(
             onConfirm = { newName ->
                 viewModel.renamePlaylist(customPlaylist.id, newName)
                 showRenameDialog = false
+            },
+        )
+    }
+
+    if (showDeleteDialog && customPlaylist != null) {
+        DeletePlaylistDialog(
+            playlistName = customPlaylist.name,
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = {
+                showDeleteDialog = false
+                viewModel.deletePlaylist(customPlaylist.id)
+                onBack()
             },
         )
     }
