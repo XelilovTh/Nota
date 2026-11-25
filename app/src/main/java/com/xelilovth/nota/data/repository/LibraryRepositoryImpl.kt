@@ -8,10 +8,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,28 +19,32 @@ class LibraryRepositoryImpl @Inject constructor(
     private val scanner: AudioScanner,
     private val settingsRepository: SettingsRepository,
 ) : LibraryRepository {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val rawTracks = MutableStateFlow<List<Track>>(emptyList())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var rawTracks: List<Track> = emptyList()
+    private val _tracks = MutableStateFlow<List<Track>>(emptyList())
+    override val tracks: StateFlow<List<Track>> = _tracks.asStateFlow()
 
-    override val tracks: StateFlow<List<Track>> = combine(
-        rawTracks,
-        settingsRepository.settings,
-    ) { list, settings ->
-        if (settings.hideShortTracks) {
-            list.filter { it.durationMs >= SHORT_TRACK_THRESHOLD_MS }
-        } else {
-            list
+    init {
+        scope.launch {
+            settingsRepository.settings.collect {
+                publishFilteredTracks()
+            }
         }
-    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+    }
 
     override suspend fun scan(): List<Track> {
-        val scannedTracks = scanner.scan()
-        rawTracks.value = scannedTracks
-        return if (settingsRepository.settings.value.hideShortTracks) {
-            scannedTracks.filter { it.durationMs >= SHORT_TRACK_THRESHOLD_MS }
+        rawTracks = scanner.scan()
+        return publishFilteredTracks()
+    }
+
+    private fun publishFilteredTracks(): List<Track> {
+        val filtered = if (settingsRepository.settings.value.hideShortTracks) {
+            rawTracks.filter { it.durationMs >= SHORT_TRACK_THRESHOLD_MS }
         } else {
-            scannedTracks
+            rawTracks
         }
+        _tracks.value = filtered
+        return filtered
     }
 
     private companion object {
