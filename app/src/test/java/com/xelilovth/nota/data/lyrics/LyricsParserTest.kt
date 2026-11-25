@@ -81,7 +81,7 @@ class LyricsParserTest {
     }
 
     @Test
-    fun ignoresInvalidWordTimestampsWithoutDroppingTheLyricLine() {
+    fun fallsBackToLineTextWhenAnyWordTimestampIsInvalid() {
         val lyricsFile = """version: '1.0'
             |lines:
             |  - text: Keep this line
@@ -99,8 +99,7 @@ class LyricsParserTest {
 
         assertEquals(1, lines.size)
         assertEquals("Keep this line", lines.single().text)
-        assertEquals(listOf("this ", "line"), lines.single().words.map { it.text })
-        assertEquals(1_200L, lines.single().words.first().endMs)
+        assertTrue(lines.single().words.isEmpty())
     }
 
     @Test

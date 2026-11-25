@@ -52,7 +52,8 @@ internal object LyricsParser {
             val line = rawLine as? Map<*, *> ?: return@mapNotNull null
             val text = (line["text"] as? String)?.trimEnd() ?: return@mapNotNull null
             if (text.isBlank()) return@mapNotNull null
-            val parsedWords = (line["words"] as? List<*>).orEmpty().mapNotNull { rawWord ->
+            val rawWords = (line["words"] as? List<*>).orEmpty()
+            val parsedWords = rawWords.mapNotNull { rawWord ->
                 val word = rawWord as? Map<*, *> ?: return@mapNotNull null
                 val wordText = word["text"] as? String ?: return@mapNotNull null
                 val startMs = (word["start_ms"] as? Number)?.toLong()?.takeIf { it >= 0L }
@@ -63,9 +64,10 @@ internal object LyricsParser {
                     endMs = (word["end_ms"] as? Number)?.toLong()?.takeIf { it > startMs },
                 )
             }
-            // Keep the lyric's original word order; malformed timing falls back to line sync.
+            // Keep the lyric's original word order and full text; malformed timing falls back to line sync.
             val words = parsedWords.takeIf { list ->
-                list.zipWithNext().all { (current, next) -> next.startMs >= current.startMs }
+                list.size == rawWords.size &&
+                    list.zipWithNext().all { (current, next) -> next.startMs >= current.startMs }
             }.orEmpty()
             val lineStart = (line["start_ms"] as? Number)?.toLong()?.takeIf { it >= 0L }
                 ?: words.firstOrNull()?.startMs
