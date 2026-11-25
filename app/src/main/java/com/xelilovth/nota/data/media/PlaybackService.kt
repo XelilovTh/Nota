@@ -79,11 +79,7 @@ class PlaybackService : Service() {
                 updateNotification()
             }
             ACTION_PREVIOUS -> {
-                if (player.currentPosition > 3_000L || !player.hasPreviousMediaItem()) {
-                    player.seekTo(0L)
-                } else {
-                    player.seekToPreviousMediaItem()
-                }
+                PlaybackNavigation.skipPrevious(player)
                 updateNotification()
             }
             ACTION_STOP -> {
@@ -91,7 +87,12 @@ class PlaybackService : Service() {
                 stopSelf()
             }
             else -> {
-                startForegroundWithNotification(buildMediaNotification(player))
+                if (player.mediaItemCount == 0) {
+                    ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
+                } else {
+                    startForegroundWithNotification(buildMediaNotification(player))
+                }
             }
         }
         return START_NOT_STICKY

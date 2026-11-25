@@ -2,6 +2,7 @@ package com.xelilovth.nota.data.repository
 
 import android.content.Context
 import com.xelilovth.nota.domain.model.CustomPlaylist
+import com.xelilovth.nota.domain.model.PlaylistCollectionType
 import com.xelilovth.nota.domain.repository.CustomPlaylistRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,16 +21,32 @@ class CustomPlaylistRepositoryImpl @Inject constructor(
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val _playlists = MutableStateFlow(loadPlaylists())
     override val playlists: StateFlow<List<CustomPlaylist>> = _playlists.asStateFlow()
+    private val _hiddenAutoGroupIds = MutableStateFlow(loadHiddenAutoGroups())
+    override val hiddenAutoGroupIds: StateFlow<Set<String>> = _hiddenAutoGroupIds.asStateFlow()
 
-    override fun createPlaylist(name: String): CustomPlaylist {
-        val cleanName = name.trim().ifBlank { "Untitled Playlist" }
+    override fun createPlaylist(name: String): CustomPlaylist =
+        createCollection(name, PlaylistCollectionType.PLAYLIST)
+
+    override fun createCollection(
+        name: String,
+        type: PlaylistCollectionType,
+        trackIds: List<Long>,
+    ): CustomPlaylist {
+        val cleanName = name.trim().ifBlank { "Untitled ${type.name.lowercase()}" }
         val created = CustomPlaylist(
-            id = "custom:${UUID.randomUUID()}",
+            id = "custom:${type.name.lowercase()}:${UUID.randomUUID()}",
             name = cleanName,
-            trackIds = emptyList(),
+            trackIds = trackIds.distinct(),
+            type = type,
         )
         updateAndSave(_playlists.value + created)
         return created
+    }
+
+    override fun hideAutoGroup(groupId: String) {
+        val updated = _hiddenAutoGroupIds.value + groupId
+        _hiddenAutoGroupIds.value = updated
+        prefs.edit().putString(KEY_HIDDEN_GROUPS, JSONArray(updated.toList()).toString()).apply()
     }
 
     override fun renamePlaylist(playlistId: String, newName: String) {
@@ -80,6 +97,7 @@ class CustomPlaylistRepositoryImpl @Inject constructor(
             val idsArray = JSONArray()
             playlist.trackIds.forEach { idsArray.put(it) }
             obj.put("trackIds", idsArray)
+            obj.put("type", playlist.type.name)
             array.put(obj)
         }
         prefs.edit().putString(KEY_PLAYLISTS, array.toString()).apply()
@@ -103,6 +121,8 @@ class CustomPlaylistRepositoryImpl @Inject constructor(
                             id = obj.getString("id"),
                             name = obj.getString("name"),
                             trackIds = trackIds,
+                            type = runCatching { PlaylistCollectionType.valueOf(obj.optString("type", "PLAYLIST")) }
+                                .getOrDefault(PlaylistCollectionType.PLAYLIST),
                         ),
                     )
                 }
@@ -112,8 +132,17 @@ class CustomPlaylistRepositoryImpl @Inject constructor(
         }
     }
 
+    private fun loadHiddenAutoGroups(): Set<String> {
+        val raw = prefs.getString(KEY_HIDDEN_GROUPS, null) ?: return emptySet()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildSet { for (i in 0 until array.length()) add(array.getString(i)) }
+        }.getOrDefault(emptySet())
+    }
+
     private companion object {
         const val PREFS_NAME = "nota_custom_playlists"
         const val KEY_PLAYLISTS = "playlists_json"
+        const val KEY_HIDDEN_GROUPS = "hidden_auto_groups"
     }
 }

@@ -1,6 +1,5 @@
 package com.xelilovth.nota.domain.model
 
-import android.net.Uri
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,7 +10,7 @@ import org.robolectric.RobolectricTestRunner
 
 class AutoPlaylistGroupingTest {
     private fun track(id: Long, album: String, folder: String) =
-        Track(id, Uri.parse("content://audio/$id"), "Track $id", "Artist", album, 1000L, folder)
+        Track(id, "content://audio/$id", "Track $id", "Artist", album, 1000L, folder)
 
     @Test
     fun groupsTracksByAlbumAndUsesFolderWhenAlbumIsUnknown() {

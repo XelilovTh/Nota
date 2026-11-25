@@ -55,8 +55,7 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun onTrackSelected(track: Track, orderedTracks: List<Track> = tracks.value) {
-        val selectedIndex = orderedTracks.indexOfFirst { it.id == track.id }
-        val queue = if (selectedIndex >= 0) orderedTracks.drop(selectedIndex) else listOf(track)
+        val queue = if (orderedTracks.any { it.id == track.id }) orderedTracks else listOf(track)
         playTrack(track, queue)
     }
 

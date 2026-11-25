@@ -2,6 +2,8 @@ package com.xelilovth.nota.presentation.playlists
 
 import androidx.lifecycle.ViewModel
 import com.xelilovth.nota.domain.model.CustomPlaylist
+import com.xelilovth.nota.domain.model.AutoPlaylist
+import com.xelilovth.nota.domain.model.PlaylistCollectionType
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.CustomPlaylistRepository
@@ -22,10 +24,26 @@ class PlaylistsViewModel @Inject constructor(
     private val toggleShuffle: ToggleShuffleUseCase,
 ) : ViewModel() {
     val customPlaylists: StateFlow<List<CustomPlaylist>> = customPlaylistRepository.playlists
+    val hiddenAutoGroupIds: StateFlow<Set<String>> = customPlaylistRepository.hiddenAutoGroupIds
     val tracks: StateFlow<List<Track>> = observeTracks()
     val playbackState: StateFlow<PlaybackState> = playbackRepository.playbackState
 
     fun createPlaylist(name: String): CustomPlaylist = customPlaylistRepository.createPlaylist(name)
+
+    fun createCollection(name: String, type: PlaylistCollectionType): CustomPlaylist =
+        customPlaylistRepository.createCollection(name, type)
+
+    fun editAutoGroup(group: AutoPlaylist): CustomPlaylist {
+        val collection = customPlaylistRepository.createCollection(
+            name = group.title,
+            type = if (group.type == com.xelilovth.nota.domain.model.PlaylistGroupType.ALBUM) PlaylistCollectionType.ALBUM else PlaylistCollectionType.FOLDER,
+            trackIds = group.tracks.map(Track::id),
+        )
+        customPlaylistRepository.hideAutoGroup(group.id)
+        return collection
+    }
+
+    fun deleteAutoGroup(groupId: String) = customPlaylistRepository.hideAutoGroup(groupId)
 
     fun renamePlaylist(playlistId: String, newName: String) =
         customPlaylistRepository.renamePlaylist(playlistId, newName)
@@ -41,8 +59,7 @@ class PlaylistsViewModel @Inject constructor(
     fun playTracks(playlistTracks: List<Track>, startTrack: Track? = null) {
         if (playlistTracks.isEmpty()) return
         val selected = startTrack ?: playlistTracks.first()
-        val index = playlistTracks.indexOfFirst { it.id == selected.id }
-        val queue = if (index >= 0) playlistTracks.drop(index) else playlistTracks
+        val queue = if (playlistTracks.any { it.id == selected.id }) playlistTracks else listOf(selected)
         playTrack(selected, queue)
     }
 

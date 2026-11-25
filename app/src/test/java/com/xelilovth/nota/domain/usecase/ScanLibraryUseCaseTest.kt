@@ -1,6 +1,5 @@
 package com.xelilovth.nota.domain.usecase
 
-import android.net.Uri
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.LibraryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +17,7 @@ class ScanLibraryUseCaseTest {
         val expected = listOf(
             Track(
                 id = 1L,
-                uri = Uri.parse("content://media/external/audio/media/1"),
+                uri = "content://media/external/audio/media/1",
                 title = "Track",
                 artist = "Artist",
                 album = "Album",

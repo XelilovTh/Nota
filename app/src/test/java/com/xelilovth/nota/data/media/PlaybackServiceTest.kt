@@ -2,8 +2,8 @@ package com.xelilovth.nota.data.media
 
 import android.content.Intent
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Test
+import org.junit.After
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
@@ -13,6 +13,11 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class PlaybackServiceTest {
+    @After
+    fun tearDown() {
+        PlaybackPlayerHolder.release()
+    }
+
     @Test
     fun playerErrorStartsForegroundBeforeStoppingService() {
         val calls = mutableListOf<String>()
@@ -26,15 +31,14 @@ class PlaybackServiceTest {
     }
 
     @Test
-    fun onStartCommandImmediatelyEntersForeground() {
+    fun emptyQueueDoesNotCreateAnEmptyForegroundNotification() {
         val controller = Robolectric.buildService(PlaybackService::class.java).create()
         val service = controller.get()
+        PlaybackPlayerHolder.get(service.applicationContext).clearMediaItems()
 
         service.onStartCommand(Intent(service, PlaybackService::class.java), 0, 1)
 
-        val notification = shadowOf(service).lastForegroundNotification
-        assertNotNull(notification)
-        assertEquals(3, notification.actions.size)
+        assertEquals(null, shadowOf(service).lastForegroundNotification)
         controller.destroy()
     }
 }

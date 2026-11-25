@@ -1,10 +1,8 @@
 package com.xelilovth.nota.domain.model
 
-import androidx.compose.runtime.Immutable
 
 enum class PlaylistGroupType { ALBUM, FOLDER }
 
-@Immutable
 data class AutoPlaylist(
     val id: String,
     val title: String,

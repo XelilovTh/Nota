@@ -1,8 +1,6 @@
 package com.xelilovth.nota.domain.model
 
-import androidx.compose.runtime.Immutable
 
-@Immutable
 data class PlaybackState(
     val track: Track? = null,
     val isPlaying: Boolean = false,
@@ -11,6 +9,7 @@ data class PlaybackState(
     val shuffle: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
     val errorMessage: String? = null,
+    val queue: List<Track> = emptyList(),
 )
 
 enum class RepeatMode { OFF, ALL, ONE }

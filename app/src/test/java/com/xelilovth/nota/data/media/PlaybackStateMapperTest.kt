@@ -1,6 +1,5 @@
 package com.xelilovth.nota.data.media
 
-import android.net.Uri
 import androidx.media3.common.Player
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
@@ -12,7 +11,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class PlaybackStateMapperTest {
     @Test fun mapsReadyPlayingAndRepeatOne() {
-        val track = Track(3L, Uri.parse("content://audio/3"), "Song", "Artist", "Album", 900L, "Music")
+        val track = Track(3L, "content://audio/3", "Song", "Artist", "Album", 900L, "Music")
         val state = PlaybackStateMapper.map(Player.STATE_READY, true, 120L, 900L, track, true, Player.REPEAT_MODE_ONE)
         assertEquals(track, state.track)
         assertTrue(state.isPlaying)

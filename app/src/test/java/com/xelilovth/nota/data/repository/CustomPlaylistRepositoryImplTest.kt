@@ -2,6 +2,7 @@ package com.xelilovth.nota.data.repository
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import com.xelilovth.nota.domain.model.PlaylistCollectionType
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -33,5 +34,12 @@ class CustomPlaylistRepositoryImplTest {
 
         reloaded.deletePlaylist(created.id)
         assertTrue(reloaded.playlists.value.none { it.id == created.id })
+
+        val album = reloaded.createCollection("Acoustic", PlaylistCollectionType.ALBUM, listOf(10L, 20L))
+        reloaded.hideAutoGroup("album:legacy")
+        val afterRestart = CustomPlaylistRepositoryImpl(context)
+        assertEquals(PlaylistCollectionType.ALBUM, afterRestart.playlists.value.first { it.id == album.id }.type)
+        assertEquals(listOf(10L, 20L), afterRestart.playlists.value.first { it.id == album.id }.trackIds)
+        assertTrue("album:legacy" in afterRestart.hiddenAutoGroupIds.value)
     }
 }

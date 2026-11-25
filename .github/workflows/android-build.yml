@@ -5,33 +5,70 @@ on:
   pull_request:
     branches: ["**"]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   build:
     name: Build, lint and unit tests
     runs-on: ubuntu-latest
+    env:
+      NOTA_RELEASE_KEYSTORE_BASE64: ${{ secrets.NOTA_RELEASE_KEYSTORE_BASE64 }}
+      NOTA_RELEASE_STORE_PASSWORD: ${{ secrets.NOTA_RELEASE_STORE_PASSWORD }}
+      NOTA_RELEASE_KEY_ALIAS: ${{ secrets.NOTA_RELEASE_KEY_ALIAS }}
+      NOTA_RELEASE_KEY_PASSWORD: ${{ secrets.NOTA_RELEASE_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+
       - name: Install Android platform
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Build, lint and test
-        run: ./gradlew --no-daemon assembleDebug assembleRelease lint testDebugUnitTest
+
+      - name: Validate signing secrets and decode keystore
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          test -n "$NOTA_RELEASE_KEYSTORE_BASE64" || { echo "Missing NOTA_RELEASE_KEYSTORE_BASE64"; exit 1; }
+          test -n "$NOTA_RELEASE_STORE_PASSWORD" || { echo "Missing NOTA_RELEASE_STORE_PASSWORD"; exit 1; }
+          test -n "$NOTA_RELEASE_KEY_ALIAS" || { echo "Missing NOTA_RELEASE_KEY_ALIAS"; exit 1; }
+          test -n "$NOTA_RELEASE_KEY_PASSWORD" || { echo "Missing NOTA_RELEASE_KEY_PASSWORD"; exit 1; }
+          mkdir -p app/keystore
+          printf '%s' "$NOTA_RELEASE_KEYSTORE_BASE64" | base64 --decode > app/keystore/release.keystore
+          test -s app/keystore/release.keystore
+          chmod 600 app/keystore/release.keystore
+
+      - name: Build debug, lint and unit tests
+        run: ./gradlew --no-daemon assembleDebug lint testDebugUnitTest
+
+      - name: Build signed release APK
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          NOTA_RELEASE_KEYSTORE_PATH: app/keystore/release.keystore
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Verify release APK signature
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+
       - name: Test failure diagnostics
         if: failure()
         run: ./gradlew --no-daemon testDebugUnitTest --stacktrace --info
+
       - name: Upload lint and unit test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -43,6 +80,7 @@ jobs:
             app/build/test-results/testDebugUnitTest/*.xml
           if-no-files-found: warn
           retention-days: 14
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -50,7 +88,9 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Upload release APK
+
+      - name: Upload signed release APK
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/upload-artifact@v4
         with:
           name: nota-release-apk

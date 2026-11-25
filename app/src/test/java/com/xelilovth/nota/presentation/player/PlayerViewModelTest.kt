@@ -1,6 +1,5 @@
 package com.xelilovth.nota.presentation.player
 
-import android.net.Uri
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
@@ -51,7 +50,7 @@ class PlayerViewModelTest {
     }
 
     private fun track(id: Long) = Track(
-        id, Uri.parse("content://audio/$id"), "Track $id", "Artist", "Album", 1000L, "Music",
+        id, "content://audio/$id", "Track $id", "Artist", "Album", 1000L, "Music",
     )
 
     private fun viewModel(repository: FakeRepository) = PlayerViewModel(
@@ -60,7 +59,7 @@ class PlayerViewModelTest {
         ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
     )
 
-    @Test fun playingTrackFromLibraryUsesSelectedTrackAndRemainingTracksAsQueue() {
+    @Test fun playingTrackFromLibraryPreservesTheFullQueueAndSelectedIndex() {
         val repository = FakeRepository()
         val viewModel = viewModel(repository)
         val libraryTracks = listOf(track(1L), track(2L), track(3L), track(4L))
@@ -69,8 +68,8 @@ class PlayerViewModelTest {
         viewModel.onRowClick(selectedTrack, libraryTracks)
 
         assertEquals(selectedTrack, repository.playedTrack)
-        assertEquals(listOf(3L, 4L), repository.playedQueue.map(Track::id))
-        assertEquals("play:3:3,4", repository.calls.single())
+        assertEquals(listOf(1L, 2L, 3L, 4L), repository.playedQueue.map(Track::id))
+        assertEquals("play:3:1,2,3,4", repository.calls.single())
     }
 
     @Test fun rowAndPlayIconSelectionProduceTheSamePlaybackStateAndQueue() {
@@ -87,9 +86,9 @@ class PlayerViewModelTest {
         assertEquals(rowRepository.playbackState.value, iconRepository.playbackState.value)
         assertEquals(rowRepository.playedTrack, iconRepository.playedTrack)
         assertEquals(rowRepository.playedQueue, iconRepository.playedQueue)
-        assertEquals(selectedTrack, rowRepository.playedQueue.first())
-        assertEquals(selectedTrack, iconRepository.playedQueue.first())
-        assertEquals(listOf(3L, 4L), rowRepository.playedQueue.map(Track::id))
+        assertEquals(selectedTrack, rowRepository.playedQueue[2])
+        assertEquals(selectedTrack, iconRepository.playedQueue[2])
+        assertEquals(listOf(1L, 2L, 3L, 4L), rowRepository.playedQueue.map(Track::id))
     }
 
     @Test fun shuffleButtonTogglesOnAndOff() {

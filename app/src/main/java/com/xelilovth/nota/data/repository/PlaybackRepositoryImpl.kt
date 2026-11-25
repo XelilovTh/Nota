@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.xelilovth.nota.data.media.PlaybackService
+import com.xelilovth.nota.data.media.PlaybackNavigation
 import com.xelilovth.nota.data.media.PlaybackStateMapper
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
@@ -83,7 +84,7 @@ class PlaybackRepositoryImpl @Inject constructor(
     }
 
     override fun skipNext() { if (player.hasNextMediaItem()) player.seekToNextMediaItem(); publishState() }
-    override fun skipPrevious() { if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem() else player.seekTo(0L); publishState() }
+    override fun skipPrevious() { PlaybackNavigation.skipPrevious(player); publishState() }
     override fun seekTo(positionMs: Long) { player.seekTo(positionMs.coerceAtLeast(0L)); publishState() }
     override fun toggleShuffle() { player.shuffleModeEnabled = !player.shuffleModeEnabled; publishState() }
     override fun cycleRepeatMode() {
@@ -156,13 +157,17 @@ class PlaybackRepositoryImpl @Inject constructor(
 
     private fun publishState() {
         val mediaId = player.currentMediaItem?.mediaId?.toLongOrNull()
+        val tracksById = libraryRepository.tracks.value.associateBy(Track::id)
         val track = when {
             mediaId == null -> null
             mediaId == cachedMediaId && cachedTrack != null -> cachedTrack
-            else -> libraryRepository.tracks.value.firstOrNull { it.id == mediaId }.also { found ->
+            else -> tracksById[mediaId].also { found ->
                 cachedMediaId = mediaId
                 cachedTrack = found
             }
+        }
+        val queue = (0 until player.mediaItemCount).mapNotNull { index ->
+            player.getMediaItemAt(index).mediaId.toLongOrNull()?.let(tracksById::get)
         }
         _playbackState.value = PlaybackStateMapper.map(
             playerState = player.playbackState,
@@ -172,6 +177,6 @@ class PlaybackRepositoryImpl @Inject constructor(
             track = track,
             shuffle = player.shuffleModeEnabled,
             repeatMode = player.repeatMode,
-        ).copy(errorMessage = _playbackState.value.errorMessage)
+        ).copy(errorMessage = _playbackState.value.errorMessage, queue = queue)
     }
 }

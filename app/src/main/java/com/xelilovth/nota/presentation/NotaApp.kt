@@ -211,12 +211,10 @@ fun NotaApp() {
                     }
                     composable(AppRoute.NOW_PLAYING) {
                         val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
-                        val queueTracks by libraryViewModel.tracks.collectAsStateWithLifecycle()
                         val sleepSeconds by settingsViewModel.sleepTimerRemainingSeconds.collectAsStateWithLifecycle()
                         NowPlayingScreen(
                             state = playbackState,
                             viewModel = playerViewModel,
-                            queueTracks = queueTracks,
                             sleepTimerRemainingSeconds = sleepSeconds,
                             onBack = { navController.popBackStack() },
                             onSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },

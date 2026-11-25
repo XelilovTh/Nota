@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,13 +32,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.CustomPlaylist
+import com.xelilovth.nota.domain.model.PlaylistCollectionType
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
-import com.xelilovth.nota.presentation.home.PlaylistGroupRow
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -50,10 +52,15 @@ fun PlaylistsScreen(
 ) {
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val customPlaylists by viewModel.customPlaylists.collectAsStateWithLifecycle()
-    val groups = remember(tracks) { groupTracksIntoPlaylists(tracks) }
+    val hiddenAutoGroupIds by viewModel.hiddenAutoGroupIds.collectAsStateWithLifecycle()
+    val groups = remember(tracks, hiddenAutoGroupIds) { groupTracksIntoPlaylists(tracks).filterNot { it.id in hiddenAutoGroupIds } }
+    val userPlaylists = customPlaylists.filter { it.type == PlaylistCollectionType.PLAYLIST }
+    val userCollections = customPlaylists.filter { it.type != PlaylistCollectionType.PLAYLIST }
     val trackById = remember(tracks) { tracks.associateBy(Track::id) }
 
+    var showCreateMenu by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var createType by remember { mutableStateOf(PlaylistCollectionType.PLAYLIST) }
     var renameTarget by remember { mutableStateOf<CustomPlaylist?>(null) }
     var deleteTarget by remember { mutableStateOf<CustomPlaylist?>(null) }
 
@@ -79,18 +86,18 @@ fun PlaylistsScreen(
                 Column {
                     Text("Playlists", style = MaterialTheme.typography.headlineMedium)
                     Text(
-                        "${customPlaylists.size} custom · ${groups.size} albums & folders",
+                        "${userPlaylists.size} playlists · ${userCollections.size + groups.size} albums & folders",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = { showCreateDialog = true }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Create playlist")
+                IconButton(onClick = { showCreateMenu = true }) {
+                    Icon(Icons.Filled.Add, contentDescription = "Create playlist or album")
                 }
             }
         }
 
-        if (customPlaylists.isNotEmpty()) {
+        if (userPlaylists.isNotEmpty()) {
             item(key = "custom_section") {
                 Text(
                     "My Playlists",
@@ -99,7 +106,7 @@ fun PlaylistsScreen(
                     modifier = Modifier.padding(top = AppDimens.ElementSpacing),
                 )
             }
-            items(customPlaylists, key = CustomPlaylist::id, contentType = { "custom_playlist" }) { playlist ->
+            items(userPlaylists, key = CustomPlaylist::id, contentType = { "custom_playlist" }) { playlist ->
                 val resolvedTracks = remember(playlist.trackIds, trackById) {
                     playlist.trackIds.mapNotNull(trackById::get)
                 }
@@ -114,7 +121,7 @@ fun PlaylistsScreen(
             }
         }
 
-        if (groups.isNotEmpty()) {
+        if (userCollections.isNotEmpty() || groups.isNotEmpty()) {
             item(key = "auto_section") {
                 Text(
                     "Albums & Folders",
@@ -123,8 +130,34 @@ fun PlaylistsScreen(
                     modifier = Modifier.padding(top = AppDimens.SectionSpacing),
                 )
             }
-            items(groups, key = AutoPlaylist::id, contentType = { "playlist" }) { group ->
-                PlaylistGroupRow(group) { onOpenPlaylist(group.id) }
+            items(userCollections, key = CustomPlaylist::id, contentType = { "managed_collection" }) { collection ->
+                val resolvedTracks = remember(collection.trackIds, trackById) { collection.trackIds.mapNotNull(trackById::get) }
+                CustomPlaylistRow(
+                    playlist = collection,
+                    coverTrack = resolvedTracks.firstOrNull(),
+                    trackCount = resolvedTracks.size,
+                    onClick = { onOpenPlaylist(collection.id) },
+                    onRename = { renameTarget = collection },
+                    onDelete = { deleteTarget = collection },
+                    renameLabel = "Rename",
+                )
+            }
+            items(groups, key = AutoPlaylist::id, contentType = { "auto_collection" }) { group ->
+                val autoCollection = remember(group) {
+                    CustomPlaylist(
+                        group.id, group.title, group.tracks.map(Track::id),
+                        if (group.type == com.xelilovth.nota.domain.model.PlaylistGroupType.ALBUM) PlaylistCollectionType.ALBUM else PlaylistCollectionType.FOLDER,
+                    )
+                }
+                CustomPlaylistRow(
+                    playlist = autoCollection,
+                    coverTrack = group.tracks.firstOrNull(),
+                    trackCount = group.tracks.size,
+                    onClick = { onOpenPlaylist(group.id) },
+                    onRename = { onOpenPlaylist(viewModel.editAutoGroup(group).id) },
+                    onDelete = { viewModel.deleteAutoGroup(group.id) },
+                    renameLabel = "Edit",
+                )
             }
         } else if (customPlaylists.isEmpty()) {
             item(key = "empty_playlists") {
@@ -143,14 +176,28 @@ fun PlaylistsScreen(
         }
     }
 
+    if (showCreateMenu) {
+        Dialog(onDismissRequest = { showCreateMenu = false }) {
+            GlassSurface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge, elevated = true, blurBackdrop = true) {
+                Column(modifier = Modifier.fillMaxWidth().padding(AppDimens.ScreenPadding), verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
+                    Text("Create new", style = MaterialTheme.typography.titleLarge)
+                    TextButton(onClick = { createType = PlaylistCollectionType.PLAYLIST; showCreateMenu = false; showCreateDialog = true }) { Text("New Playlist") }
+                    TextButton(onClick = { createType = PlaylistCollectionType.ALBUM; showCreateMenu = false; showCreateDialog = true }) { Text("New Album") }
+                    TextButton(onClick = { createType = PlaylistCollectionType.FOLDER; showCreateMenu = false; showCreateDialog = true }) { Text("New Folder") }
+                    TextButton(onClick = { showCreateMenu = false }) { Text("Cancel") }
+                }
+            }
+        }
+    }
+
     if (showCreateDialog) {
         PlaylistNameDialog(
-            title = "New playlist",
+            title = when (createType) { PlaylistCollectionType.PLAYLIST -> "New Playlist"; PlaylistCollectionType.ALBUM -> "New Album"; PlaylistCollectionType.FOLDER -> "New Folder" },
             initialName = "",
             confirmLabel = "Create",
             onDismiss = { showCreateDialog = false },
             onConfirm = { name ->
-                viewModel.createPlaylist(name)
+                viewModel.createCollection(name, createType)
                 showCreateDialog = false
             },
         )
@@ -158,7 +205,7 @@ fun PlaylistsScreen(
 
     renameTarget?.let { target ->
         PlaylistNameDialog(
-            title = "Rename playlist",
+            title = "Rename collection",
             initialName = target.name,
             confirmLabel = "Save",
             onDismiss = { renameTarget = null },
@@ -189,6 +236,7 @@ private fun CustomPlaylistRow(
     onClick: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    renameLabel: String = "Rename",
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     GlassSurface(
@@ -216,7 +264,7 @@ private fun CustomPlaylistRow(
                 )
                 val unit = if (trackCount == 1) "track" else "tracks"
                 Text(
-                    "$trackCount $unit",
+                    "$trackCount $unit · ${playlist.type.name.lowercase()}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
@@ -225,14 +273,14 @@ private fun CustomPlaylistRow(
             }
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "Playlist options")
+                    Icon(Icons.Filled.MoreVert, contentDescription = "Collection options")
                 }
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Rename") },
+                        text = { Text(renameLabel) },
                         leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
                         onClick = {
                             menuExpanded = false

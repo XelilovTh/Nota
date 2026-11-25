@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
@@ -38,8 +37,8 @@ class PlaybackRepositoryImplTest {
         }
     }
 
-    private class FakeLibraryRepository : LibraryRepository {
-        override val tracks = MutableStateFlow(emptyList<Track>())
+    private class FakeLibraryRepository(initialTracks: List<Track> = emptyList()) : LibraryRepository {
+        override val tracks = MutableStateFlow(initialTracks)
         override suspend fun scan(): List<Track> = tracks.value
     }
 
@@ -51,12 +50,28 @@ class PlaybackRepositoryImplTest {
     }
 
     @Test
+    fun startingMiddleTrackKeepsEarlierTracksInQueue() {
+        val application = RuntimeEnvironment.getApplication()
+        val tracks = (1L..3L).map { id ->
+            Track(id, "content://audio/$id", "Song $id", "Artist", "Album", 10_000L, "Music")
+        }
+        val context = RecordingContext(application)
+        val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository(tracks))
+
+        repository.playTrack(tracks[1], tracks)
+
+        assertEquals(3, player.mediaItemCount)
+        assertEquals(1, player.currentMediaItemIndex)
+        assertEquals(listOf(1L, 2L, 3L), repository.playbackState.value.queue.map(Track::id))
+    }
+
+    @Test
     fun emptyQueueDoesNotStartPlaybackServiceOrSetMediaItems() {
         val context = RecordingContext(RuntimeEnvironment.getApplication())
         val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository())
         val track = Track(
             1L,
-            Uri.parse("content://audio/1"),
+            "content://audio/1",
             "Song",
             "Artist",
             "Album",
@@ -79,7 +94,7 @@ class PlaybackRepositoryImplTest {
         val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository())
         val track = Track(
             2L,
-            Uri.parse("content://audio/2"),
+            "content://audio/2",
             "Allowed Song",
             "Artist",
             "Album",
@@ -126,7 +141,7 @@ class PlaybackRepositoryImplTest {
         val repository = PlaybackRepositoryImpl(throwingContext, player, FakeLibraryRepository())
         val track = Track(
             3L,
-            Uri.parse("content://audio/3"),
+            "content://audio/3",
             "Resilient Song",
             "Artist",
             "Album",

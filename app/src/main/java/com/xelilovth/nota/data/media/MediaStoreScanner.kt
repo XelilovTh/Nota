@@ -62,7 +62,7 @@ class MediaStoreScanner @Inject constructor(
                         add(
                             Track(
                                 id = id,
-                                uri = contentUri,
+                                uri = contentUri.toString(),
                                 title = result.stringOrFallback(titleColumn, "Unknown title"),
                                 artist = result.stringOrFallback(artistColumn, "Unknown artist"),
                                 album = result.stringOrFallback(albumColumn, "Unknown album"),

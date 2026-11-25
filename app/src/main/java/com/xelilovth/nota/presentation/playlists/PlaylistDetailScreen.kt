@@ -76,7 +76,7 @@ fun PlaylistDetailScreen(
 
     val playlistTitle = customPlaylist?.name ?: autoPlaylist?.title ?: "Playlist"
     val playlistSubtitle = when {
-        customPlaylist != null -> "custom"
+        customPlaylist != null -> customPlaylist.type.name.lowercase()
         autoPlaylist != null -> autoPlaylist.type.name.lowercase()
         else -> ""
     }
@@ -122,10 +122,10 @@ fun PlaylistDetailScreen(
                     Icon(Icons.Filled.Add, contentDescription = "Add songs")
                 }
                 IconButton(onClick = { showRenameDialog = true }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "Rename playlist")
+                    Icon(Icons.Outlined.Edit, contentDescription = "Rename collection")
                 }
                 IconButton(onClick = { showDeleteDialog = true }) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "Delete playlist")
+                    Icon(Icons.Outlined.Delete, contentDescription = "Delete collection")
                 }
             }
         }
@@ -136,7 +136,7 @@ fun PlaylistDetailScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("Playlist not found", style = MaterialTheme.typography.titleMedium)
+                Text("Collection not found", style = MaterialTheme.typography.titleMedium)
             }
         } else {
             val listState = rememberLazyListState()
@@ -325,7 +325,7 @@ fun PlaylistDetailScreen(
 
     if (showRenameDialog && customPlaylist != null) {
         PlaylistNameDialog(
-            title = "Rename playlist",
+            title = "Rename collection",
             initialName = customPlaylist.name,
             confirmLabel = "Save",
             onDismiss = { showRenameDialog = false },

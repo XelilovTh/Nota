@@ -1,6 +1,5 @@
 package com.xelilovth.nota.data.repository
 
-import android.net.Uri
 import com.xelilovth.nota.data.media.AudioScanner
 import com.xelilovth.nota.domain.model.AppSettings
 import com.xelilovth.nota.domain.model.ThemeMode
@@ -34,7 +33,7 @@ class LibraryRepositoryImplTest {
         val expected = listOf(
             Track(
                 id = 7L,
-                uri = Uri.parse("content://media/external/audio/media/7"),
+                uri = "content://media/external/audio/media/7",
                 title = "Song",
                 artist = "Artist",
                 album = "Album",
@@ -57,8 +56,8 @@ class LibraryRepositoryImplTest {
 
     @Test
     fun hideShortTracksFiltersAudioUnderThirtySeconds() = runTest {
-        val shortTrack = Track(1L, Uri.parse("content://media/1"), "Beep", "A", "B", 5_000L, "Notif")
-        val longTrack = Track(2L, Uri.parse("content://media/2"), "Song", "A", "B", 180_000L, "Music")
+        val shortTrack = Track(1L, "content://media/1", "Beep", "A", "B", 5_000L, "Notif")
+        val longTrack = Track(2L, "content://media/2", "Song", "A", "B", 180_000L, "Music")
         val repository = LibraryRepositoryImpl(
             object : AudioScanner {
                 override suspend fun scan() = listOf(shortTrack, longTrack)

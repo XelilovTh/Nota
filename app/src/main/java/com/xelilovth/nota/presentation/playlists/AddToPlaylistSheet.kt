@@ -170,7 +170,7 @@ fun PlaylistNameDialog(
                         value = name,
                         onValueChange = { name = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Playlist name") },
+                        placeholder = { Text("Collection name") },
                         singleLine = true,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -220,9 +220,9 @@ fun DeletePlaylistDialog(
                     .padding(AppDimens.ScreenPadding),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
             ) {
-                Text("Delete playlist?", style = MaterialTheme.typography.titleLarge)
+                Text("Delete collection?", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Remove \"$playlistName\" from your playlists?",
+                    "Remove \"$playlistName\" from Nota? Audio files on your device will not be deleted.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Row(

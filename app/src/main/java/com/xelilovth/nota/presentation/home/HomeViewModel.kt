@@ -55,8 +55,7 @@ class HomeViewModel @Inject constructor(
     }
     fun play(track: Track) {
         val library = tracks.value
-        val selectedIndex = library.indexOfFirst { it.id == track.id }
-        val queue = if (selectedIndex >= 0) library.drop(selectedIndex) else listOf(track)
+        val queue = if (library.any { it.id == track.id }) library else listOf(track)
         playTrack(track, queue)
     }
 
@@ -72,8 +71,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun playPlaylistTrack(playlist: AutoPlaylist, track: Track) {
-        val selectedIndex = playlist.tracks.indexOfFirst { it.id == track.id }
-        val queue = if (selectedIndex >= 0) playlist.tracks.drop(selectedIndex) else listOf(track)
+        val queue = if (playlist.tracks.any { it.id == track.id }) playlist.tracks else listOf(track)
         playTrack(track, queue)
     }
 }

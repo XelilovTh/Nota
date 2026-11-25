@@ -1,6 +1,5 @@
 package com.xelilovth.nota.presentation.library
 
-import android.net.Uri
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.LibraryRepository
@@ -44,11 +43,11 @@ class LibraryViewModelTest {
     }
 
     private fun track(id: Long) = Track(
-        id, Uri.parse("content://audio/$id"), "Track $id", "Artist", "Album", 1_000L, "Music",
+        id, "content://audio/$id", "Track $id", "Artist", "Album", 1_000L, "Music",
     )
 
     @Test
-    fun selectingLibraryRowStartsTrackAndQueuesItWithFollowingTracks() {
+    fun selectingLibraryRowKeepsTheFullQueueIncludingEarlierTracks() {
         val libraryTracks = listOf(track(1L), track(2L), track(3L), track(4L))
         val libraryRepository = FakeLibraryRepository(libraryTracks)
         val playbackRepository = FakePlaybackRepository()
@@ -61,7 +60,7 @@ class LibraryViewModelTest {
         viewModel.onTrackSelected(libraryTracks[1])
 
         assertEquals(libraryTracks[1], playbackRepository.selectedTrack)
-        assertEquals(listOf(2L, 3L, 4L), playbackRepository.queue.map(Track::id))
+        assertEquals(listOf(1L, 2L, 3L, 4L), playbackRepository.queue.map(Track::id))
     }
 
     @Test
