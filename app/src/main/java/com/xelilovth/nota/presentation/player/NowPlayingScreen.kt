@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -97,7 +99,7 @@ fun NowPlayingScreen(
     var showAddToPlaylist by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
+        Modifier.fillMaxSize().navigationBarsPadding().padding(AppDimens.ScreenPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
@@ -129,7 +131,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.4f))
+        Spacer(modifier = Modifier.weight(0.3f))
 
         Column(
             Modifier.fillMaxWidth(),
@@ -138,20 +140,21 @@ fun NowPlayingScreen(
         ) {
             Text(
                 state.track?.title ?: "No track selected",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 state.track?.artist.orEmpty(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
-        Spacer(modifier = Modifier.weight(0.35f))
+        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
@@ -160,12 +163,12 @@ fun NowPlayingScreen(
         ) {
             Text(
                 formatDuration(displayPositionMs),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 "|",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.outline,
             )
             val rightTime = if (showRemaining && duration > 0L) {
@@ -175,12 +178,12 @@ fun NowPlayingScreen(
             }
             Text(
                 rightTime,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        Spacer(modifier = Modifier.weight(0.35f))
+        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
 
         CircularArcPlayerArt(
             track = state.track,
@@ -199,7 +202,7 @@ fun NowPlayingScreen(
             modifier = Modifier.fillMaxWidth(AppDimens.PlayerArtworkFraction).aspectRatio(1f),
         )
 
-        Spacer(modifier = Modifier.weight(0.55f))
+        Spacer(modifier = Modifier.weight(0.5f))
 
         GlassSurface(
             shape = CircleShape,
@@ -253,7 +256,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.35f))
+        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
