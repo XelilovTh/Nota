@@ -55,7 +55,8 @@ class HomeViewModel @Inject constructor(
     }
     fun play(track: Track) {
         val library = tracks.value
-        playTrack(track, library.ifEmpty { listOf(track) })
+        val queue = if (library.any { it.id == track.id }) library else listOf(track)
+        playTrack(track, queue)
     }
 
     fun playPlaylist(playlist: AutoPlaylist) {
@@ -70,6 +71,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun playPlaylistTrack(playlist: AutoPlaylist, track: Track) {
-        playTrack(track, playlist.tracks.ifEmpty { listOf(track) })
+        val queue = if (playlist.tracks.any { it.id == track.id }) playlist.tracks else listOf(track)
+        playTrack(track, queue)
     }
 }

@@ -59,7 +59,8 @@ class PlaylistsViewModel @Inject constructor(
     fun playTracks(playlistTracks: List<Track>, startTrack: Track? = null) {
         if (playlistTracks.isEmpty()) return
         val selected = startTrack ?: playlistTracks.first()
-        playTrack(selected, playlistTracks)
+        val queue = if (playlistTracks.any { it.id == selected.id }) playlistTracks else listOf(selected)
+        playTrack(selected, queue)
     }
 
     fun playTracksShuffled(playlistTracks: List<Track>) {

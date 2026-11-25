@@ -28,7 +28,8 @@ class PlayerViewModel @Inject constructor(
 ) : ViewModel() {
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
     fun onRowClick(track: Track, libraryTracks: List<Track>) {
-        playTrack(track, libraryTracks.ifEmpty { listOf(track) })
+        val queue = if (libraryTracks.any { it.id == track.id }) libraryTracks else listOf(track)
+        playTrack(track, queue)
     }
 
     fun onPlayIconClick(track: Track, libraryTracks: List<Track>) = onRowClick(track, libraryTracks)

@@ -55,7 +55,8 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun onTrackSelected(track: Track, orderedTracks: List<Track> = tracks.value) {
-        playTrack(track, orderedTracks.ifEmpty { listOf(track) })
+        val queue = if (orderedTracks.any { it.id == track.id }) orderedTracks else listOf(track)
+        playTrack(track, queue)
     }
 
     fun playShuffled(orderedTracks: List<Track> = tracks.value) {
