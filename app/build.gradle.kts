@@ -6,6 +6,13 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+val releaseKeystorePath = providers.environmentVariable("NOTA_RELEASE_KEYSTORE_PATH").orNull
+val releaseStorePassword = providers.environmentVariable("NOTA_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("NOTA_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("NOTA_RELEASE_KEY_PASSWORD").orNull
+val hasReleaseSigning = listOf(releaseKeystorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+    .all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.xelilovth.nota"
     compileSdk = 35
@@ -13,17 +20,27 @@ android {
         applicationId = "com.xelilovth.nota"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
     compileOptions {

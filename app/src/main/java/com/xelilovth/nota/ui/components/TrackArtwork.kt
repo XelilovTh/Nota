@@ -54,18 +54,19 @@ private object ArtworkCache {
 @Composable
 fun TrackArtwork(
     trackId: Long?,
-    trackUri: Uri?,
+    trackUri: String?,
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.small,
     iconPadding: Dp = AppDimens.ElementSpacing,
 ) {
     val context = LocalContext.current
+    val parsedUri = remember(trackUri) { trackUri?.let(Uri::parse) }
     var bitmap by remember(trackId) {
         mutableStateOf(if (trackId != null) ArtworkCache.get(trackId) else null)
     }
 
     LaunchedEffect(trackId, trackUri) {
-        if (trackId == null || trackUri == null) {
+        if (trackId == null || parsedUri == null) {
             bitmap = null
             return@LaunchedEffect
         }
@@ -79,7 +80,7 @@ fun TrackArtwork(
             return@LaunchedEffect
         }
         val loaded = withContext(Dispatchers.IO) {
-            loadEmbeddedArtwork(context, trackUri)?.asImageBitmap()
+            loadEmbeddedArtwork(context, parsedUri)?.asImageBitmap()
         }
         ArtworkCache.put(trackId, loaded)
         bitmap = loaded

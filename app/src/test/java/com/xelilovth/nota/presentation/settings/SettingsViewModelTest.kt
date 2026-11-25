@@ -1,6 +1,5 @@
 package com.xelilovth.nota.presentation.settings
 
-import android.net.Uri
 import com.xelilovth.nota.data.media.SleepTimerManager
 import com.xelilovth.nota.data.repository.SettingsRepositoryImpl
 import com.xelilovth.nota.domain.model.PlaybackState
@@ -36,7 +35,7 @@ class SettingsViewModelTest {
 
     private class FakeLibraryRepository : LibraryRepository {
         override val tracks = MutableStateFlow(
-            listOf(Track(1L, Uri.parse("content://audio/1"), "Song", "Artist", "Album", 120_000L, "Music")),
+            listOf(Track(1L, "content://audio/1", "Song", "Artist", "Album", 120_000L, "Music")),
         )
         var scanCount = 0
         override suspend fun scan(): List<Track> {

@@ -1,6 +1,5 @@
 package com.xelilovth.nota.presentation.home
 
-import android.net.Uri
 import com.xelilovth.nota.domain.model.AppSettings
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.ThemeMode
@@ -46,7 +45,7 @@ class HomeViewModelTest {
         override fun stopPlayback() { playbackState.value = PlaybackState() }
     }
 
-    private fun track(id: Long) = Track(id, Uri.parse("content://audio/$id"), "Track", "Artist", "Album", 1000L, "Music")
+    private fun track(id: Long) = Track(id, "content://audio/$id", "Track", "Artist", "Album", 1000L, "Music")
 
     @Test
     fun playActionStartsFirstLibraryTrack() {

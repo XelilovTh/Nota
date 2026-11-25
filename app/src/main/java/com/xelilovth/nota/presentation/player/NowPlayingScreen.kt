@@ -79,12 +79,12 @@ private const val ARC_SWEEP_ANGLE = 270f
 fun NowPlayingScreen(
     state: PlaybackState,
     viewModel: PlayerViewModel,
-    queueTracks: List<Track> = emptyList(),
     sleepTimerRemainingSeconds: Long? = null,
     onBack: () -> Unit,
     onSleepTimer: () -> Unit,
     onSettings: () -> Unit,
 ) {
+    val queueTracks = state.queue
     val duration = state.durationMs.coerceAtLeast(0L)
     val position = state.positionMs.coerceIn(0L, duration)
     val playerProgress = if (duration > 0L) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
@@ -264,7 +264,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.25f))
+        Spacer(modifier = Modifier.weight(0.12f))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -336,6 +336,8 @@ fun NowPlayingScreen(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.weight(0.12f))
     }
 
     if (showQueueSheet) {

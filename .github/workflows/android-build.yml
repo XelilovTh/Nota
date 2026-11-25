@@ -11,6 +11,11 @@ jobs:
   build:
     name: Build, lint and unit tests
     runs-on: ubuntu-latest
+    env:
+      NOTA_RELEASE_KEYSTORE_BASE64: ${{ secrets.NOTA_RELEASE_KEYSTORE_BASE64 }}
+      NOTA_RELEASE_STORE_PASSWORD: ${{ secrets.NOTA_RELEASE_STORE_PASSWORD }}
+      NOTA_RELEASE_KEY_ALIAS: ${{ secrets.NOTA_RELEASE_KEY_ALIAS }}
+      NOTA_RELEASE_KEY_PASSWORD: ${{ secrets.NOTA_RELEASE_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,7 +32,14 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+      - name: Decode stable release signing key
+        if: env.NOTA_RELEASE_KEYSTORE_BASE64 != ''
+        run: |
+          mkdir -p app/keystore
+          printf '%s' "$NOTA_RELEASE_KEYSTORE_BASE64" | base64 --decode > app/keystore/release.keystore
       - name: Build, lint and test
+        env:
+          NOTA_RELEASE_KEYSTORE_PATH: app/keystore/release.keystore
         run: ./gradlew --no-daemon assembleDebug assembleRelease lint testDebugUnitTest
       - name: Test failure diagnostics
         if: failure()

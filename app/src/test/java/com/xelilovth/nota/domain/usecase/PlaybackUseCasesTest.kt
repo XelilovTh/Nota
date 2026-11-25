@@ -1,6 +1,5 @@
 package com.xelilovth.nota.domain.usecase
 
-import android.net.Uri
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.PlaybackRepository
@@ -27,7 +26,7 @@ class PlaybackUseCasesTest {
 
     @Test fun eachUseCaseDelegatesItsOperation() {
         val repository = FakeRepository()
-        val track = Track(11L, Uri.parse("content://audio/11"), "Song", "Artist", "Album", 1L, "Music")
+        val track = Track(11L, "content://audio/11", "Song", "Artist", "Album", 1L, "Music")
         PlayTrackUseCase(repository)(track, listOf(track))
         TogglePlayPauseUseCase(repository)()
         SkipNextUseCase(repository)()

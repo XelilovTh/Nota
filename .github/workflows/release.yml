@@ -9,7 +9,7 @@ on:
       tag:
         description: "Release tag name"
         required: true
-        default: "v0.1.0"
+        default: "v0.2.0"
 
 permissions:
   contents: write
@@ -39,7 +39,20 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Decode stable release signing key
+        env:
+          NOTA_RELEASE_KEYSTORE_BASE64: ${{ secrets.NOTA_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$NOTA_RELEASE_KEYSTORE_BASE64" || { echo "Missing NOTA_RELEASE_KEYSTORE_BASE64 repository secret"; exit 1; }
+          mkdir -p app/keystore
+          printf '%s' "$NOTA_RELEASE_KEYSTORE_BASE64" | base64 --decode > app/keystore/release.keystore
+
       - name: Build release APK
+        env:
+          NOTA_RELEASE_KEYSTORE_PATH: app/keystore/release.keystore
+          NOTA_RELEASE_STORE_PASSWORD: ${{ secrets.NOTA_RELEASE_STORE_PASSWORD }}
+          NOTA_RELEASE_KEY_ALIAS: ${{ secrets.NOTA_RELEASE_KEY_ALIAS }}
+          NOTA_RELEASE_KEY_PASSWORD: ${{ secrets.NOTA_RELEASE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
 
       - name: Publish Release
