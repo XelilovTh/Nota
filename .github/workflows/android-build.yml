@@ -58,7 +58,7 @@ jobs:
       - name: Build signed release APK
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
-          NOTA_RELEASE_KEYSTORE_PATH: app/keystore/release.keystore
+          NOTA_RELEASE_KEYSTORE_PATH: keystore/release.keystore
         run: ./gradlew --no-daemon assembleRelease
 
       - name: Verify release APK signature
