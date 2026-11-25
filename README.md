@@ -22,4 +22,4 @@ A clean Android application foundation. This repository currently contains only 
 - ./gradlew lint
 - ./gradlew testDebugUnitTest
 
-GitHub Actions validates pull requests targeting `main` and pushes to `main`. Feature branches are validated through their pull request to avoid duplicate runs.
+GitHub Actions validates pull requests targeting any branch and pushes to `main`. Feature branches are validated through their pull request to avoid duplicate runs.

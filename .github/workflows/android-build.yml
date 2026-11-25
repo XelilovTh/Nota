@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: ["**"]
   workflow_dispatch:
 
 # Keep only the newest validation run for a given PR/branch.
