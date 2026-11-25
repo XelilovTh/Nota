@@ -1,6 +1,5 @@
 package com.xelilovth.nota.presentation.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,7 +21,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -30,10 +28,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.ThemeMode
+import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 
 @Composable
 fun SettingsScreen(
@@ -48,7 +49,12 @@ fun SettingsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(AppDimens.ScreenPadding),
+        contentPadding = PaddingValues(
+            start = AppDimens.ScreenPadding,
+            top = AppDimens.ScreenPadding,
+            end = AppDimens.ScreenPadding,
+            bottom = LocalBottomContentPadding.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
     ) {
         item {
@@ -65,11 +71,10 @@ fun SettingsScreen(
 
         item {
             SectionLabel("Appearance")
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
@@ -85,6 +90,7 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = selected,
                                 onClick = { viewModel.setThemeMode(mode) },
+                                border = null,
                                 label = {
                                     Text(
                                         when (mode) {
@@ -92,9 +98,13 @@ fun SettingsScreen(
                                             ThemeMode.LIGHT -> "Light"
                                             ThemeMode.DARK -> "Dark"
                                         },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
                                     )
                                 },
                                 colors = FilterChipDefaults.filterChipColors(
+                                    labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                                 ),
@@ -108,11 +118,10 @@ fun SettingsScreen(
 
         item {
             SectionLabel("Library")
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -172,11 +181,10 @@ fun SettingsScreen(
 
         item {
             SectionLabel("Playback")
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
             ) {
                 Row(
                     modifier = Modifier
@@ -200,11 +208,10 @@ fun SettingsScreen(
 
         item {
             SectionLabel("About")
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),

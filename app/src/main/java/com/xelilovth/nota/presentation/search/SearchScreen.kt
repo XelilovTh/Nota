@@ -9,14 +9,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,13 +26,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.filterTracks
 import com.xelilovth.nota.presentation.home.CompactTrackRow
 import com.xelilovth.nota.presentation.home.HomeViewModel
+import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -56,34 +61,54 @@ fun SearchScreen(
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-    ) {
-        Text("Search", style = MaterialTheme.typography.headlineMedium)
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Search title, artist or album") },
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { query = "" }) {
-                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
-                    }
-                }
-            },
-            singleLine = true,
-        )
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.ScreenPadding, vertical = AppDimens.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+        ) {
+            Text("Search", style = MaterialTheme.typography.headlineMedium)
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = CircleShape,
+                elevated = false,
+            ) {
+                TextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search title, artist or album") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) {
+                                Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
+                )
+            }
+        }
         when {
             tracks.isEmpty() -> Text(
                 "Your library is empty",
+                modifier = Modifier.padding(horizontal = AppDimens.ScreenPadding),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             results.isEmpty() -> Text(
                 "No results found",
+                modifier = Modifier.padding(horizontal = AppDimens.ScreenPadding),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -94,7 +119,13 @@ fun SearchScreen(
                 }
                 LazyColumn(
                     state = listState,
-                    contentPadding = PaddingValues(vertical = AppDimens.ElementSpacing),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(
+                        start = AppDimens.ScreenPadding,
+                        end = AppDimens.ScreenPadding,
+                        top = AppDimens.ElementSpacing,
+                        bottom = LocalBottomContentPadding.current,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                 ) {
                     items(results, key = Track::id, contentType = { "track" }) { track ->

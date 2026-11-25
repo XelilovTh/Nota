@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface SettingsRepository {
     val settings: StateFlow<AppSettings>
+    val recentTrackIds: StateFlow<List<Long>>
     fun setThemeMode(mode: ThemeMode)
     fun setHideShortTracks(hide: Boolean)
+    fun addRecentTrack(trackId: Long)
 }

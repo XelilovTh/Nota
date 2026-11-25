@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
+    implementation(libs.haze)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

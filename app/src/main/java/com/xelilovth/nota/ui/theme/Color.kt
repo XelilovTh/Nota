@@ -1,5 +1,6 @@
 package com.xelilovth.nota.ui.theme
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
 object AppColors {
@@ -31,3 +32,46 @@ object AppColors {
     val DarkSurfaceContainerHigh = Color(0xFF202020)
     val DarkSurfaceContainerHighest = Color(0xFF282828)
 }
+
+@Immutable
+data class GlassColors(
+    val surfaceTint: Color,
+    val surfaceElevatedTint: Color,
+    val surfaceSubtleTint: Color,
+    val borderHighlight: Color,
+    val borderEdge: Color,
+    val ambientOrbPrimary: Color,
+    val ambientOrbSecondary: Color,
+    val liquidLensFill: Color,
+    val liquidLensRimBright: Color,
+    val liquidLensRimSoft: Color,
+    val subtleRowBorder: Boolean,
+)
+
+val LightGlassColors = GlassColors(
+    surfaceTint = Color(0x99FFFFFF),
+    surfaceElevatedTint = Color(0xC2FFFFFF),
+    surfaceSubtleTint = Color(0x66F5F5F5),
+    borderHighlight = Color(0xE6FFFFFF),
+    borderEdge = Color(0x1F000000),
+    ambientOrbPrimary = Color(0x2E111111),
+    ambientOrbSecondary = Color(0x1A555555),
+    liquidLensFill = Color(0xD9FFFFFF),
+    liquidLensRimBright = Color(0xFFFFFFFF),
+    liquidLensRimSoft = Color(0x26000000),
+    subtleRowBorder = true,
+)
+
+val DarkGlassColors = GlassColors(
+    surfaceTint = Color(0x66222222),
+    surfaceElevatedTint = Color(0x9E1C1C1C),
+    surfaceSubtleTint = Color(0x471E1E1E),
+    borderHighlight = Color(0x1CFFFFFF),
+    borderEdge = Color(0x05FFFFFF),
+    ambientOrbPrimary = Color(0x26FFFFFF),
+    ambientOrbSecondary = Color(0x18A8A8A8),
+    liquidLensFill = Color(0x2EFFFFFF),
+    liquidLensRimBright = Color(0x38FFFFFF),
+    liquidLensRimSoft = Color(0x08FFFFFF),
+    subtleRowBorder = false,
+)

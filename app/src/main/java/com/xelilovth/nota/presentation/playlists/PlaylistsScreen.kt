@@ -1,7 +1,5 @@
 package com.xelilovth.nota.presentation.playlists
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +22,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,8 +38,10 @@ import com.xelilovth.nota.domain.model.CustomPlaylist
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
 import com.xelilovth.nota.presentation.home.PlaylistGroupRow
+import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 
 @Composable
 fun PlaylistsScreen(
@@ -63,7 +62,12 @@ fun PlaylistsScreen(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(AppDimens.ScreenPadding),
+        contentPadding = PaddingValues(
+            start = AppDimens.ScreenPadding,
+            top = AppDimens.ScreenPadding,
+            end = AppDimens.ScreenPadding,
+            bottom = LocalBottomContentPadding.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
     ) {
         item(key = "playlists_header") {
@@ -187,11 +191,11 @@ private fun CustomPlaylistRow(
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    GlassSurface(
+        modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
+        subtle = false,
+        onClick = onClick,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),

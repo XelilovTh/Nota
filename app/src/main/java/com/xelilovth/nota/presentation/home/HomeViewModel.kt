@@ -6,14 +6,16 @@ import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.PlaybackRepository
+import com.xelilovth.nota.domain.repository.SettingsRepository
 import com.xelilovth.nota.domain.usecase.ObserveTracksUseCase
 import com.xelilovth.nota.domain.usecase.PlayTrackUseCase
 import com.xelilovth.nota.domain.usecase.ToggleShuffleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -22,11 +24,14 @@ class HomeViewModel @Inject constructor(
     private val playbackRepository: PlaybackRepository,
     private val playTrack: PlayTrackUseCase,
     private val toggleShuffle: ToggleShuffleUseCase,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     val tracks: StateFlow<List<Track>> = observeTracks()
     val playbackState: StateFlow<PlaybackState> = playbackRepository.playbackState
-    private val _recentlyPlayed = MutableStateFlow<List<Track>>(emptyList())
-    val recentlyPlayed: StateFlow<List<Track>> = _recentlyPlayed.asStateFlow()
+    val recentlyPlayed: StateFlow<List<Track>> = combine(tracks, settingsRepository.recentTrackIds) { libraryTracks, recentIds ->
+        val byId = libraryTracks.associateBy(Track::id)
+        recentIds.mapNotNull(byId::get)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     private var lastTrackId: Long? = null
 
     init {
@@ -35,7 +40,7 @@ class HomeViewModel @Inject constructor(
                 val track = state.track ?: return@collect
                 if (track.id != lastTrackId) {
                     lastTrackId = track.id
-                    _recentlyPlayed.value = (listOf(track) + _recentlyPlayed.value.filterNot { it.id == track.id }).take(10)
+                    settingsRepository.addRecentTrack(track.id)
                 }
             }
         }

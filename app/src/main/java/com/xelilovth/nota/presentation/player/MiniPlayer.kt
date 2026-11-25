@@ -1,6 +1,5 @@
 package com.xelilovth.nota.presentation.player
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -20,7 +20,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -29,14 +28,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
+import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.theme.AppDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MiniPlayer(state: PlaybackState, viewModel: PlayerViewModel, onOpen: () -> Unit) {
+fun MiniPlayer(
+    state: PlaybackState,
+    viewModel: PlayerViewModel,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val track = state.track ?: return
     val duration = state.durationMs.coerceAtLeast(0L)
     val progress = if (duration > 0L) (state.positionMs.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
@@ -52,25 +58,29 @@ fun MiniPlayer(state: PlaybackState, viewModel: PlayerViewModel, onOpen: () -> U
 
     SwipeToDismissBox(
         state = dismissState,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppDimens.FloatingNavHorizontalPadding),
         enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
         backgroundContent = {
             Box(modifier = Modifier.fillMaxSize())
         },
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-            color = MaterialTheme.colorScheme.surfaceVariant,
+        GlassSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(AppDimens.FloatingMiniPlayerHeight),
+            shape = MaterialTheme.shapes.large,
+            elevated = true,
+            blurBackdrop = true,
+            onClick = onOpen,
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(AppDimens.MiniPlayerProgressHeight),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.outline,
-                )
+            Box(modifier = Modifier.fillMaxSize()) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = AppDimens.MiniPlayerPadding, vertical = AppDimens.ElementSpacing),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = AppDimens.MiniPlayerPadding),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                 ) {
@@ -107,6 +117,22 @@ fun MiniPlayer(state: PlaybackState, viewModel: PlayerViewModel, onOpen: () -> U
                         Icon(Icons.Filled.SkipNext, contentDescription = "Next")
                     }
                 }
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = AppDimens.MiniPlayerProgressHorizontalInset,
+                            vertical = AppDimens.MiniPlayerProgressBottomMargin,
+                        )
+                        .height(AppDimens.MiniPlayerProgressHeight)
+                        .clip(CircleShape),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+                    gapSize = AppDimens.Zero,
+                    drawStopIndicator = {},
+                )
             }
         }
     }

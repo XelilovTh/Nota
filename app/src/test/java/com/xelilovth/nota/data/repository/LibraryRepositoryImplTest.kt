@@ -19,9 +19,13 @@ class LibraryRepositoryImplTest {
         initialHideShort: Boolean = false,
     ) : SettingsRepository {
         override val settings = MutableStateFlow(AppSettings(hideShortTracks = initialHideShort))
+        override val recentTrackIds = MutableStateFlow<List<Long>>(emptyList())
         override fun setThemeMode(mode: ThemeMode) = Unit
         override fun setHideShortTracks(hide: Boolean) {
             settings.value = settings.value.copy(hideShortTracks = hide)
+        }
+        override fun addRecentTrack(trackId: Long) {
+            recentTrackIds.value = (listOf(trackId) + recentTrackIds.value.filterNot { it == trackId }).take(10)
         }
     }
 

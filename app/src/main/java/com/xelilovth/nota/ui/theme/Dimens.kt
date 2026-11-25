@@ -16,11 +16,11 @@ object AppDimens {
     val IconSizeSmall = 18.dp
     val IconSizeMedium = 24.dp
     val IconSizeLarge = 28.dp
-    val PlayerArtworkFraction = 0.72f
+    val PlayerArtworkFraction = 0.78f
     val PlayerArtworkSize = 240.dp
     val CircularSeekbarStroke = 3.dp
     val CircularSeekbarThumbRadius = 6.dp
-    val CircularSeekbarRingGap = 14.dp
+    val CircularSeekbarRingGap = 10.dp
     val PlaylistHeaderArtworkSize = 132.dp
     val PlayerArtworkIconSize = 64.dp
     val PlayerControlSpacing = 12.dp
@@ -30,4 +30,23 @@ object AppDimens {
     val ShapeMedium = 12.dp
     val ShapeLarge = 16.dp
     val ShapeExtraLarge = 28.dp
+
+    val GlassBlurRadius = 26.dp
+    val GlassBorderWidth = 1.dp
+    val GlassSubtleBorderWidth = 0.5.dp
+    val GlassLensBorderWidth = 1.5.dp
+    val MiniPlayerProgressBottomMargin = 4.dp
+    val MiniPlayerProgressHorizontalInset = 20.dp
+    val TopScrimExtraHeight = 20.dp
+    val BottomScrimHeight = 112.dp
+    val FloatingNavHeight = 64.dp
+    val FloatingNavHorizontalPadding = 16.dp
+    val FloatingNavBottomPadding = 12.dp
+    val FloatingNavInnerPadding = 4.dp
+    val FloatingMiniPlayerHeight = 64.dp
+    val FloatingMiniPlayerGap = 8.dp
+    val FloatingBottomClearance = 164.dp
+    val FloatingNavOnlyClearance = 96.dp
+    val PlayerBottomSafePadding = 32.dp
+    val Zero = 0.dp
 }
