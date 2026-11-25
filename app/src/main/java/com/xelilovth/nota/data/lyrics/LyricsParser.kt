@@ -28,7 +28,7 @@ internal object LyricsParser {
                 text = text,
                 startMs = minutes * 60_000L + seconds * 1_000L + millis,
             )
-        }.sortedBy { it.startMs }
+        }.sortedBy { it.startMs }.toList()
         return parsed.mapIndexed { index, line ->
             line.copy(endMs = parsed.getOrNull(index + 1)?.startMs ?: durationMs.takeIf { it > 0L })
         }
