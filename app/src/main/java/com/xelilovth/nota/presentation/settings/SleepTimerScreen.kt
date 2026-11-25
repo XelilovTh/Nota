@@ -1,20 +1,19 @@
 package com.xelilovth.nota.presentation.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,7 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 
 private val SLEEP_PRESETS_MINUTES = listOf(15, 30, 45, 60)
 
@@ -34,7 +35,15 @@ fun SleepTimerScreen(
     val remainingSeconds by viewModel.sleepTimerRemainingSeconds.collectAsStateWithLifecycle()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(
+                start = AppDimens.ScreenPadding,
+                top = AppDimens.ScreenPadding,
+                end = AppDimens.ScreenPadding,
+                bottom = LocalBottomContentPadding.current,
+            ),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
     ) {
         Row(
@@ -47,11 +56,10 @@ fun SleepTimerScreen(
             Text("Sleep Timer", style = MaterialTheme.typography.headlineMedium)
         }
 
-        Surface(
+        GlassSurface(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
-            border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.large,
+            elevated = true,
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
@@ -71,11 +79,27 @@ fun SleepTimerScreen(
 
         Column(verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
             SLEEP_PRESETS_MINUTES.forEach { minutes ->
-                OutlinedButton(
-                    onClick = { viewModel.startSleepTimer(minutes) },
+                GlassSurface(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    subtle = true,
+                    onClick = { viewModel.startSleepTimer(minutes) },
                 ) {
-                    Text("$minutes minutes")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = AppDimens.CardPadding,
+                                vertical = AppDimens.RowVerticalPadding,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            "$minutes minutes",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
                 }
             }
             if (remainingSeconds != null) {

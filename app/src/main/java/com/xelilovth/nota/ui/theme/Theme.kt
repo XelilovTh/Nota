@@ -5,6 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
+import dev.chrisbanes.haze.HazeState
 
 private val LightColorScheme = lightColorScheme(
     primary = AppColors.LightPrimary,
@@ -50,15 +54,28 @@ private val DarkColorScheme = darkColorScheme(
     surfaceContainerHighest = AppColors.DarkSurfaceContainerHighest,
 )
 
+val LocalGlassColors = staticCompositionLocalOf { LightGlassColors }
+val LocalHazeState = compositionLocalOf<HazeState?> { null }
+val LocalBottomContentPadding = compositionLocalOf { AppDimens.ScreenPadding }
+
+object NotaGlassTheme {
+    val colors: GlassColors
+        @Composable
+        get() = LocalGlassColors.current
+}
+
 @Composable
 fun NotaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
-        typography = AppTypography,
-        shapes = AppShapes,
-        content = content,
-    )
+    val glassColors = if (darkTheme) DarkGlassColors else LightGlassColors
+    CompositionLocalProvider(LocalGlassColors provides glassColors) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+            typography = AppTypography,
+            shapes = AppShapes,
+            content = content,
+        )
+    }
 }

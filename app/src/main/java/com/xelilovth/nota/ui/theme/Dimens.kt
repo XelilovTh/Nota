@@ -30,4 +30,16 @@ object AppDimens {
     val ShapeMedium = 12.dp
     val ShapeLarge = 16.dp
     val ShapeExtraLarge = 28.dp
+
+    val GlassBlurRadius = 22.dp
+    val GlassBorderWidth = 1.dp
+    val GlassLensBorderWidth = 1.5.dp
+    val FloatingNavHeight = 64.dp
+    val FloatingNavHorizontalPadding = 16.dp
+    val FloatingNavBottomPadding = 12.dp
+    val FloatingNavInnerPadding = 4.dp
+    val FloatingMiniPlayerHeight = 64.dp
+    val FloatingMiniPlayerGap = 8.dp
+    val FloatingBottomClearance = 164.dp
+    val FloatingNavOnlyClearance = 96.dp
 }

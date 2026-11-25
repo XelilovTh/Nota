@@ -5,10 +5,10 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,9 +48,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
+import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 
 @Composable
 fun LibraryScreen(
@@ -124,7 +126,12 @@ fun LibraryScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(AppDimens.ScreenPadding),
+                    contentPadding = PaddingValues(
+                        start = AppDimens.ScreenPadding,
+                        top = AppDimens.ScreenPadding,
+                        end = AppDimens.ScreenPadding,
+                        bottom = LocalBottomContentPadding.current,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                 ) {
                     item(key = "library_header") {
@@ -214,64 +221,95 @@ private fun TrackRow(
     onPlay: () -> Unit,
     onAddToPlaylist: () -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-        modifier = Modifier.fillMaxWidth()
-            .clickable(onClick = onPlay)
-            .padding(vertical = AppDimens.RowVerticalPadding),
+    GlassSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        subtle = true,
+        onClick = onPlay,
     ) {
-        TrackArtwork(
-            trackId = track.id,
-            trackUri = track.uri,
-            modifier = Modifier.size(AppDimens.ArtworkSmallSize),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                track.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = AppDimens.CardPadding,
+                    top = AppDimens.RowVerticalPadding,
+                    end = AppDimens.ElementSpacing,
+                    bottom = AppDimens.RowVerticalPadding,
+                ),
+        ) {
+            TrackArtwork(
+                trackId = track.id,
+                trackUri = track.uri,
+                modifier = Modifier.size(AppDimens.ArtworkSmallSize),
             )
-            Text(
-                "${track.artist} · ${track.album}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (isCurrent && isPlaying) {
-            Icon(
-                Icons.Outlined.GraphicEq,
-                contentDescription = "Playing",
-                modifier = Modifier.size(AppDimens.IconSizeSmall),
-            )
-        } else {
-            Text(
-                formatDuration(track.durationMs),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        IconButton(onClick = onAddToPlaylist) {
-            Icon(
-                Icons.AutoMirrored.Outlined.PlaylistAdd,
-                contentDescription = "Add to playlist",
-                modifier = Modifier.size(AppDimens.IconSizeSmall),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    track.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${track.artist} · ${track.album}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (isCurrent && isPlaying) {
+                Icon(
+                    Icons.Outlined.GraphicEq,
+                    contentDescription = "Playing",
+                    modifier = Modifier.size(AppDimens.IconSizeSmall),
+                )
+            } else {
+                Text(
+                    formatDuration(track.durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onAddToPlaylist) {
+                Icon(
+                    Icons.AutoMirrored.Outlined.PlaylistAdd,
+                    contentDescription = "Add to playlist",
+                    modifier = Modifier.size(AppDimens.IconSizeSmall),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun CenteredMessage(content: @Composable () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+private fun CenteredMessage(content: @Composable ColumnScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(
+                start = AppDimens.ScreenPadding,
+                top = AppDimens.ScreenPadding,
+                end = AppDimens.ScreenPadding,
+                bottom = LocalBottomContentPadding.current,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        content()
+        GlassSurface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            elevated = true,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(AppDimens.CardPadding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                content = content,
+            )
+        }
     }
 }

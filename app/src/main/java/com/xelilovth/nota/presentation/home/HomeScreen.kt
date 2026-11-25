@@ -6,7 +6,6 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
@@ -25,12 +25,11 @@ import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,9 +50,12 @@ import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.AppRoute
 import com.xelilovth.nota.presentation.library.LibraryViewModel
+import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
+import com.xelilovth.nota.ui.theme.LocalGlassColors
 
 @Composable
 fun HomeScreen(
@@ -88,7 +90,12 @@ fun HomeScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(AppDimens.ScreenPadding),
+        contentPadding = PaddingValues(
+            start = AppDimens.ScreenPadding,
+            top = AppDimens.ScreenPadding,
+            end = AppDimens.ScreenPadding,
+            bottom = LocalBottomContentPadding.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
     ) {
         item {
@@ -105,22 +112,39 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                Row {
-                    IconButton(onClick = { navController.navigate(AppRoute.homeActionRoute("search") ?: AppRoute.SEARCH) }) {
-                        Icon(Icons.Outlined.Search, "Search")
+                Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
+                    GlassSurface(
+                        modifier = Modifier.size(AppDimens.ArtworkSmallSize),
+                        shape = CircleShape,
+                        subtle = true,
+                        onClick = { navController.navigate(AppRoute.homeActionRoute("search") ?: AppRoute.SEARCH) },
+                    ) {
+                        Icon(
+                            Icons.Outlined.Search,
+                            contentDescription = "Search",
+                            modifier = Modifier.align(Alignment.Center),
+                        )
                     }
-                    IconButton(onClick = { navController.navigate(AppRoute.homeActionRoute("settings") ?: AppRoute.SETTINGS) }) {
-                        Icon(Icons.Outlined.Settings, "Settings")
+                    GlassSurface(
+                        modifier = Modifier.size(AppDimens.ArtworkSmallSize),
+                        shape = CircleShape,
+                        subtle = true,
+                        onClick = { navController.navigate(AppRoute.homeActionRoute("settings") ?: AppRoute.SETTINGS) },
+                    ) {
+                        Icon(
+                            Icons.Outlined.Settings,
+                            contentDescription = "Settings",
+                            modifier = Modifier.align(Alignment.Center),
+                        )
                     }
                 }
             }
         }
         item {
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
+                elevated = true,
             ) {
                 Column(
                     Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
@@ -137,6 +161,10 @@ fun HomeScreen(
                         Button(
                             onClick = { onPlayWithNotificationPermission(viewModel::playFirstTrack) },
                             enabled = tracks.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
                         ) {
                             Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(AppDimens.IconSizeSmall))
                             Text(" Play")
@@ -144,6 +172,10 @@ fun HomeScreen(
                         OutlinedButton(
                             onClick = { onPlayWithNotificationPermission(viewModel::playShuffledLibrary) },
                             enabled = tracks.isNotEmpty(),
+                            border = BorderStroke(AppDimens.BorderWidth, LocalGlassColors.current.borderHighlight),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
                         ) {
                             Icon(Icons.Filled.Shuffle, null, modifier = Modifier.size(AppDimens.IconSizeSmall))
                             Text(" Shuffle")
@@ -220,38 +252,47 @@ internal fun CompactTrackRow(
     isPlaying: Boolean = false,
     onClick: () -> Unit,
 ) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = AppDimens.RowVerticalPadding),
-        verticalAlignment = Alignment.CenterVertically,
+    GlassSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        subtle = true,
+        onClick = onClick,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                track.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                track.artist,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (isCurrent && isPlaying) {
-            Icon(
-                Icons.Outlined.GraphicEq,
-                contentDescription = "Playing",
-                modifier = Modifier.size(AppDimens.IconSizeSmall),
-            )
-        } else {
-            Text(
-                formatDuration(track.durationMs),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.CardPadding, vertical = AppDimens.RowVerticalPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    track.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    track.artist,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (isCurrent && isPlaying) {
+                Icon(
+                    Icons.Outlined.GraphicEq,
+                    contentDescription = "Playing",
+                    modifier = Modifier.size(AppDimens.IconSizeSmall),
+                )
+            } else {
+                Text(
+                    formatDuration(track.durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -259,11 +300,11 @@ internal fun CompactTrackRow(
 @Composable
 internal fun PlaylistGroupRow(group: AutoPlaylist, onClick: () -> Unit) {
     val coverTrack = group.tracks.firstOrNull()
-    Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    GlassSurface(
+        modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
+        subtle = true,
+        onClick = onClick,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),

@@ -1,6 +1,5 @@
 package com.xelilovth.nota.presentation.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,7 +21,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -33,7 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.ThemeMode
+import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 
 @Composable
 fun SettingsScreen(
@@ -48,7 +48,12 @@ fun SettingsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(AppDimens.ScreenPadding),
+        contentPadding = PaddingValues(
+            start = AppDimens.ScreenPadding,
+            top = AppDimens.ScreenPadding,
+            end = AppDimens.ScreenPadding,
+            bottom = LocalBottomContentPadding.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
     ) {
         item {
@@ -65,11 +70,10 @@ fun SettingsScreen(
 
         item {
             SectionLabel("Appearance")
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
@@ -108,11 +112,10 @@ fun SettingsScreen(
 
         item {
             SectionLabel("Library")
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -172,11 +175,10 @@ fun SettingsScreen(
 
         item {
             SectionLabel("Playback")
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
             ) {
                 Row(
                     modifier = Modifier
@@ -200,11 +202,10 @@ fun SettingsScreen(
 
         item {
             SectionLabel("About")
-            Surface(
+            GlassSurface(
                 modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
-                shape = MaterialTheme.shapes.medium,
-                border = BorderStroke(AppDimens.BorderWidth, MaterialTheme.colorScheme.outline),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),

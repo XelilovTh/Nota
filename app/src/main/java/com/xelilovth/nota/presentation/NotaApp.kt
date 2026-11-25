@@ -8,28 +8,26 @@ import java.nio.charset.StandardCharsets
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -57,18 +55,20 @@ import com.xelilovth.nota.presentation.search.SearchScreen
 import com.xelilovth.nota.presentation.settings.SettingsScreen
 import com.xelilovth.nota.presentation.settings.SettingsViewModel
 import com.xelilovth.nota.presentation.settings.SleepTimerScreen
-
-private data class TabItem(
-    val route: String,
-    val label: String,
-    val icon: ImageVector,
-)
+import com.xelilovth.nota.ui.components.GlassAmbientBackground
+import com.xelilovth.nota.ui.components.LiquidGlassBottomBar
+import com.xelilovth.nota.ui.components.LiquidNavTab
+import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
+import com.xelilovth.nota.ui.theme.LocalHazeState
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 private val tabItems = listOf(
-    TabItem(AppRoute.HOME, "Home", Icons.Outlined.Home),
-    TabItem(AppRoute.PLAYLISTS, "Playlists", Icons.Outlined.MusicNote),
-    TabItem(AppRoute.SEARCH, "Search", Icons.Outlined.Search),
-    TabItem(AppRoute.LIBRARY, "Library", Icons.Outlined.LibraryMusic),
+    LiquidNavTab(AppRoute.HOME, "Home", Icons.Outlined.Home),
+    LiquidNavTab(AppRoute.PLAYLISTS, "Playlists", Icons.Outlined.MusicNote),
+    LiquidNavTab(AppRoute.SEARCH, "Search", Icons.Outlined.Search),
+    LiquidNavTab(AppRoute.LIBRARY, "Library", Icons.Outlined.LibraryMusic),
 )
 
 @Composable
@@ -121,111 +121,134 @@ fun NotaApp() {
     val libraryViewModel: LibraryViewModel = hiltViewModel()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val showTabs = currentRoute in AppRoute.bottomTabs
+    val hazeState = remember { HazeState() }
+    val hasMiniPlayer = currentRoute != AppRoute.NOW_PLAYING &&
+        remember(playerViewModel) {
+            playerViewModel.playbackState
+                .map { it.track != null }
+                .distinctUntilChanged()
+        }.collectAsStateWithLifecycle(initialValue = false).value
+    val bottomClearance = when {
+        showTabs && hasMiniPlayer -> AppDimens.FloatingBottomClearance
+        showTabs -> AppDimens.FloatingNavOnlyClearance
+        hasMiniPlayer -> AppDimens.FloatingNavOnlyClearance
+        else -> AppDimens.ScreenPadding
+    }
+    val selectedIndex = tabItems.indexOfFirst { tab ->
+        currentDestination?.hierarchy?.any { it.route == tab.route } == true
+    }.coerceAtLeast(0)
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            Column {
+    CompositionLocalProvider(
+        LocalHazeState provides hazeState,
+        LocalBottomContentPadding provides bottomClearance,
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .hazeSource(state = hazeState),
+            ) {
+                GlassAmbientBackground(modifier = Modifier.fillMaxSize())
+                NavHost(
+                    navController = navController,
+                    startDestination = AppRoute.HOME,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding(),
+                ) {
+                    composable(AppRoute.HOME) { HomeScreen(navController, onPlayWithNotificationPermission = requestPlaybackPermission) }
+                    composable(AppRoute.PLAYLISTS) {
+                        PlaylistsScreen(
+                            onOpenPlaylist = { playlistId -> navController.navigate(AppRoute.playlistDetail(playlistId)) },
+                        )
+                    }
+                    composable(
+                        route = AppRoute.PLAYLIST_DETAIL,
+                        arguments = listOf(navArgument("playlistId") { type = NavType.StringType }),
+                    ) { entry ->
+                        val rawId = entry.arguments?.getString("playlistId").orEmpty()
+                        val decodedId = URLDecoder.decode(rawId, StandardCharsets.UTF_8.name())
+                        PlaylistDetailScreen(
+                            playlistId = decodedId,
+                            onBack = { navController.popBackStack() },
+                            onPlayWithNotificationPermission = requestPlaybackPermission,
+                        )
+                    }
+                    composable(AppRoute.SEARCH) {
+                        val activeTrackState by remember(playerViewModel) {
+                            playerViewModel.playbackState.map { it.track?.id to it.isPlaying }.distinctUntilChanged()
+                        }.collectAsStateWithLifecycle(initialValue = null to false)
+                        SearchScreen(
+                            activeTrackId = activeTrackState.first,
+                            isPlaying = activeTrackState.second,
+                            onPlayWithNotificationPermission = requestPlaybackPermission,
+                        )
+                    }
+                    composable(AppRoute.LIBRARY) {
+                        val activeTrackState by remember(playerViewModel) {
+                            playerViewModel.playbackState.map { it.track?.id to it.isPlaying }.distinctUntilChanged()
+                        }.collectAsStateWithLifecycle(initialValue = null to false)
+                        LibraryScreen(
+                            activeTrackId = activeTrackState.first,
+                            isPlaying = activeTrackState.second,
+                            onPlayWithNotificationPermission = requestPlaybackPermission,
+                        )
+                    }
+                    composable(AppRoute.SETTINGS) {
+                        SettingsScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
+                        )
+                    }
+                    composable(AppRoute.SLEEP_TIMER) {
+                        SleepTimerScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable(AppRoute.NOW_PLAYING) {
+                        val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
+                        val queueTracks by libraryViewModel.tracks.collectAsStateWithLifecycle()
+                        val sleepSeconds by settingsViewModel.sleepTimerRemainingSeconds.collectAsStateWithLifecycle()
+                        NowPlayingScreen(
+                            state = playbackState,
+                            viewModel = playerViewModel,
+                            queueTracks = queueTracks,
+                            sleepTimerRemainingSeconds = sleepSeconds,
+                            onBack = { navController.popBackStack() },
+                            onSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
+                            onSettings = { navController.navigate(AppRoute.SETTINGS) },
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(bottom = AppDimens.FloatingNavBottomPadding),
+            ) {
                 MiniPlayerHost(
                     playerViewModel = playerViewModel,
                     visible = currentRoute != AppRoute.NOW_PLAYING,
                     onOpen = { navController.navigate(AppRoute.NOW_PLAYING) },
+                    modifier = Modifier.padding(
+                        bottom = if (showTabs) AppDimens.FloatingMiniPlayerGap else AppDimens.ElementSpacing,
+                    ),
                 )
                 if (showTabs) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                        tabItems.forEach { tab ->
-                            val selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = {
-                                    navController.navigate(tab.route, navOptions {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    })
-                                },
-                                icon = { Icon(tab.icon, contentDescription = tab.label) },
-                                label = { Text(tab.label) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onSurface,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                            )
-                        }
-                    }
+                    LiquidGlassBottomBar(
+                        tabs = tabItems,
+                        selectedIndex = selectedIndex,
+                        onSelectTab = { index ->
+                            val tab = tabItems[index]
+                            navController.navigate(tab.route, navOptions {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            })
+                        },
+                    )
                 }
-            }
-        },
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = AppRoute.HOME,
-            modifier = Modifier.padding(innerPadding),
-        ) {
-            composable(AppRoute.HOME) { HomeScreen(navController, onPlayWithNotificationPermission = requestPlaybackPermission) }
-            composable(AppRoute.PLAYLISTS) {
-                PlaylistsScreen(
-                    onOpenPlaylist = { playlistId -> navController.navigate(AppRoute.playlistDetail(playlistId)) },
-                )
-            }
-            composable(
-                route = AppRoute.PLAYLIST_DETAIL,
-                arguments = listOf(navArgument("playlistId") { type = NavType.StringType }),
-            ) { entry ->
-                val rawId = entry.arguments?.getString("playlistId").orEmpty()
-                val decodedId = URLDecoder.decode(rawId, StandardCharsets.UTF_8.name())
-                PlaylistDetailScreen(
-                    playlistId = decodedId,
-                    onBack = { navController.popBackStack() },
-                    onPlayWithNotificationPermission = requestPlaybackPermission,
-                )
-            }
-            composable(AppRoute.SEARCH) {
-                val activeTrackState by remember(playerViewModel) {
-                    playerViewModel.playbackState.map { it.track?.id to it.isPlaying }.distinctUntilChanged()
-                }.collectAsStateWithLifecycle(initialValue = null to false)
-                SearchScreen(
-                    activeTrackId = activeTrackState.first,
-                    isPlaying = activeTrackState.second,
-                    onPlayWithNotificationPermission = requestPlaybackPermission,
-                )
-            }
-            composable(AppRoute.LIBRARY) {
-                val activeTrackState by remember(playerViewModel) {
-                    playerViewModel.playbackState.map { it.track?.id to it.isPlaying }.distinctUntilChanged()
-                }.collectAsStateWithLifecycle(initialValue = null to false)
-                LibraryScreen(
-                    activeTrackId = activeTrackState.first,
-                    isPlaying = activeTrackState.second,
-                    onPlayWithNotificationPermission = requestPlaybackPermission,
-                )
-            }
-            composable(AppRoute.SETTINGS) {
-                SettingsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
-                )
-            }
-            composable(AppRoute.SLEEP_TIMER) {
-                SleepTimerScreen(onBack = { navController.popBackStack() })
-            }
-            composable(AppRoute.NOW_PLAYING) {
-                val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
-                val queueTracks by libraryViewModel.tracks.collectAsStateWithLifecycle()
-                val sleepSeconds by settingsViewModel.sleepTimerRemainingSeconds.collectAsStateWithLifecycle()
-                NowPlayingScreen(
-                    state = playbackState,
-                    viewModel = playerViewModel,
-                    queueTracks = queueTracks,
-                    sleepTimerRemainingSeconds = sleepSeconds,
-                    onBack = { navController.popBackStack() },
-                    onSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
-                    onSettings = { navController.navigate(AppRoute.SETTINGS) },
-                )
             }
         }
     }
@@ -236,10 +259,16 @@ private fun MiniPlayerHost(
     playerViewModel: PlayerViewModel,
     visible: Boolean,
     onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     if (!visible) return
     val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
     if (playbackState.track != null) {
-        MiniPlayer(playbackState, playerViewModel, onOpen)
+        MiniPlayer(
+            state = playbackState,
+            viewModel = playerViewModel,
+            onOpen = onOpen,
+            modifier = modifier,
+        )
     }
 }
