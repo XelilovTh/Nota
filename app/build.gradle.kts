@@ -13,6 +13,15 @@ val releaseKeyPassword = providers.environmentVariable("NOTA_RELEASE_KEY_PASSWOR
 val hasReleaseSigning = listOf(releaseKeystorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
     .all { !it.isNullOrBlank() }
 
+gradle.taskGraph.whenReady {
+    val requestsRelease = allTasks.any { it.name.contains("Release", ignoreCase = true) }
+    if (requestsRelease && !hasReleaseSigning) {
+        throw org.gradle.api.GradleException(
+            "Release APK signing is not configured. Provide the NOTA_RELEASE_* signing environment variables.",
+        )
+    }
+}
+
 android {
     namespace = "com.xelilovth.nota"
     compileSdk = 35

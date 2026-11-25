@@ -39,21 +39,32 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Decode stable release signing key
+      - name: Validate signing secrets and decode keystore
         env:
           NOTA_RELEASE_KEYSTORE_BASE64: ${{ secrets.NOTA_RELEASE_KEYSTORE_BASE64 }}
+          NOTA_RELEASE_STORE_PASSWORD: ${{ secrets.NOTA_RELEASE_STORE_PASSWORD }}
+          NOTA_RELEASE_KEY_ALIAS: ${{ secrets.NOTA_RELEASE_KEY_ALIAS }}
+          NOTA_RELEASE_KEY_PASSWORD: ${{ secrets.NOTA_RELEASE_KEY_PASSWORD }}
         run: |
-          test -n "$NOTA_RELEASE_KEYSTORE_BASE64" || { echo "Missing NOTA_RELEASE_KEYSTORE_BASE64 repository secret"; exit 1; }
+          test -n "$NOTA_RELEASE_KEYSTORE_BASE64" || { echo "Missing NOTA_RELEASE_KEYSTORE_BASE64"; exit 1; }
+          test -n "$NOTA_RELEASE_STORE_PASSWORD" || { echo "Missing NOTA_RELEASE_STORE_PASSWORD"; exit 1; }
+          test -n "$NOTA_RELEASE_KEY_ALIAS" || { echo "Missing NOTA_RELEASE_KEY_ALIAS"; exit 1; }
+          test -n "$NOTA_RELEASE_KEY_PASSWORD" || { echo "Missing NOTA_RELEASE_KEY_PASSWORD"; exit 1; }
           mkdir -p app/keystore
           printf '%s' "$NOTA_RELEASE_KEYSTORE_BASE64" | base64 --decode > app/keystore/release.keystore
+          test -s app/keystore/release.keystore
+          chmod 600 app/keystore/release.keystore
 
-      - name: Build release APK
+      - name: Build signed release APK
         env:
           NOTA_RELEASE_KEYSTORE_PATH: app/keystore/release.keystore
           NOTA_RELEASE_STORE_PASSWORD: ${{ secrets.NOTA_RELEASE_STORE_PASSWORD }}
           NOTA_RELEASE_KEY_ALIAS: ${{ secrets.NOTA_RELEASE_KEY_ALIAS }}
           NOTA_RELEASE_KEY_PASSWORD: ${{ secrets.NOTA_RELEASE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
+
+      - name: Verify release APK signature
+        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
 
       - name: Publish Release
         env:
