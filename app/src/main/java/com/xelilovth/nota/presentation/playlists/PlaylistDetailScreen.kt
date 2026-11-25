@@ -156,6 +156,7 @@ fun PlaylistDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.large,
                         elevated = true,
+                        blurBackdrop = true,
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),

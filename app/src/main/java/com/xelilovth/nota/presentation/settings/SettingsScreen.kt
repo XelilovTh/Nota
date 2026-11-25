@@ -99,6 +99,7 @@ fun SettingsScreen(
                                     )
                                 },
                                 colors = FilterChipDefaults.filterChipColors(
+                                    labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                                 ),

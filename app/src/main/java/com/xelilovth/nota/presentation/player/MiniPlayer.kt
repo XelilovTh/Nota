@@ -56,7 +56,9 @@ fun MiniPlayer(
 
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier.padding(horizontal = AppDimens.FloatingNavHorizontalPadding),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppDimens.FloatingNavHorizontalPadding),
         enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
         backgroundContent = {
@@ -69,6 +71,7 @@ fun MiniPlayer(
                 .height(AppDimens.FloatingMiniPlayerHeight),
             shape = MaterialTheme.shapes.large,
             elevated = true,
+            blurBackdrop = true,
             onClick = onOpen,
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -117,9 +120,10 @@ fun MiniPlayer(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .padding(horizontal = AppDimens.ShapeLarge)
                         .height(AppDimens.MiniPlayerProgressHeight),
                     color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.outline,
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
                 )
             }
         }

@@ -204,6 +204,7 @@ fun NowPlayingScreen(
         GlassSurface(
             shape = CircleShape,
             elevated = true,
+            blurBackdrop = true,
         ) {
             Row(
                 modifier = Modifier.padding(
@@ -262,6 +263,7 @@ fun NowPlayingScreen(
                 modifier = Modifier.weight(1f),
                 shape = CircleShape,
                 subtle = true,
+                blurBackdrop = true,
                 onClick = { showQueueSheet = true },
             ) {
                 Row(
@@ -291,6 +293,7 @@ fun NowPlayingScreen(
                 modifier = Modifier.weight(1f),
                 shape = CircleShape,
                 subtle = true,
+                blurBackdrop = true,
                 onClick = onSleepTimer,
             ) {
                 Row(

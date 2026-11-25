@@ -7,8 +7,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -87,6 +89,7 @@ fun GlassSurface(
     shape: Shape = MaterialTheme.shapes.medium,
     elevated: Boolean = false,
     subtle: Boolean = false,
+    blurBackdrop: Boolean = false,
     borderWidth: Dp = AppDimens.GlassBorderWidth,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
@@ -99,7 +102,7 @@ fun GlassSurface(
         else -> glass.surfaceTint
     }
 
-    val backdropModifier = if (hazeState != null) {
+    val backdropModifier = if (blurBackdrop && hazeState != null) {
         Modifier.hazeEffect(
             state = hazeState,
             style = HazeStyle(
@@ -130,6 +133,9 @@ fun GlassSurface(
                 shape = shape,
             )
             .then(clickModifier),
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            content()
+        }
+    }
 }

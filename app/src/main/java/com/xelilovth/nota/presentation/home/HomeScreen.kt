@@ -145,6 +145,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
                 elevated = true,
+                blurBackdrop = true,
             ) {
                 Column(
                     Modifier.fillMaxWidth().padding(AppDimens.CardPadding),

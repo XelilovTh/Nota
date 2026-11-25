@@ -76,6 +76,7 @@ fun LiquidGlassBottomBar(
             .height(AppDimens.FloatingNavHeight),
         shape = CircleShape,
         elevated = true,
+        blurBackdrop = true,
     ) {
         BoxWithConstraints(
             modifier = Modifier

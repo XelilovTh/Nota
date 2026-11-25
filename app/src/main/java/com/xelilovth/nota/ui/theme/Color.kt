@@ -61,14 +61,14 @@ val LightGlassColors = GlassColors(
 )
 
 val DarkGlassColors = GlassColors(
-    surfaceTint = Color(0x99161616),
-    surfaceElevatedTint = Color(0xBD1A1A1A),
-    surfaceSubtleTint = Color(0x66141414),
+    surfaceTint = Color(0x88161616),
+    surfaceElevatedTint = Color(0x94141414),
+    surfaceSubtleTint = Color(0x591A1A1A),
     borderHighlight = Color(0x40FFFFFF),
     borderEdge = Color(0x14FFFFFF),
     ambientOrbPrimary = Color(0x1AFFFFFF),
     ambientOrbSecondary = Color(0x129E9E9E),
-    liquidLensFill = Color(0x36FFFFFF),
-    liquidLensRimBright = Color(0x80FFFFFF),
-    liquidLensRimSoft = Color(0x1AFFFFFF),
+    liquidLensFill = Color(0x28FFFFFF),
+    liquidLensRimBright = Color(0x73FFFFFF),
+    liquidLensRimSoft = Color(0x14FFFFFF),
 )
