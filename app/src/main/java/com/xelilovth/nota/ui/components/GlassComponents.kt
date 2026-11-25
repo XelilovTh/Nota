@@ -11,6 +11,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -121,21 +122,34 @@ fun GlassSurface(
         Modifier
     }
 
+    val borderModifier = if (!(subtle && !glass.subtleRowBorder)) {
+        val resolvedBorderWidth = if (subtle) AppDimens.GlassSubtleBorderWidth else borderWidth
+        val borderBrush = remember(glass.borderHighlight, glass.borderEdge) {
+            Brush.linearGradient(colors = listOf(glass.borderHighlight, glass.borderEdge))
+        }
+        Modifier.border(
+            width = resolvedBorderWidth,
+            brush = borderBrush,
+            shape = shape,
+        )
+    } else {
+        Modifier
+    }
+
     Box(
         modifier = modifier
             .clip(shape)
             .then(backdropModifier)
-            .border(
-                width = borderWidth,
-                brush = Brush.linearGradient(
-                    colors = listOf(glass.borderHighlight, glass.borderEdge),
-                ),
-                shape = shape,
-            )
+            .then(borderModifier)
             .then(clickModifier),
     ) {
-        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        val onSurface = MaterialTheme.colorScheme.onSurface
+        if (LocalContentColor.current == onSurface) {
             content()
+        } else {
+            CompositionLocalProvider(LocalContentColor provides onSurface) {
+                content()
+            }
         }
     }
 }

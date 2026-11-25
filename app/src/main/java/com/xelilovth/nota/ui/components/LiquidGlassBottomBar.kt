@@ -116,9 +116,9 @@ fun LiquidGlassBottomBar(
             )
 
             val lensBorderWidth = if (isInteracting) {
-                AppDimens.GlassLensBorderWidth
-            } else {
                 AppDimens.GlassBorderWidth
+            } else {
+                AppDimens.GlassSubtleBorderWidth
             }
 
             val lensFillBrush = Brush.verticalGradient(

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.ui.components.GlassSurface
@@ -120,8 +122,12 @@ fun MiniPlayer(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = AppDimens.ShapeLarge)
-                        .height(AppDimens.MiniPlayerProgressHeight),
+                        .padding(
+                            horizontal = AppDimens.MiniPlayerProgressHorizontalInset,
+                            vertical = AppDimens.MiniPlayerProgressBottomMargin,
+                        )
+                        .height(AppDimens.MiniPlayerProgressHeight)
+                        .clip(CircleShape),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
                 )

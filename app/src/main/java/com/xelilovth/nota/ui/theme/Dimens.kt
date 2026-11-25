@@ -33,7 +33,10 @@ object AppDimens {
 
     val GlassBlurRadius = 26.dp
     val GlassBorderWidth = 1.dp
+    val GlassSubtleBorderWidth = 0.5.dp
     val GlassLensBorderWidth = 1.5.dp
+    val MiniPlayerProgressBottomMargin = 4.dp
+    val MiniPlayerProgressHorizontalInset = 20.dp
     val TopScrimExtraHeight = 20.dp
     val BottomScrimHeight = 112.dp
     val FloatingNavHeight = 64.dp

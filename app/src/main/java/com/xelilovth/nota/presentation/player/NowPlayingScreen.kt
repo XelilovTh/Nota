@@ -418,7 +418,11 @@ private fun CircularArcPlayerArt(
     modifier: Modifier = Modifier,
 ) {
     val activeColor = MaterialTheme.colorScheme.primary
-    val trackColor = MaterialTheme.colorScheme.outline
+    val trackColor = if (LocalGlassColors.current.subtleRowBorder) {
+        MaterialTheme.colorScheme.outline
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)
+    }
     var latestProgress by remember { mutableFloatStateOf(progress) }
     latestProgress = progress
 

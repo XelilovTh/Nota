@@ -45,6 +45,7 @@ data class GlassColors(
     val liquidLensFill: Color,
     val liquidLensRimBright: Color,
     val liquidLensRimSoft: Color,
+    val subtleRowBorder: Boolean,
 )
 
 val LightGlassColors = GlassColors(
@@ -58,17 +59,19 @@ val LightGlassColors = GlassColors(
     liquidLensFill = Color(0xD9FFFFFF),
     liquidLensRimBright = Color(0xFFFFFFFF),
     liquidLensRimSoft = Color(0x26000000),
+    subtleRowBorder = true,
 )
 
 val DarkGlassColors = GlassColors(
-    surfaceTint = Color(0x88161616),
-    surfaceElevatedTint = Color(0x94141414),
-    surfaceSubtleTint = Color(0x591A1A1A),
-    borderHighlight = Color(0x40FFFFFF),
-    borderEdge = Color(0x14FFFFFF),
-    ambientOrbPrimary = Color(0x1AFFFFFF),
-    ambientOrbSecondary = Color(0x129E9E9E),
-    liquidLensFill = Color(0x28FFFFFF),
-    liquidLensRimBright = Color(0x73FFFFFF),
-    liquidLensRimSoft = Color(0x14FFFFFF),
+    surfaceTint = Color(0x66222222),
+    surfaceElevatedTint = Color(0x9E1C1C1C),
+    surfaceSubtleTint = Color(0x471E1E1E),
+    borderHighlight = Color(0x1CFFFFFF),
+    borderEdge = Color(0x05FFFFFF),
+    ambientOrbPrimary = Color(0x26FFFFFF),
+    ambientOrbSecondary = Color(0x18A8A8A8),
+    liquidLensFill = Color(0x2EFFFFFF),
+    liquidLensRimBright = Color(0x38FFFFFF),
+    liquidLensRimSoft = Color(0x08FFFFFF),
+    subtleRowBorder = false,
 )

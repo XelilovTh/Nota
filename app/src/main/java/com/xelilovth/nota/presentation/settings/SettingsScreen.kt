@@ -89,6 +89,7 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = selected,
                                 onClick = { viewModel.setThemeMode(mode) },
+                                border = null,
                                 label = {
                                     Text(
                                         when (mode) {
