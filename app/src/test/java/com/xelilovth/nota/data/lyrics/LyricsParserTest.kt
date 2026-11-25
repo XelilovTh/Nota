@@ -51,6 +51,80 @@ class LyricsParserTest {
     }
 
     @Test
+    fun sortsLyricsFileLinesAndInfersEndTimesWithoutChangingWordOrder() {
+        val lyricsFile = """version: '1.0'
+            |lines:
+            |  - text: Second line
+            |    start_ms: 2000
+            |    words:
+            |      - text: 'Hello '
+            |        start_ms: 2000
+            |      - text: world
+            |        start_ms: 2400
+            |  - text: First line
+            |    start_ms: 1000
+            |    words:
+            |      - text: 'First '
+            |        start_ms: 1000
+            |      - text: line
+            |        start_ms: 1500
+            |""".trimMargin()
+
+        val lines = LyricsParser.fromLyricsFile(lyricsFile, durationMs = 3_000L)
+
+        assertEquals(listOf("First line", "Second line"), lines.map { it.text })
+        assertEquals(1_000L, lines[0].words[0].startMs)
+        assertEquals(1_500L, lines[0].words[0].endMs)
+        assertEquals(2_000L, lines[0].endMs)
+        assertEquals(2_400L, lines[1].words[0].endMs)
+        assertEquals(3_000L, lines[1].words[1].endMs)
+    }
+
+    @Test
+    fun ignoresInvalidWordTimestampsWithoutDroppingTheLyricLine() {
+        val lyricsFile = """version: '1.0'
+            |lines:
+            |  - text: Keep this line
+            |    start_ms: 1000
+            |    words:
+            |      - text: 'Keep '
+            |        start_ms: -1
+            |      - text: 'this '
+            |        start_ms: 1100
+            |      - text: line
+            |        start_ms: 1200
+            |""".trimMargin()
+
+        val lines = LyricsParser.fromLyricsFile(lyricsFile, durationMs = 2_000L)
+
+        assertEquals(1, lines.size)
+        assertEquals("Keep this line", lines.single().text)
+        assertEquals(listOf("this ", "line"), lines.single().words.map { it.text })
+        assertEquals(1_200L, lines.single().words.first().endMs)
+    }
+
+    @Test
+    fun fallsBackToLineTextWhenWordTimestampsAreOutOfOrder() {
+        val lyricsFile = """version: '1.0'
+            |lines:
+            |  - text: Keep the original word order
+            |    start_ms: 1000
+            |    words:
+            |      - text: 'Keep '
+            |        start_ms: 1200
+            |      - text: 'the '
+            |        start_ms: 1100
+            |      - text: original word order
+            |        start_ms: 1300
+            |""".trimMargin()
+
+        val line = LyricsParser.fromLyricsFile(lyricsFile).single()
+
+        assertEquals("Keep the original word order", line.text)
+        assertTrue(line.words.isEmpty())
+    }
+
+    @Test
     fun prefersWordSyncThenLineSyncThenPlainText() {
         val lyricsFile = """version: '1.0'
             |lines:

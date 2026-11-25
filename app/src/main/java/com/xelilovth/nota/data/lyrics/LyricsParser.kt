@@ -41,32 +41,57 @@ internal object LyricsParser {
         .map { LyricLine(it) }
         .toList()
 
-    fun fromLyricsFile(value: String): List<LyricLine> {
+    fun fromLyricsFile(value: String, durationMs: Long = 0L): List<LyricLine> {
         val options = LoaderOptions().apply {
             maxAliasesForCollections = 20
             codePointLimit = 1_000_000
         }
         val root = Yaml(SafeConstructor(options)).load<Any?>(value) as? Map<*, *> ?: return emptyList()
         val rawLines = root["lines"] as? List<*> ?: return emptyList()
-        return rawLines.mapNotNull { rawLine ->
+        val parsed = rawLines.mapNotNull { rawLine ->
             val line = rawLine as? Map<*, *> ?: return@mapNotNull null
-            val text = line["text"] as? String ?: return@mapNotNull null
-            val words = (line["words"] as? List<*>).orEmpty().mapNotNull { rawWord ->
+            val text = (line["text"] as? String)?.trimEnd() ?: return@mapNotNull null
+            if (text.isBlank()) return@mapNotNull null
+            val parsedWords = (line["words"] as? List<*>).orEmpty().mapNotNull { rawWord ->
                 val word = rawWord as? Map<*, *> ?: return@mapNotNull null
                 val wordText = word["text"] as? String ?: return@mapNotNull null
-                val startMs = (word["start_ms"] as? Number)?.toLong() ?: return@mapNotNull null
+                val startMs = (word["start_ms"] as? Number)?.toLong()?.takeIf { it >= 0L }
+                    ?: return@mapNotNull null
                 LyricWord(
                     text = wordText,
                     startMs = startMs,
-                    endMs = (word["end_ms"] as? Number)?.toLong(),
+                    endMs = (word["end_ms"] as? Number)?.toLong()?.takeIf { it > startMs },
                 )
             }
+            // Keep the lyric's original word order; malformed timing falls back to line sync.
+            val words = parsedWords.takeIf { list ->
+                list.zipWithNext().all { (current, next) -> next.startMs >= current.startMs }
+            }.orEmpty()
+            val lineStart = (line["start_ms"] as? Number)?.toLong()?.takeIf { it >= 0L }
+                ?: words.firstOrNull()?.startMs
             LyricLine(
                 text = text,
-                startMs = (line["start_ms"] as? Number)?.toLong(),
-                endMs = (line["end_ms"] as? Number)?.toLong(),
+                startMs = lineStart,
+                endMs = (line["end_ms"] as? Number)?.toLong()?.takeIf { lineStart == null || it > lineStart },
                 words = words,
             )
+        }.sortedBy { it.startMs ?: Long.MAX_VALUE }
+
+        return parsed.mapIndexed { index, line ->
+            val nextLineStart = parsed.getOrNull(index + 1)?.startMs
+            val lineEndCandidates = listOfNotNull(
+                line.endMs,
+                nextLineStart,
+                durationMs.takeIf { it > 0L },
+            ).filter { line.startMs == null || it > line.startMs }
+            val lineEnd = lineEndCandidates.minOrNull()
+            val normalizedWords = line.words.mapIndexed { wordIndex, word ->
+                val nextWordStart = line.words.getOrNull(wordIndex + 1)?.startMs
+                val wordEndCandidates = listOfNotNull(word.endMs, nextWordStart, lineEnd)
+                    .filter { it > word.startMs }
+                word.copy(endMs = wordEndCandidates.minOrNull())
+            }
+            line.copy(endMs = lineEnd?.takeIf { line.startMs == null || it > line.startMs }, words = normalizedWords)
         }
     }
 
@@ -118,7 +143,7 @@ internal object LyricsParser {
         source: LyricsSource,
     ): TrackLyrics? {
         if (hasWordSync && !lyricsFile.isNullOrBlank()) {
-            val wordLines = runCatching { fromLyricsFile(lyricsFile) }.getOrDefault(emptyList())
+            val wordLines = runCatching { fromLyricsFile(lyricsFile, durationMs) }.getOrDefault(emptyList())
             if (wordLines.any { it.words.isNotEmpty() }) {
                 return TrackLyrics(wordLines, source, LyricsSyncType.WORD)
             }

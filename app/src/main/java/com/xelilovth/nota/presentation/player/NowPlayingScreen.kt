@@ -283,6 +283,7 @@ fun NowPlayingScreen(
                     LyricsPanel(
                         state = lyricsUiState,
                         positionMs = position,
+                        isPlaying = state.isPlaying,
                         onCollapse = { lyricsExpanded = false },
                         onOpenGenius = {
                             val track = state.track
