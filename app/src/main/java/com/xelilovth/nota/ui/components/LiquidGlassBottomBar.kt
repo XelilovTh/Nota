@@ -97,7 +97,8 @@ fun LiquidGlassBottomBar(
             val interactionSources = remember(tabCount) {
                 List(tabCount) { MutableInteractionSource() }
             }
-            val anyTabPressed = interactionSources.any { it.collectIsPressedAsState().value }
+            val pressedStates = interactionSources.map { it.collectIsPressedAsState().value }
+            val anyTabPressed = pressedStates.any { it }
             val isInteracting = isDragging || anyTabPressed
 
             val settledIndex by animateFloatAsState(
