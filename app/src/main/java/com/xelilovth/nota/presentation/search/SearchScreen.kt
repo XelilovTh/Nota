@@ -78,6 +78,9 @@ fun SearchScreen(
             else -> {
                 val listState = rememberLazyListState()
                 val playIconPainter = rememberVectorPainter(Icons.Filled.PlayArrow)
+                val onPlayTrack: (Track) -> Unit = remember(viewModel, onPlayWithNotificationPermission) {
+                    { track -> onPlayWithNotificationPermission { viewModel.play(track) } }
+                }
                 LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(vertical = AppDimens.ElementSpacing),
@@ -87,7 +90,8 @@ fun SearchScreen(
                         CompactTrackRow(
                             track = track,
                             playIconPainter = playIconPainter,
-                        ) { onPlayWithNotificationPermission { viewModel.play(track) } }
+                            onClick = { onPlayTrack(track) },
+                        )
                     }
                 }
             }

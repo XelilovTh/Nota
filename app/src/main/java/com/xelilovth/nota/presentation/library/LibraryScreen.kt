@@ -94,6 +94,9 @@ fun LibraryScreen(
             else -> {
                 val listState = rememberLazyListState()
                 val playIconPainter = rememberVectorPainter(Icons.Filled.PlayArrow)
+                val onPlayTrack: (Track) -> Unit = remember(viewModel, onPlayWithNotificationPermission) {
+                    { track -> onPlayWithNotificationPermission { viewModel.onTrackSelected(track) } }
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -104,7 +107,7 @@ fun LibraryScreen(
                         TrackRow(
                             track = track,
                             playIconPainter = playIconPainter,
-                            onPlay = { onPlayWithNotificationPermission { viewModel.onTrackSelected(track) } },
+                            onPlay = { onPlayTrack(track) },
                         )
                     }
                 }

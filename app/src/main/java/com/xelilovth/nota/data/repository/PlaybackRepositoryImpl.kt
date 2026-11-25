@@ -63,12 +63,12 @@ class PlaybackRepositoryImpl @Inject constructor(
         val mediaItems = tracks.map(::toMediaItem)
         if (mediaItems.isEmpty()) return
 
-        ensurePlaybackServiceStarted()
         val index = if (selectedIndex >= 0) selectedIndex else 0
         _playbackState.value = _playbackState.value.copy(errorMessage = null)
         player.setMediaItems(mediaItems, index, 0L)
         player.prepare()
         player.play()
+        ensurePlaybackServiceStarted()
         publishState()
     }
 
@@ -127,7 +127,10 @@ class PlaybackRepositoryImpl @Inject constructor(
 
     private fun ensurePlaybackServiceStarted() {
         try {
-            ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java))
+            val intent = Intent(context, PlaybackService::class.java).apply {
+                action = PlaybackService.ACTION_UPDATE
+            }
+            ContextCompat.startForegroundService(context, intent)
         } catch (_: IllegalStateException) {
             // Avoid crashing with ForegroundServiceStartNotAllowedException if called from background.
         }

@@ -32,7 +32,9 @@ class PlaybackServiceTest {
 
         service.onStartCommand(Intent(service, PlaybackService::class.java), 0, 1)
 
-        assertNotNull(shadowOf(service).lastForegroundNotification)
+        val notification = shadowOf(service).lastForegroundNotification
+        assertNotNull(notification)
+        assertEquals(3, notification.actions.size)
         controller.destroy()
     }
 }
