@@ -171,6 +171,7 @@ fun NowPlayingScreen(
     var lyricsExpanded by remember { mutableStateOf(false) }
     val lyricsUiState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    val groqApiKey by viewModel.groqApiKey.collectAsStateWithLifecycle()
     val translationLanguage by viewModel.translationLanguage.collectAsStateWithLifecycle()
     val favoriteTrackIds by viewModel.favoriteTrackIds.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
@@ -509,11 +510,11 @@ fun NowPlayingScreen(
                         onGenerateWithGemini = {
                             val track = state.track
                             if (track != null) {
-                                if (geminiApiKey.isBlank()) {
+                                if (geminiApiKey.isBlank() && groqApiKey.isBlank()) {
                                     pendingGeminiAction = PendingGeminiAction.TRANSCRIBE
                                     showGeminiKeyDialog = true
                                 } else {
-                                    viewModel.generateLyricsWithGemini(track)
+                                    viewModel.generateLyricsWithAi(track)
                                 }
                             }
                         },
@@ -887,6 +888,7 @@ fun NowPlayingScreen(
     }
 
     if (showGeminiKeyDialog) {
+        var selectedProvider by remember { mutableStateOf(0) } // 0 = Gemini, 1 = Groq
         var keyInput by remember { mutableStateOf("") }
         Dialog(onDismissRequest = {
             showGeminiKeyDialog = false
@@ -905,9 +907,34 @@ fun NowPlayingScreen(
                     verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
                 ) {
                     Text(
-                        stringResource(R.string.lyrics_gemini_key_title),
+                        stringResource(R.string.lyrics_ai_keys_title),
                         style = MaterialTheme.typography.titleLarge,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        listOf("Gemini", "Groq").forEachIndexed { index, label ->
+                            val isSelected = selectedProvider == index
+                            GlassSurface(
+                                modifier = Modifier.weight(1f),
+                                shape = CircleShape,
+                                elevated = isSelected,
+                                subtle = !isSelected,
+                                onClick = { selectedProvider = index },
+                            ) {
+                                Text(
+                                    text = label,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = AppDimens.RowVerticalPadding),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                     GlassSurface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = CircleShape,
@@ -917,7 +944,13 @@ fun NowPlayingScreen(
                             value = keyInput,
                             onValueChange = { keyInput = it },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text(stringResource(R.string.lyrics_gemini_key_hint)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(
+                                        if (selectedProvider == 0) R.string.lyrics_gemini_key_hint else R.string.lyrics_groq_key_hint,
+                                    ),
+                                )
+                            },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -942,14 +975,24 @@ fun NowPlayingScreen(
                         Button(
                             onClick = {
                                 val trimmedKey = keyInput.trim()
-                                viewModel.saveGeminiApiKey(trimmedKey)
+                                if (selectedProvider == 0) {
+                                    viewModel.saveGeminiApiKey(trimmedKey)
+                                } else {
+                                    viewModel.saveGroqApiKey(trimmedKey)
+                                }
                                 showGeminiKeyDialog = false
                                 val action = pendingGeminiAction
                                 pendingGeminiAction = null
                                 state.track?.let { track ->
                                     when (action) {
                                         PendingGeminiAction.TRANSLATE -> viewModel.toggleLyricsTranslation(track, trimmedKey)
-                                        PendingGeminiAction.TRANSCRIBE, null -> viewModel.generateLyricsWithGemini(track, trimmedKey)
+                                        PendingGeminiAction.TRANSCRIBE, null -> {
+                                            if (selectedProvider == 0) {
+                                                viewModel.generateLyricsWithGemini(track, trimmedKey)
+                                            } else {
+                                                viewModel.generateLyricsWithGroq(track, trimmedKey)
+                                            }
+                                        }
                                     }
                                 }
                             },

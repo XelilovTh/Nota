@@ -304,6 +304,62 @@ class LyricsRepositoryImpl @Inject constructor(
             parsed
         }
 
+    override suspend fun generateLyricsWithGroq(track: Track, apiKey: String): TrackLyrics? =
+        withContext(ioDispatcher) {
+            val trimmedKey = apiKey.trim()
+            if (trimmedKey.isBlank()) return@withContext null
+
+            val trackUri = Uri.parse(track.uri)
+            val audioBytes = runCatching {
+                context.contentResolver.openInputStream(trackUri)?.use { it.readBytes() }
+            }.getOrNull() ?: return@withContext null
+            if (audioBytes.isEmpty() || audioBytes.size > MAX_GROQ_INLINE_BYTES) {
+                return@withContext null
+            }
+
+            val mimeType = context.contentResolver.getType(trackUri) ?: "audio/mpeg"
+            val ext = extensionForMimeType(mimeType)
+            val responseJson = try {
+                postGroqTranscription(
+                    apiKey = trimmedKey,
+                    audioBytes = audioBytes,
+                    fileName = "audio.$ext",
+                    mimeType = mimeType,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            } ?: return@withContext null
+
+            val enhancedLrc = buildEnhancedLrcFromWhisperJson(responseJson) ?: return@withContext null
+            val lrcLines = LyricsParser.fromLrc(enhancedLrc, track.durationMs)
+            val parsed = if (lrcLines.isNotEmpty()) {
+                TrackLyrics(
+                    lines = lrcLines,
+                    source = LyricsSource.GROQ,
+                    syncType = if (lrcLines.any { it.words.isNotEmpty() }) {
+                        LyricsSyncType.WORD
+                    } else {
+                        LyricsSyncType.LINE
+                    },
+                )
+            } else {
+                LyricsParser.fromPlain(enhancedLrc).takeIf { it.isNotEmpty() }?.let { plainLines ->
+                    TrackLyrics(
+                        lines = plainLines,
+                        source = LyricsSource.GROQ,
+                        syncType = LyricsSyncType.PLAIN,
+                    )
+                }
+            } ?: return@withContext null
+
+            writeDiskCache(track.id, parsed)
+            saveGeminiLrcFile(track, enhancedLrc)
+            cache[track.id] = CachedLyrics(parsed, System.currentTimeMillis())
+            parsed
+        }
+
     override suspend fun translateLyrics(
         track: Track,
         lyrics: TrackLyrics,
@@ -936,10 +992,137 @@ class LyricsRepositoryImpl @Inject constructor(
     private fun sanitizeFileName(raw: String): String =
         raw.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim()
 
+    private fun extensionForMimeType(mimeType: String): String = when {
+        mimeType.contains("mp4", ignoreCase = true) || mimeType.contains("m4a", ignoreCase = true) -> "m4a"
+        mimeType.contains("ogg", ignoreCase = true) -> "ogg"
+        mimeType.contains("flac", ignoreCase = true) -> "flac"
+        mimeType.contains("wav", ignoreCase = true) -> "wav"
+        mimeType.contains("webm", ignoreCase = true) -> "webm"
+        else -> "mp3"
+    }
+
+    private fun postGroqTranscription(
+        apiKey: String,
+        audioBytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+    ): JSONObject? {
+        val boundary = "----NotaGroqBoundary${System.currentTimeMillis()}"
+        val connection = (URL(GROQ_TRANSCRIPTION_URL).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            connectTimeout = GEMINI_CONNECT_TIMEOUT_MS
+            readTimeout = GEMINI_READ_TIMEOUT_MS
+            setRequestProperty("Authorization", "Bearer $apiKey")
+            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+        }
+        return try {
+            connection.outputStream.use { out ->
+                fun writeField(name: String, value: String) {
+                    out.write("--$boundary\r\n".toByteArray(Charsets.UTF_8))
+                    out.write("Content-Disposition: form-data; name=\"$name\"\r\n\r\n".toByteArray(Charsets.UTF_8))
+                    out.write("$value\r\n".toByteArray(Charsets.UTF_8))
+                }
+                writeField("model", GROQ_WHISPER_MODEL)
+                writeField("response_format", "verbose_json")
+                writeField("timestamp_granularities[]", "word")
+                writeField("timestamp_granularities[]", "segment")
+                out.write("--$boundary\r\n".toByteArray(Charsets.UTF_8))
+                out.write(
+                    "Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n"
+                        .toByteArray(Charsets.UTF_8),
+                )
+                out.write("Content-Type: $mimeType\r\n\r\n".toByteArray(Charsets.UTF_8))
+                out.write(audioBytes)
+                out.write("\r\n--$boundary--\r\n".toByteArray(Charsets.UTF_8))
+            }
+            if (connection.responseCode !in 200..299) return null
+            val responseText = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            JSONObject(responseText)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun buildEnhancedLrcFromWhisperJson(json: JSONObject): String? {
+        val segments = json.optJSONArray("segments")
+        val words = json.optJSONArray("words")
+        data class TimedWord(val text: String, val startSec: Double)
+
+        val wordList = buildList {
+            if (words != null) {
+                for (i in 0 until words.length()) {
+                    val obj = words.optJSONObject(i) ?: continue
+                    val word = obj.optString("word").trim()
+                    if (word.isBlank()) continue
+                    add(TimedWord(word, obj.optDouble("start", 0.0)))
+                }
+            }
+        }
+
+        val lines = mutableListOf<String>()
+        if (segments != null && segments.length() > 0) {
+            var wordCursor = 0
+            for (i in 0 until segments.length()) {
+                val seg = segments.optJSONObject(i) ?: continue
+                val segStart = seg.optDouble("start", 0.0)
+                val segEnd = seg.optDouble("end", segStart)
+                val segText = seg.optString("text").trim()
+                if (segText.isBlank()) continue
+
+                val segWords = mutableListOf<TimedWord>()
+                while (wordCursor < wordList.size && wordList[wordCursor].startSec <= segEnd + 0.08) {
+                    if (wordList[wordCursor].startSec >= segStart - 0.15) {
+                        segWords.add(wordList[wordCursor])
+                    }
+                    wordCursor++
+                }
+                val linePrefix = formatLrcBracketTime(segStart)
+                if (segWords.isNotEmpty()) {
+                    val joinedWords = segWords.joinToString(" ") { w ->
+                        "${formatLrcAngleTime(w.startSec)}${w.text}"
+                    }
+                    lines.add("$linePrefix $joinedWords")
+                } else {
+                    lines.add("$linePrefix $segText")
+                }
+            }
+        } else if (wordList.isNotEmpty()) {
+            wordList.chunked(8).forEach { chunk ->
+                val linePrefix = formatLrcBracketTime(chunk.first().startSec)
+                val joined = chunk.joinToString(" ") { w -> "${formatLrcAngleTime(w.startSec)}${w.text}" }
+                lines.add("$linePrefix $joined")
+            }
+        } else {
+            val plain = json.optString("text").trim()
+            if (plain.isNotBlank()) return plain
+        }
+        return lines.joinToString("\n").takeIf { it.isNotBlank() }
+    }
+
+    private fun formatLrcBracketTime(seconds: Double): String {
+        val totalCentis = (seconds.coerceAtLeast(0.0) * 100.0).toLong()
+        val mins = totalCentis / 6000L
+        val secs = (totalCentis % 6000L) / 100L
+        val centis = totalCentis % 100L
+        return "[${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}]"
+    }
+
+    private fun formatLrcAngleTime(seconds: Double): String {
+        val totalCentis = (seconds.coerceAtLeast(0.0) * 100.0).toLong()
+        val mins = totalCentis / 6000L
+        val secs = (totalCentis % 6000L) / 100L
+        val centis = totalCentis % 100L
+        return "<${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}>"
+    }
+
     private companion object {
         const val LYRICS_CACHE_DIR = "lyrics_cache"
         const val GEMINI_LYRICS_DIR = "gemini_lyrics"
         val PUBLIC_LYRICS_RELATIVE_PATH = "${Environment.DIRECTORY_DOCUMENTS}/Nota/Lyrics"
+        const val GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+        const val GROQ_WHISPER_MODEL = "whisper-large-v3-turbo"
+        const val MAX_GROQ_INLINE_BYTES = 24 * 1024 * 1024
         const val OFFSETS_PREFS_NAME = "nota_lyrics_offsets"
         const val CONNECT_TIMEOUT_MS = 5_000
         const val READ_TIMEOUT_MS = 7_000

@@ -73,6 +73,7 @@ class PlayerViewModel @Inject constructor(
 
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
     val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
+    val groqApiKey: StateFlow<String> = settingsRepository.groqApiKey
     val translationLanguage: StateFlow<String> = settingsRepository.lyricsTranslationLanguage
     val favoriteTrackIds: StateFlow<Set<Long>> = settingsRepository.favoriteTrackIds
     val downloadProgress: StateFlow<Map<Long, Int>> =
@@ -139,6 +140,99 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun saveGeminiApiKey(key: String) = settingsRepository.setGeminiApiKey(key.trim())
+
+    fun saveGroqApiKey(key: String) = settingsRepository.setGroqApiKey(key.trim())
+
+    fun generateLyricsWithAi(track: Track) {
+        val geminiKey = geminiApiKey.value.trim()
+        val groqKey = groqApiKey.value.trim()
+        if (geminiKey.isBlank() && groqKey.isBlank()) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = "Gemini or Groq API key is required",
+            )
+            return
+        }
+        lyricsJob?.cancel()
+        _lyricsState.value = _lyricsState.value.copy(
+            trackId = track.id,
+            isLoading = true,
+            notFound = false,
+            errorMessage = null,
+        )
+        lyricsJob = viewModelScope.launch {
+            val lyrics = (if (geminiKey.isNotBlank()) {
+                runCatching { lyricsRepository.generateLyricsWithGemini(track, geminiKey) }.getOrNull()
+            } else {
+                null
+            }) ?: if (groqKey.isNotBlank()) {
+                runCatching { lyricsRepository.generateLyricsWithGroq(track, groqKey) }.getOrNull()
+            } else {
+                null
+            }
+            val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = if (lyrics != null) {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = lyrics,
+                        notFound = false,
+                        syncOffsetMs = offsetMs,
+                    )
+                } else {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = _lyricsState.value.lyrics,
+                        notFound = _lyricsState.value.lyrics == null,
+                        syncOffsetMs = offsetMs,
+                        errorMessage = "Could not transcribe lyrics with AI",
+                    )
+                }
+            }
+        }
+    }
+
+    fun generateLyricsWithGroq(track: Track, apiKeyOverride: String? = null) {
+        val apiKey = (apiKeyOverride ?: groqApiKey.value).trim()
+        if (apiKey.isBlank()) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = "Groq API key is required",
+            )
+            return
+        }
+        lyricsJob?.cancel()
+        _lyricsState.value = _lyricsState.value.copy(
+            trackId = track.id,
+            isLoading = true,
+            notFound = false,
+            errorMessage = null,
+        )
+        lyricsJob = viewModelScope.launch {
+            val lyrics = runCatching { lyricsRepository.generateLyricsWithGroq(track, apiKey) }.getOrNull()
+            val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = if (lyrics != null) {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = lyrics,
+                        notFound = false,
+                        syncOffsetMs = offsetMs,
+                    )
+                } else {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = _lyricsState.value.lyrics,
+                        notFound = _lyricsState.value.lyrics == null,
+                        syncOffsetMs = offsetMs,
+                        errorMessage = "Could not transcribe lyrics with Groq",
+                    )
+                }
+            }
+        }
+    }
 
     fun generateLyricsWithGemini(track: Track, apiKeyOverride: String? = null) {
         val apiKey = (apiKeyOverride ?: geminiApiKey.value).trim()

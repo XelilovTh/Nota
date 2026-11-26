@@ -29,6 +29,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.settings
     val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
+    val groqApiKey: StateFlow<String> = settingsRepository.groqApiKey
     val discoveredFolders: StateFlow<List<String>> = libraryRepository.allDiscoveredFolders
     val excludedFolders: StateFlow<Set<String>> = settingsRepository.excludedFolders
     val tracks = observeTracks()
@@ -53,6 +54,8 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setStreamCacheSizeMb(sizeMb)
 
     fun setGeminiApiKey(key: String) = settingsRepository.setGeminiApiKey(key.trim())
+
+    fun setGroqApiKey(key: String) = settingsRepository.setGroqApiKey(key.trim())
 
     fun findDuplicateGroups(): List<List<Track>> {
         return tracks.value

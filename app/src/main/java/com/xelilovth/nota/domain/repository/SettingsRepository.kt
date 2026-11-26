@@ -11,6 +11,7 @@ interface SettingsRepository {
     val settings: StateFlow<AppSettings>
     val recentTrackIds: StateFlow<List<Long>>
     val geminiApiKey: StateFlow<String> get() = MutableStateFlow("")
+    val groqApiKey: StateFlow<String> get() = MutableStateFlow("")
     val favoriteTrackIds: StateFlow<Set<Long>> get() = MutableStateFlow(emptySet())
     val playCounts: StateFlow<Map<Long, Int>> get() = MutableStateFlow(emptyMap())
     val listenDurationsMs: StateFlow<Map<Long, Long>> get() = MutableStateFlow(emptyMap())
@@ -25,6 +26,7 @@ interface SettingsRepository {
     fun setStreamCacheSizeMb(sizeMb: Int) = Unit
     fun addRecentTrack(trackId: Long)
     fun setGeminiApiKey(key: String) = Unit
+    fun setGroqApiKey(key: String) = Unit
     fun toggleFavorite(trackId: Long) = Unit
     fun incrementPlayCount(trackId: Long) = Unit
     fun addListenDuration(trackId: Long, deltaMs: Long) = Unit

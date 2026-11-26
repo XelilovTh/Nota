@@ -25,6 +25,8 @@ class SettingsRepositoryImpl @Inject constructor(
     override val recentTrackIds: StateFlow<List<Long>> = _recentTrackIds.asStateFlow()
     private val _geminiApiKey = MutableStateFlow(prefs.getString(KEY_GEMINI_API_KEY, "").orEmpty())
     override val geminiApiKey: StateFlow<String> = _geminiApiKey.asStateFlow()
+    private val _groqApiKey = MutableStateFlow(prefs.getString(KEY_GROQ_API_KEY, "").orEmpty())
+    override val groqApiKey: StateFlow<String> = _groqApiKey.asStateFlow()
     private val _favoriteTrackIds = MutableStateFlow(loadFavoriteTrackIds())
     override val favoriteTrackIds: StateFlow<Set<Long>> = _favoriteTrackIds.asStateFlow()
     private val _playCounts = MutableStateFlow(loadPlayCounts())
@@ -77,6 +79,11 @@ class SettingsRepositoryImpl @Inject constructor(
     override fun setGeminiApiKey(key: String) {
         prefs.edit().putString(KEY_GEMINI_API_KEY, key).apply()
         _geminiApiKey.value = key
+    }
+
+    override fun setGroqApiKey(key: String) {
+        prefs.edit().putString(KEY_GROQ_API_KEY, key).apply()
+        _groqApiKey.value = key
     }
 
     override fun toggleFavorite(trackId: Long) {
@@ -235,6 +242,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_CROSSFADE_SECONDS = "crossfade_seconds"
         const val KEY_RECENT_TRACK_IDS = "recent_track_ids"
         const val KEY_GEMINI_API_KEY = "gemini_api_key"
+        const val KEY_GROQ_API_KEY = "groq_api_key"
         const val KEY_FAVORITE_TRACK_IDS = "favorite_track_ids"
         const val KEY_PLAY_COUNTS = "play_counts"
         const val KEY_LISTEN_DURATIONS_MS = "listen_durations_ms"

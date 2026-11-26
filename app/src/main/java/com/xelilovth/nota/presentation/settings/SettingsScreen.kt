@@ -75,6 +75,7 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    val groqApiKey by viewModel.groqApiKey.collectAsStateWithLifecycle()
     val discoveredFolders by viewModel.discoveredFolders.collectAsStateWithLifecycle()
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
@@ -337,18 +338,24 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                stringResource(R.string.lyrics_gemini_key_title),
+                                stringResource(R.string.lyrics_ai_keys_title),
                                 style = MaterialTheme.typography.titleMedium,
                             )
+                            val keyStatus = when {
+                                geminiApiKey.isNotBlank() && groqApiKey.isNotBlank() -> "Gemini & Groq configured"
+                                geminiApiKey.isNotBlank() -> "Gemini configured"
+                                groqApiKey.isNotBlank() -> "Groq configured"
+                                else -> "Not set"
+                            }
                             Text(
-                                if (geminiApiKey.isNotBlank()) "Configured" else "Not set",
+                                keyStatus,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         Icon(
                             Icons.Outlined.Key,
-                            contentDescription = stringResource(R.string.lyrics_gemini_key_title),
+                            contentDescription = stringResource(R.string.lyrics_ai_keys_title),
                         )
                     }
                 }
@@ -678,7 +685,10 @@ fun SettingsScreen(
     }
 
     if (showGeminiKeyDialog) {
-        var keyInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
+        var selectedProvider by remember { mutableStateOf(0) } // 0 = Gemini, 1 = Groq
+        var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
+        var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
+        val activeInput = if (selectedProvider == 0) geminiInput else groqInput
         Dialog(onDismissRequest = { showGeminiKeyDialog = false }) {
             GlassSurface(
                 modifier = Modifier.fillMaxWidth(),
@@ -693,19 +703,52 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
                 ) {
                     Text(
-                        stringResource(R.string.lyrics_gemini_key_title),
+                        stringResource(R.string.lyrics_ai_keys_title),
                         style = MaterialTheme.typography.titleLarge,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        listOf("Gemini" to geminiInput.isNotBlank(), "Groq" to groqInput.isNotBlank()).forEachIndexed { index, (label, hasKey) ->
+                            val isSelected = selectedProvider == index
+                            GlassSurface(
+                                modifier = Modifier.weight(1f),
+                                shape = CircleShape,
+                                elevated = isSelected,
+                                subtle = !isSelected,
+                                onClick = { selectedProvider = index },
+                            ) {
+                                Text(
+                                    text = if (hasKey) "$label ✓" else label,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = AppDimens.RowVerticalPadding),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                     GlassSurface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = CircleShape,
                         subtle = true,
                     ) {
                         TextField(
-                            value = keyInput,
-                            onValueChange = { keyInput = it },
+                            value = activeInput,
+                            onValueChange = { value ->
+                                if (selectedProvider == 0) geminiInput = value else groqInput = value
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text(stringResource(R.string.lyrics_gemini_key_hint)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(
+                                        if (selectedProvider == 0) R.string.lyrics_gemini_key_hint else R.string.lyrics_groq_key_hint,
+                                    ),
+                                )
+                            },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -726,15 +769,21 @@ fun SettingsScreen(
                         }
                         TextButton(
                             onClick = {
-                                viewModel.setGeminiApiKey("")
-                                showGeminiKeyDialog = false
+                                if (selectedProvider == 0) {
+                                    geminiInput = ""
+                                    viewModel.setGeminiApiKey("")
+                                } else {
+                                    groqInput = ""
+                                    viewModel.setGroqApiKey("")
+                                }
                             },
                         ) {
                             Text("Clear")
                         }
                         Button(
                             onClick = {
-                                viewModel.setGeminiApiKey(keyInput)
+                                viewModel.setGeminiApiKey(geminiInput)
+                                viewModel.setGroqApiKey(groqInput)
                                 showGeminiKeyDialog = false
                             },
                         ) {
