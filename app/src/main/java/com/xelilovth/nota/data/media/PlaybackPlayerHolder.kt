@@ -6,9 +6,9 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
-import androidx.media3.extractor.mp3.Mp3Extractor
 
 @OptIn(UnstableApi::class)
 object PlaybackPlayerHolder {
@@ -18,7 +18,7 @@ object PlaybackPlayerHolder {
         instance ?: run {
             val appContext = context.applicationContext
             val extractorsFactory = DefaultExtractorsFactory()
-                .setMp3ExtractorFlags(Mp3Extractor.FLAG_ENABLE_INDEX_SEEKING)
+                .setConstantBitrateSeekingEnabled(true)
             ExoPlayer.Builder(appContext)
                 .setMediaSourceFactory(DefaultMediaSourceFactory(appContext, extractorsFactory))
                 .setWakeMode(C.WAKE_MODE_LOCAL)
@@ -32,6 +32,7 @@ object PlaybackPlayerHolder {
                         true,
                     )
                     setHandleAudioBecomingNoisy(true)
+                    setSeekParameters(SeekParameters.EXACT)
                 }.also { instance = it }
         }
     }
