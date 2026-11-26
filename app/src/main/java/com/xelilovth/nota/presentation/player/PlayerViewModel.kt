@@ -178,10 +178,9 @@ class PlayerViewModel @Inject constructor(
             return
         }
         val targetLanguage = translationLanguage.value
-        if (currentLyrics.translatedLanguage == targetLanguage &&
-            currentLyrics.lines.any { !it.translatedText.isNullOrBlank() }
-        ) {
-            _lyricsState.value = current.copy(showTranslation = true)
+        val cachedForLang = cachedLyricsForLanguage(currentLyrics, targetLanguage)
+        if (cachedForLang != null) {
+            _lyricsState.value = current.copy(lyrics = cachedForLang, showTranslation = true)
             return
         }
         val key = (apiKeyOverride ?: geminiApiKey.value).trim()
@@ -194,15 +193,26 @@ class PlayerViewModel @Inject constructor(
         val current = _lyricsState.value
         val currentLyrics = current.lyrics ?: return
         if (track == null || current.isTranslating) return
-        if (currentLyrics.translatedLanguage == language &&
-            currentLyrics.lines.any { !it.translatedText.isNullOrBlank() }
-        ) {
-            _lyricsState.value = current.copy(showTranslation = true)
+        val cachedForLang = cachedLyricsForLanguage(currentLyrics, language)
+        if (cachedForLang != null) {
+            _lyricsState.value = current.copy(lyrics = cachedForLang, showTranslation = true)
             return
         }
         val key = (apiKeyOverride ?: geminiApiKey.value).trim()
         if (key.isBlank()) return
         translateLyricsInto(track, currentLyrics, key, language)
+    }
+
+    private fun cachedLyricsForLanguage(lyrics: TrackLyrics, language: String): TrackLyrics? {
+        val hasDirectMap = lyrics.lines.any { !it.translations[language].isNullOrBlank() }
+        val hasLegacyMatch = lyrics.translatedLanguage == language && lyrics.lines.any { !it.translatedText.isNullOrBlank() }
+        if (!hasDirectMap && !hasLegacyMatch) return null
+        val resolvedLines = lyrics.lines.map { line ->
+            val textForLang = line.translations[language]
+                ?: line.translatedText.takeIf { lyrics.translatedLanguage == language }
+            line.copy(translatedText = textForLang)
+        }
+        return lyrics.copy(lines = resolvedLines, translatedLanguage = language)
     }
 
     private fun translateLyricsInto(

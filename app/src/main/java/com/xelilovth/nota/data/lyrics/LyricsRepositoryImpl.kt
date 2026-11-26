@@ -231,11 +231,17 @@ class LyricsRepositoryImpl @Inject constructor(
     ): TrackLyrics? = withContext(ioDispatcher) {
         val trimmedKey = apiKey.trim()
         if (lyrics.lines.isEmpty() || trimmedKey.isBlank()) return@withContext null
-        if (
-            lyrics.translatedLanguage == targetLanguage &&
-            lyrics.lines.any { !it.translatedText.isNullOrBlank() }
+        if (lyrics.lines.any { !it.translations[targetLanguage].isNullOrBlank() } ||
+            (lyrics.translatedLanguage == targetLanguage && lyrics.lines.any { !it.translatedText.isNullOrBlank() })
         ) {
-            return@withContext lyrics
+            val cachedLines = lyrics.lines.map { line ->
+                val cachedText = line.translations[targetLanguage] ?: line.translatedText
+                val merged = if (cachedText != null) line.translations + (targetLanguage to cachedText) else line.translations
+                line.copy(translatedText = cachedText, translations = merged)
+            }
+            val updated = lyrics.copy(lines = cachedLines, translatedLanguage = targetLanguage)
+            cache[track.id] = CachedLyrics(updated, System.currentTimeMillis())
+            return@withContext updated
         }
 
         val numberedLines = lyrics.lines
@@ -302,7 +308,14 @@ class LyricsRepositoryImpl @Inject constructor(
 
         val updatedLines = lyrics.lines.mapIndexed { index, line ->
             val translation = translationsByIndex[index]
-            if (translation != null) line.copy(translatedText = translation) else line
+            if (translation != null) {
+                line.copy(
+                    translatedText = translation,
+                    translations = line.translations + (targetLanguage to translation),
+                )
+            } else {
+                line
+            }
         }
         val updated = lyrics.copy(lines = updatedLines, translatedLanguage = targetLanguage)
         writeDiskCache(track.id, updated)
@@ -375,6 +388,16 @@ class LyricsRepositoryImpl @Inject constructor(
                             if (!line.translatedText.isNullOrBlank()) {
                                 put("translatedText", line.translatedText)
                             }
+                            if (line.translations.isNotEmpty()) {
+                                put(
+                                    "translations",
+                                    JSONObject().apply {
+                                        line.translations.forEach { (lang, value) ->
+                                            if (value.isNotBlank()) put(lang, value)
+                                        }
+                                    },
+                                )
+                            }
                             put(
                                 "words",
                                 JSONArray().apply {
@@ -430,9 +453,24 @@ class LyricsRepositoryImpl @Inject constructor(
                 LyricWord(text = wordText, startMs = wordStartMs, endMs = wordEndMs)
             }
             val translatedText = lineObj.optString("translatedText").takeUnless { it.isBlank() }
+            val translationsMap = mutableMapOf<String, String>()
+            lineObj.optJSONObject("translations")?.let { obj ->
+                val keys = obj.keys()
+                while (keys.hasNext()) {
+                    val lang = keys.next()
+                    val value = obj.optString(lang).takeUnless { it.isBlank() }
+                    if (value != null) translationsMap[lang] = value
+                }
+            }
+            if (translatedLanguage != null && translatedText != null && !translationsMap.containsKey(translatedLanguage)) {
+                translationsMap[translatedLanguage] = translatedText
+            }
             if (words.isEmpty()) {
                 LyricsParser.parseInlineWordLine(text, startMs, endMs)?.let { repaired ->
-                    return@mapNotNull repaired.copy(translatedText = translatedText)
+                    return@mapNotNull repaired.copy(
+                        translatedText = translatedText,
+                        translations = translationsMap,
+                    )
                 }
             }
             LyricLine(
@@ -441,6 +479,7 @@ class LyricsRepositoryImpl @Inject constructor(
                 endMs = endMs,
                 words = words,
                 translatedText = translatedText,
+                translations = translationsMap,
             )
         }
         if (!instrumental && lines.isEmpty()) return null
