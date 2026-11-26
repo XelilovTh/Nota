@@ -390,7 +390,7 @@ fun NowPlayingScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .weight(if (lyricsExpanded) 0.72f else 0.28f)
                 .pointerInput(lyricsExpanded, state.track?.id) {
                     if (!lyricsExpanded && state.track != null) {
                         var upwardDrag = 0f
@@ -485,7 +485,7 @@ fun NowPlayingScreen(
             Column(
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
+                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -661,7 +661,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.12f))
+        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
     }
 
     if (showQueueSheet) {
