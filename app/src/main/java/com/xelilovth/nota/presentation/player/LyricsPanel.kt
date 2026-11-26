@@ -649,9 +649,10 @@ private fun LyricsContent(
                         },
                     )
                 }
-                if (showTranslation && !line.translatedText.isNullOrBlank()) {
+                val translated = line.translatedText?.trim()
+                if (showTranslation && !translated.isNullOrBlank() && !translated.equals(line.text.trim(), ignoreCase = true)) {
                     Text(
-                        text = line.translatedText,
+                        text = translated,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = AppDimens.ShapeExtraSmall),

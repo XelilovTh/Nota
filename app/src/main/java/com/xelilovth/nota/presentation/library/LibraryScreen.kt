@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.Sort
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -189,6 +190,11 @@ fun LibraryScreen(
                                     ) {
                                         DropdownMenuItem(
                                             text = { Text("Title") },
+                                            trailingIcon = {
+                                                if (sortOrder == LibrarySort.TITLE) {
+                                                    Icon(Icons.Filled.Check, contentDescription = "Selected")
+                                                }
+                                            },
                                             onClick = {
                                                 viewModel.setSortOrder(LibrarySort.TITLE)
                                                 sortMenuExpanded = false
@@ -196,6 +202,11 @@ fun LibraryScreen(
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Artist") },
+                                            trailingIcon = {
+                                                if (sortOrder == LibrarySort.ARTIST) {
+                                                    Icon(Icons.Filled.Check, contentDescription = "Selected")
+                                                }
+                                            },
                                             onClick = {
                                                 viewModel.setSortOrder(LibrarySort.ARTIST)
                                                 sortMenuExpanded = false
@@ -203,6 +214,11 @@ fun LibraryScreen(
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Duration") },
+                                            trailingIcon = {
+                                                if (sortOrder == LibrarySort.DURATION) {
+                                                    Icon(Icons.Filled.Check, contentDescription = "Selected")
+                                                }
+                                            },
                                             onClick = {
                                                 viewModel.setSortOrder(LibrarySort.DURATION)
                                                 sortMenuExpanded = false

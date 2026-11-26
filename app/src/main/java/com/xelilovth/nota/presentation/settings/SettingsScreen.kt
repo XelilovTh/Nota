@@ -487,7 +487,7 @@ fun SettingsScreen(
                 ) {
                     Text("Nota", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Version 0.1.0 · Minimalist local audio player",
+                        "Version 0.3.0 · Local & online music player",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

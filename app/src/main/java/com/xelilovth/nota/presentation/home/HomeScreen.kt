@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -395,12 +396,23 @@ internal fun CompactTrackRow(
                 )
             }
             if (listenDurationMs != null && listenDurationMs > 0L) {
-                Text(
-                    formatDuration(listenDurationMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
                     modifier = Modifier.padding(end = AppDimens.ElementSpacing),
-                )
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.ShapeExtraSmall),
+                ) {
+                    Icon(
+                        Icons.Outlined.Headphones,
+                        contentDescription = "Listening time",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                    )
+                    Text(
+                        formatDuration(listenDurationMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             if (isCurrent && isPlaying) {
                 Icon(

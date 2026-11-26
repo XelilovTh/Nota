@@ -14,6 +14,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.xelilovth.nota.data.media.PlaybackService
 import com.xelilovth.nota.data.media.PlaybackNavigation
 import com.xelilovth.nota.data.media.PlaybackStateMapper
+import com.xelilovth.nota.data.media.StreamCacheHolder
 import com.xelilovth.nota.data.online.OnlineMusicRepositoryImpl
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
@@ -31,6 +32,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -93,13 +95,26 @@ class PlaybackRepositoryImpl @Inject constructor(
             } else if (player.volume != 1.0f) {
                 player.volume = 1.0f
             }
-            maybeResolveCurrentOnlineItem(mediaItem)
             publishState()
         }
         override fun onPlayerError(error: PlaybackException) = handlePlayerError(error)
     }
 
     init {
+        StreamCacheHolder.onlineUriResolver = { onlineUri ->
+            val onlineId = OnlineMusicRepositoryImpl.extractOnlineId(onlineUri)
+            if (onlineId != null) {
+                try {
+                    runBlocking { onlineMusicRepository?.resolveStreamUrl(onlineId) }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+        }
         player.addListener(listener)
         scope.launch {
             settingsRepository.settings
@@ -185,35 +200,6 @@ class PlaybackRepositoryImpl @Inject constructor(
         player.play()
         ensurePlaybackServiceStarted()
         publishState()
-    }
-
-    private fun maybeResolveCurrentOnlineItem(mediaItem: MediaItem?) {
-        val item = mediaItem ?: return
-        val uri = item.localConfiguration?.uri?.toString() ?: return
-        if (!uri.startsWith(OnlineMusicRepositoryImpl.ONLINE_URI_PREFIX)) return
-        val trackId = item.mediaId.toLongOrNull() ?: return
-        val onlineId = OnlineMusicRepositoryImpl.extractOnlineId(uri) ?: return
-        val itemIndex = player.currentMediaItemIndex
-        if (itemIndex < 0) return
-
-        resolveJob?.cancel()
-        resolveJob = scope.launch {
-            val resolvedUri = try {
-                onlineMusicRepository?.resolveStreamUrl(onlineId)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                null
-            } ?: return@launch
-            resolvedStreamUris[trackId] = resolvedUri
-            val track = activeOnlineTracks[trackId] ?: return@launch
-            if (player.currentMediaItemIndex == itemIndex) {
-                player.replaceMediaItem(itemIndex, toMediaItem(track, resolvedUri))
-                player.prepare()
-                player.play()
-                publishState()
-            }
-        }
     }
 
     override fun togglePlayPause() {

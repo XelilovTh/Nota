@@ -297,7 +297,7 @@ fun PlaylistDetailScreen(
     if (showAddSongsSheet && customPlaylist != null) {
         ModalBottomSheet(
             onDismissRequest = { showAddSongsSheet = false },
-            containerColor = LocalGlassColors.current.surfaceElevatedTint,
+            containerColor = LocalGlassColors.current.sheetBackground,
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
                 Text(

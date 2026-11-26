@@ -10,6 +10,7 @@
     <application
         android:name=".NotaApplication"
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
         android:label="Nota"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">

@@ -1,20 +1,27 @@
 package com.xelilovth.nota.data.media
 
 import android.content.Context
+import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import java.io.File
+import java.io.IOException
 
 @OptIn(UnstableApi::class)
 object StreamCacheHolder {
     private const val CACHE_DIR_NAME = "media_stream_cache"
+    private const val ONLINE_URI_PREFIX = "nota://online/"
+
+    @Volatile
+    var onlineUriResolver: ((String) -> String?)? = null
 
     @Volatile
     private var cacheInstance: SimpleCache? = null
@@ -42,9 +49,19 @@ object StreamCacheHolder {
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000)
         val upstreamFactory = DefaultDataSource.Factory(appContext, httpFactory)
+        val resolvingFactory = ResolvingDataSource.Factory(upstreamFactory) { dataSpec ->
+            val rawUri = dataSpec.uri.toString()
+            if (rawUri.startsWith(ONLINE_URI_PREFIX)) {
+                val resolved = onlineUriResolver?.invoke(rawUri)
+                    ?: throw IOException("Unable to resolve online stream URI: $rawUri")
+                dataSpec.withUri(Uri.parse(resolved))
+            } else {
+                dataSpec
+            }
+        }
         return CacheDataSource.Factory()
             .setCache(getCache(appContext))
-            .setUpstreamDataSourceFactory(upstreamFactory)
+            .setUpstreamDataSourceFactory(resolvingFactory)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
     }
 
