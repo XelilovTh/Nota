@@ -33,7 +33,6 @@ import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.DeleteTrackResult
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
+import com.xelilovth.nota.ui.components.GlassDropdownMenu
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
@@ -184,7 +184,7 @@ fun LibraryScreen(
                                     IconButton(onClick = { sortMenuExpanded = true }) {
                                         Icon(Icons.AutoMirrored.Outlined.Sort, contentDescription = "Sort")
                                     }
-                                    DropdownMenu(
+                                    GlassDropdownMenu(
                                         expanded = sortMenuExpanded,
                                         onDismissRequest = { sortMenuExpanded = false },
                                     ) {
@@ -487,7 +487,7 @@ private fun TrackRow(
                         modifier = Modifier.size(AppDimens.IconSizeSmall),
                     )
                 }
-                DropdownMenu(
+                GlassDropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                 ) {

@@ -15,6 +15,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -22,8 +23,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -457,6 +460,31 @@ fun GlassSurface(
             }
         }
     }
+}
+
+@Composable
+fun GlassDropdownMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val glass = LocalGlassColors.current
+    val shape = MaterialTheme.shapes.large
+    val borderBrush = remember(glass.borderHighlight, glass.borderEdge) {
+        Brush.linearGradient(colors = listOf(glass.borderHighlight, glass.borderEdge))
+    }
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        modifier = modifier,
+        shape = shape,
+        containerColor = glass.sheetBackground,
+        tonalElevation = AppDimens.Zero,
+        shadowElevation = AppDimens.Zero,
+        border = BorderStroke(AppDimens.GlassBorderWidth, borderBrush),
+        content = content,
+    )
 }
 
 fun Modifier.verticalEdgeFade(edgeHeight: Dp): Modifier = this

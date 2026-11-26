@@ -60,7 +60,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -105,6 +104,7 @@ import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
 import com.xelilovth.nota.ui.components.AudioWaveformVisualizer
+import com.xelilovth.nota.ui.components.GlassDropdownMenu
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.OfflineDownloadDialog
 import com.xelilovth.nota.ui.components.TrackArtwork
@@ -306,7 +306,7 @@ fun NowPlayingScreen(
                     IconButton(onClick = { showTrackMenu = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "More options")
                     }
-                    DropdownMenu(
+                    GlassDropdownMenu(
                         expanded = showTrackMenu,
                         onDismissRequest = { showTrackMenu = false },
                     ) {

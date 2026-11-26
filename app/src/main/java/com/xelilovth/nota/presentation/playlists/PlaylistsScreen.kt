@@ -20,7 +20,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +42,7 @@ import com.xelilovth.nota.domain.model.CustomPlaylist
 import com.xelilovth.nota.domain.model.PlaylistCollectionType
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
+import com.xelilovth.nota.ui.components.GlassDropdownMenu
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -346,7 +346,7 @@ private fun CustomPlaylistRow(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(Icons.Filled.MoreVert, contentDescription = "Collection options")
                 }
-                DropdownMenu(
+                GlassDropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                 ) {
