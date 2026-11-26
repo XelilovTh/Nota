@@ -184,7 +184,6 @@ class PlayerViewModel @Inject constructor(
             return
         }
         val key = (apiKeyOverride ?: geminiApiKey.value).trim()
-        if (key.isBlank()) return
         translateLyricsInto(track, currentLyrics, key, targetLanguage)
     }
 
@@ -199,7 +198,6 @@ class PlayerViewModel @Inject constructor(
             return
         }
         val key = (apiKeyOverride ?: geminiApiKey.value).trim()
-        if (key.isBlank()) return
         translateLyricsInto(track, currentLyrics, key, language)
     }
 

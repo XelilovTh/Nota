@@ -465,33 +465,10 @@ fun NowPlayingScreen(
                             state.track?.let { viewModel.deleteLyrics(it.id) }
                         },
                         onToggleTranslation = {
-                            val track = state.track
-                            if (track != null) {
-                                val hasTranslations = lyricsUiState.lyrics?.translatedLanguage == translationLanguage &&
-                                    lyricsUiState.lyrics?.lines?.any { !it.translatedText.isNullOrBlank() } == true
-                                if (!lyricsUiState.showTranslation && !hasTranslations && geminiApiKey.isBlank()) {
-                                    pendingGeminiAction = PendingGeminiAction.TRANSLATE
-                                    showGeminiKeyDialog = true
-                                } else {
-                                    viewModel.toggleLyricsTranslation(track)
-                                }
-                            }
+                            state.track?.let { viewModel.toggleLyricsTranslation(it) }
                         },
                         onSelectTranslationLanguage = { language ->
-                            val track = state.track
-                            if (track != null) {
-                                val hasTranslationsForLang = lyricsUiState.lyrics?.translatedLanguage == language &&
-                                    lyricsUiState.lyrics?.lines?.any { !it.translatedText.isNullOrBlank() } == true
-                                if (!hasTranslationsForLang && geminiApiKey.isBlank()) {
-                                    viewModel.setTranslationLanguage(language, null)
-                                    pendingGeminiAction = PendingGeminiAction.TRANSLATE
-                                    showGeminiKeyDialog = true
-                                } else {
-                                    viewModel.setTranslationLanguage(language, track)
-                                }
-                            } else {
-                                viewModel.setTranslationLanguage(language, null)
-                            }
+                            viewModel.setTranslationLanguage(language, state.track)
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
