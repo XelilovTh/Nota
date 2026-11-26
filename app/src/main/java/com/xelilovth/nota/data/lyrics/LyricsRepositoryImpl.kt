@@ -47,7 +47,6 @@ class LyricsRepositoryImpl @Inject constructor(
     private val offsetsPrefs by lazy {
         context.getSharedPreferences(OFFSETS_PREFS_NAME, Context.MODE_PRIVATE)
     }
-    private val geminiBlockedUntilMs = AtomicLong(0L)
     private val translationMutex = Mutex()
     private val lastRemoteTranslateAtMs = AtomicLong(0L)
     private val inFlightTranslations = ConcurrentHashMap<String, CompletableDeferred<TrackLyrics?>>()
@@ -261,16 +260,7 @@ class LyricsRepositoryImpl @Inject constructor(
 
                 enforceTranslationThrottle()
 
-                val trimmedKey = apiKey.trim()
-                val translationsByIndex = if (
-                    trimmedKey.isNotBlank() &&
-                    System.currentTimeMillis() >= geminiBlockedUntilMs.get()
-                ) {
-                    translateWithGemini(latestLyrics, trimmedKey, targetLanguage)
-                        ?: translateWithOnlineFallbacks(latestLyrics, targetLanguage)
-                } else {
-                    translateWithOnlineFallbacks(latestLyrics, targetLanguage)
-                }
+                val translationsByIndex = translateWithOnlineFallbacks(latestLyrics, targetLanguage)
 
                 if (translationsByIndex.isNullOrEmpty()) {
                     return@withLock null
@@ -325,84 +315,6 @@ class LyricsRepositoryImpl @Inject constructor(
             delay(TRANSLATION_MIN_INTERVAL_MS - elapsed)
         }
         lastRemoteTranslateAtMs.set(System.currentTimeMillis())
-    }
-
-    private fun translateWithGemini(
-        lyrics: TrackLyrics,
-        apiKey: String,
-        targetLanguage: String,
-    ): Map<Int, String>? {
-        val numberedLines = lyrics.lines
-            .mapIndexed { index, line -> "$index|${line.text}" }
-            .joinToString("\n")
-        val prompt = buildString {
-            append("Translate each numbered lyric line naturally into $targetLanguage.\n")
-            append("Keep the exact index|translated text format on each line, preserving the index number and | separator.\n")
-            append("Do not include any markdown formatting, code fences, or explanations.\n\n")
-            append(numberedLines)
-        }
-        val requestBody = JSONObject().apply {
-            put(
-                "contents",
-                JSONArray().put(
-                    JSONObject().apply {
-                        put(
-                            "parts",
-                            JSONArray().put(
-                                JSONObject().apply {
-                                    put("text", prompt)
-                                },
-                            ),
-                        )
-                    },
-                ),
-            )
-        }
-
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${Uri.encode(apiKey)}"
-        val (status, responseJson) = try {
-            postJsonWithStatus(url, requestBody)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            -1 to null
-        }
-
-        if (status == 429) {
-            geminiBlockedUntilMs.set(System.currentTimeMillis() + GEMINI_RATE_LIMIT_COOLDOWN_MS)
-            return null
-        }
-        if (status == 401 || status == 403) {
-            geminiBlockedUntilMs.set(System.currentTimeMillis() + GEMINI_BLOCKED_COOLDOWN_MS)
-            return null
-        }
-        if (responseJson == null) return null
-
-        val rawText = responseJson
-            .optJSONArray("candidates")
-            ?.optJSONObject(0)
-            ?.optJSONObject("content")
-            ?.optJSONArray("parts")
-            ?.optJSONObject(0)
-            ?.optString("text")
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: return null
-
-        val cleaned = stripMarkdownFences(rawText).trim()
-        if (cleaned.isBlank()) return null
-
-        val translationsByIndex = mutableMapOf<Int, String>()
-        cleaned.lines().forEach { rawLine ->
-            val sep = rawLine.indexOf('|')
-            if (sep <= 0) return@forEach
-            val index = rawLine.substring(0, sep).trim().toIntOrNull() ?: return@forEach
-            val translation = rawLine.substring(sep + 1).trim()
-            if (index in lyrics.lines.indices && translation.isNotBlank()) {
-                translationsByIndex[index] = translation
-            }
-        }
-        return translationsByIndex.takeIf { it.isNotEmpty() }
     }
 
     private suspend fun translateWithOnlineFallbacks(
@@ -842,10 +754,7 @@ class LyricsRepositoryImpl @Inject constructor(
         return withoutEnd.joinToString("\n")
     }
 
-    private fun postJson(url: String, body: JSONObject): JSONObject? =
-        postJsonWithStatus(url, body).second
-
-    private fun postJsonWithStatus(url: String, body: JSONObject): Pair<Int, JSONObject?> {
+    private fun postJson(url: String, body: JSONObject): JSONObject? {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = GEMINI_CONNECT_TIMEOUT_MS
@@ -859,9 +768,9 @@ class LyricsRepositoryImpl @Inject constructor(
                 writer.write(body.toString())
             }
             val status = connection.responseCode
-            if (status !in 200..299) return status to null
+            if (status !in 200..299) return null
             val responseText = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            status to runCatching { JSONObject(responseText) }.getOrNull()
+            runCatching { JSONObject(responseText) }.getOrNull()
         } finally {
             connection.disconnect()
         }
@@ -911,8 +820,6 @@ class LyricsRepositoryImpl @Inject constructor(
         const val TRANSLATION_CHUNK_MAX_CHARS = 900
         const val TRANSLATION_CHUNK_DELAY_MS = 200L
         const val TRANSLATION_SINGLE_LINE_DELAY_MS = 120L
-        const val GEMINI_RATE_LIMIT_COOLDOWN_MS = 60_000L
-        const val GEMINI_BLOCKED_COOLDOWN_MS = 300_000L
         val LINGVA_INSTANCES = listOf("https://lingva.ml", "https://lingva.lunar.icu")
         const val USER_AGENT = "Nota/0.3.0 (https://github.com/XelilovTh/Nota)"
     }

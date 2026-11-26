@@ -390,7 +390,7 @@ fun NowPlayingScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(if (lyricsExpanded) 0.72f else 0.28f)
+                .weight(1f)
                 .pointerInput(lyricsExpanded, state.track?.id) {
                     if (!lyricsExpanded && state.track != null) {
                         var upwardDrag = 0f
@@ -523,7 +523,7 @@ fun NowPlayingScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+                Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
             }
         }
 
@@ -588,7 +588,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.12f))
+        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
