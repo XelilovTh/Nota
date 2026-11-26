@@ -150,7 +150,6 @@ fun NotaApp() {
             isPlayerOpen = false
         }
     }
-    BackHandler(enabled = isPlayerOpen) { isPlayerOpen = false }
     val bottomClearance = when {
         showTabs && hasMiniPlayer -> AppDimens.FloatingBottomClearance
         showTabs -> AppDimens.FloatingNavOnlyClearance
@@ -314,6 +313,7 @@ fun NotaApp() {
                     }
                 }
                 if (isPlayerOpen || playerOffsetY.value < screenHeightPx - 1f) {
+                    BackHandler(enabled = isPlayerOpen) { isPlayerOpen = false }
                     val bgState by remember(playerViewModel) {
                         playerViewModel.playbackState
                             .map { Triple(it.isPlaying, it.track?.id, it.track?.uri) }

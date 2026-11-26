@@ -38,7 +38,7 @@ class LibraryViewModel @Inject constructor(
     private var hasAttemptedScan = false
 
     fun scanIfEmpty() {
-        if (tracks.value.isEmpty() && !hasAttemptedScan) {
+        if (!hasAttemptedScan) {
             scan()
         }
     }
