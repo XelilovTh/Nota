@@ -1,6 +1,7 @@
 package com.xelilovth.nota.ui.theme
 
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 object AppDimens {
     val ScreenPadding = 20.dp
@@ -49,4 +50,27 @@ object AppDimens {
     val FloatingNavOnlyClearance = 96.dp
     val PlayerBottomSafePadding = 32.dp
     val Zero = 0.dp
+
+    val LyricsDragThreshold = 48.dp
+    val LyricsHandleBarHeight = 32.dp
+    val LyricsHandleWidth = 42.dp
+    val LyricsHandleThickness = 4.dp
+    val LyricsEmptyPadding = 28.dp
+    val LyricsLineSpacing = 22.dp
+    val LyricsContentVerticalPadding = 28.dp
+    val LyricsContentHorizontalPadding = 20.dp
+    val LyricsWordCornerRadius = 6.dp
+    val LyricsWordHorizontalPadding = 3.dp
+    val LyricsWordSpacing = 4.dp
+    val LyricsSwipeHintSize = 52.dp
+    val LyricsSwipeArrowSize = 36.dp
+    val LyricsSwipeTravel = 6.dp
+    val LyricsLoadingSpinnerSize = 28.dp
+    val LyricsEmptyIconSize = 42.dp
+    val LyricsWordFontSize = 20.sp
+    val LyricsActiveWordFontSize = 22.sp
+    val LyricsLineHeight = 32.sp
+    val LyricsPlainFontSize = 19.sp
+    val LyricsActiveLineFontSize = 23.sp
+    val LyricsInactiveLineFontSize = 18.sp
 }

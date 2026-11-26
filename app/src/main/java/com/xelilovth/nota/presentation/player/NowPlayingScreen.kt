@@ -69,7 +69,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
@@ -257,7 +256,7 @@ fun NowPlayingScreen(
                                 change.consume()
                             },
                             onDragEnd = {
-                                if (dragDistance < -48.dp.toPx()) lyricsExpanded = true
+                                if (dragDistance < -AppDimens.LyricsDragThreshold.toPx()) lyricsExpanded = true
                                 dragDistance = 0f
                             },
                             onDragCancel = { dragDistance = 0f },
@@ -295,7 +294,10 @@ fun NowPlayingScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    LyricsSwipeHint(modifier = Modifier.fillMaxSize())
+                    LyricsSwipeHint(
+                        onExpand = { lyricsExpanded = true },
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
             }
         }
