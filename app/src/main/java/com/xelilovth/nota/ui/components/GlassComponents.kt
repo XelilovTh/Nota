@@ -14,9 +14,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalGlassColors
@@ -153,3 +158,22 @@ fun GlassSurface(
         }
     }
 }
+
+fun Modifier.verticalEdgeFade(edgeHeight: Dp): Modifier = this
+    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+    .drawWithContent {
+        drawContent()
+        val fadePx = edgeHeight.toPx()
+        if (size.height > 0f && fadePx > 0f) {
+            val fraction = (fadePx / size.height).coerceIn(0f, 0.45f)
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    fraction to Color.Black,
+                    (1f - fraction) to Color.Black,
+                    1f to Color.Transparent,
+                ),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+    }

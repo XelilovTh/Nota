@@ -1,10 +1,17 @@
 name: Android Build
 on:
+  # Feature branches are validated by their PR event. Restrict push builds to
+  # main so each feature-branch commit does not start a duplicate workflow.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
+
+# Keep only the newest validation run for a given PR/branch.
+concurrency:
+  group: nota-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

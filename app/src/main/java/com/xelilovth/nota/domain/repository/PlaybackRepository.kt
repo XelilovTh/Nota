@@ -14,4 +14,5 @@ interface PlaybackRepository {
     fun toggleShuffle()
     fun cycleRepeatMode()
     fun stopPlayback()
+    fun setLyricsSyncActive(active: Boolean) = Unit
 }
