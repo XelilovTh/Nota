@@ -41,22 +41,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.TextUnitType
 import com.xelilovth.nota.R
 import com.xelilovth.nota.domain.model.LyricLine
 import com.xelilovth.nota.domain.model.LyricsSyncType
 import com.xelilovth.nota.domain.model.TrackLyrics
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.theme.AppDimens
-import kotlinx.coroutines.delay
+
+private const val LYRICS_LOOKAHEAD_MS = 80L
+private const val LYRICS_DRIFT_SNAP_THRESHOLD_MS = 250L
 
 @Composable
 internal fun LyricsPanel(
@@ -183,15 +185,36 @@ private fun LyricsContent(
     isPlaying: Boolean,
 ) {
     val lines = lyrics.lines
-    var smoothPositionMs by remember(lyrics, positionMs) { mutableLongStateOf(positionMs) }
-    LaunchedEffect(positionMs, isPlaying, lyrics) {
-        val anchorRealtimeMs = SystemClock.elapsedRealtime()
-        smoothPositionMs = positionMs
+    var anchorPositionMs by remember(lyrics) {
+        mutableLongStateOf(if (isPlaying) positionMs + LYRICS_LOOKAHEAD_MS else positionMs)
+    }
+    var anchorRealtimeMs by remember(lyrics) { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    var smoothPositionMs by remember(lyrics) { mutableLongStateOf(anchorPositionMs) }
+
+    LaunchedEffect(positionMs) {
+        val targetPositionMs = if (isPlaying) positionMs + LYRICS_LOOKAHEAD_MS else positionMs
+        if (!isPlaying || kotlin.math.abs(targetPositionMs - smoothPositionMs) > LYRICS_DRIFT_SNAP_THRESHOLD_MS) {
+            anchorPositionMs = targetPositionMs
+            anchorRealtimeMs = SystemClock.elapsedRealtime()
+            smoothPositionMs = targetPositionMs
+        }
+    }
+
+    LaunchedEffect(isPlaying, lyrics) {
         if (isPlaying) {
+            anchorPositionMs = positionMs + LYRICS_LOOKAHEAD_MS
+            anchorRealtimeMs = SystemClock.elapsedRealtime()
+            smoothPositionMs = anchorPositionMs
             while (true) {
-                delay(32L)
-                smoothPositionMs = positionMs + (SystemClock.elapsedRealtime() - anchorRealtimeMs).coerceAtLeast(0L)
+                withFrameMillis {
+                    smoothPositionMs = anchorPositionMs +
+                        (SystemClock.elapsedRealtime() - anchorRealtimeMs).coerceAtLeast(0L)
+                }
             }
+        } else {
+            anchorPositionMs = positionMs
+            anchorRealtimeMs = SystemClock.elapsedRealtime()
+            smoothPositionMs = positionMs
         }
     }
 
@@ -212,7 +235,9 @@ private fun LyricsContent(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds(),
         state = listState,
         contentPadding = PaddingValues(
             horizontal = AppDimens.LyricsContentHorizontalPadding,
@@ -285,29 +310,29 @@ private fun SyncedWordLine(
             val wordColor by animateColorAsState(
                 targetValue = if (isCurrentWord) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.62f),
-                animationSpec = tween(durationMillis = 170),
+                animationSpec = tween(durationMillis = 55),
                 label = "lyric-word-color",
             )
             val backgroundAlpha by animateFloatAsState(
                 targetValue = if (isCurrentWord) 0.17f else 0f,
-                animationSpec = tween(durationMillis = 170),
+                animationSpec = tween(durationMillis = 55),
                 label = "lyric-word-highlight",
-            )
-            val wordSize by animateFloatAsState(
-                targetValue = if (isCurrentWord) AppDimens.LyricsActiveWordFontSize.value else AppDimens.LyricsWordFontSize.value,
-                animationSpec = tween(durationMillis = 170),
-                label = "lyric-word-size",
             )
             Text(
                 text = word.text.trim(),
                 modifier = Modifier
+                    .graphicsLayer {
+                        val scale = if (isCurrentWord) 1.06f else 1f
+                        scaleX = scale
+                        scaleY = scale
+                    }
                     .background(
                         color = MaterialTheme.colorScheme.primary.copy(alpha = backgroundAlpha),
                         shape = RoundedCornerShape(AppDimens.LyricsWordCornerRadius),
                     )
                     .padding(horizontal = AppDimens.LyricsWordHorizontalPadding),
                 color = wordColor,
-                fontSize = TextUnit(wordSize, TextUnitType.Sp),
+                fontSize = AppDimens.LyricsWordFontSize,
                 lineHeight = AppDimens.LyricsLineHeight,
                 fontWeight = if (isCurrentWord) FontWeight.ExtraBold else FontWeight.Medium,
             )

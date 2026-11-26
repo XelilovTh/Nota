@@ -119,7 +119,7 @@ class PlaybackRepositoryImpl @Inject constructor(
         progressJob = scope.launch {
             while (isActive && player.isPlaying) {
                 publishState()
-                delay(500L)
+                delay(200L)
             }
         }
     }

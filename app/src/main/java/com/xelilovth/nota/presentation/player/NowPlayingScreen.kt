@@ -302,6 +302,10 @@ fun NowPlayingScreen(
             }
         }
 
+        AnimatedVisibility(visible = lyricsExpanded) {
+            Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
+        }
+
         GlassSurface(
             shape = CircleShape,
             elevated = true,
