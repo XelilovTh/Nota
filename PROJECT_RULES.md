@@ -1,44 +1,45 @@
 # PROJECT_RULES.md
 
-Bu fayl bütün mərhələlərə aiddir. Hər mərhələ promptu bu qaydalara istinad edir və onları təkrar etmir.
+Bu fayl layihə üzərində işləyən bütün agentlər və developerlər üçün məcburidir. Həmçinin `AGENTS.md`, `docs/ARCHITECTURE.md` və `docs/DESIGN_SYSTEM.md` qeydlərinə baxın.
 
 ## Ümumi prinsiplər
-- Hər mərhələ yalnız öz tapşırıqlarını yerinə yetirir. Növbəti mərhələnin işi əvvəlcədən əlavə edilmir.
-- Dizayn sonradan dəyişəcək: rənglər, tipografiya, formalar və ölçülər yalnız `ui/theme/` paketində təyin olunur. Komponentlərdə hard-coded rəng və ölçü olmur.
-- Bütün düymələr real funksiyasını yerinə yetirməlidir. Yer tutan ekran yalnız açıq şəkildə "placeholder" kimi qeyd olunduqda istifadə olunur.
-- Phase 1-də EQ, Sleep Timer, Lyrics və custom playlist məntiqi yazılmır.
+- Yalnız tapşırığın əhatə etdiyi sahələri dəyişin; əlaqəsiz faylları və ya mövcud şərhləri səbəbsiz silməyin.
+- **Dizayn token qaydası (MƏCBURİ):** Rənglər, tipografiya, formalar və ölçülər **yalnız** `app/src/main/java/com/xelilovth/nota/ui/theme/` paketində təyin olunur. Komponentlərdə və ekranlarda hard-coded `.dp`, `.sp` və ya `Color(...)` yazmaq **qadağandır**.
+- **Liquid Glass üslubu:** Bütün kartlar, dialoqlar (təsdiq pəncərələri, dil seçimi, API açarı dialoqu) və alt panellər `GlassSurface` / `GlassDialog` istifadə etməlidir.
+- **Bütün düymələr real funksiya daşımalıdır:** Hazır funksiyanı yerinə yetirməyən placeholder düymə buraxmayın.
+- **Player & Lyrics qaydaları:**
+  - `NowPlayingScreen` `NotaApp.kt` içində modal overlay kimi saxlanılır (`NavHost` route-una qaytarılmır).
+  - Mahnı sözlərinin tərcüməsi Gemini API limitini xərcləməmək üçün yalnız ödənişsiz onlayn tərcümə zənciri (`Google Translate gtx` -> `Lingva` -> `MyMemory`) ilə aparılır; Gemini yalnız audio-dan söz çıxarma (`generateLyricsWithGemini`) üçün istifadə olunur.
+  - `PlaybackPlayerHolder` üzərində `SeekParameters.EXACT` və `setConstantBitrateSeekingEnabled(true)` qorunur (`FLAG_ENABLE_INDEX_SEEKING` əlavə edilmir).
 
 ## Keyfiyyət qapıları
-Hər mərhələdə bu ardıcıllıqla yoxlanır:
-1. `./gradlew assembleDebug`: xəta olmamalıdır
-2. `./gradlew lint`: kritik xətalar düzəldilir, xəbərdarlıqlar düzəldilir və ya səbəbi yazılır
-3. `./gradlew testDebugUnitTest`: bütün testlər keçməlidir
+Hər dəyişiklikdən sonra bu ardıcıllıqla yoxlanır:
+1. Token auditi: `rg -n "\.dp\b|\.sp\b|Color\(" app/src/main/java/com/xelilovth/nota/ --glob "!**/ui/theme/**"` (0 nəticə olmalıdır)
+2. `./gradlew --no-daemon assembleDebug` — xəta olmamalıdır
+3. `./gradlew --no-daemon lint` — kritik xətalar düzəldilir
+4. `./gradlew --no-daemon testDebugUnitTest` — bütün testlər keçməlidir
+5. Release build (CI): `./gradlew --no-daemon assembleRelease` + `apksigner verify`
 
 Qapı xəta verərsə:
-- Tam xəta logu götürülür, düzəldilir və qapı yenidən işlədilir.
-- Hər qapı üçün maksimum **3 cəhd**.
-- 3-cü cəhddən sonra da keçmirsə, dayanılır və hesabat verilir: dəqiq xəta, nə cəhd edildiyi, ehtimal olunan səbəb.
-- Keçməyən kod push olunmur.
+- Tam xəta logu götürülür, düzəldilir və qapı yenidən işlədilir (maksimum **3 cəhd**).
+- Keçməyən kod `main`-ə merge olunmur.
+- **Lokal mühitdə Android SDK yoxdursa**, token auditi lokal aparılır, build/lint/test doğrulaması isə **GitHub Actions CI** (`.github/workflows/android-build.yml`) üzərindən yoxlanır və bu hesabatda açıq qeyd edilir.
 
-Lokal Gradle və ya Android SDK yoxdursa, GitHub Actions build doğrulama kimi istifadə olunur və hesabatda bu aydın yazılır.
+## Git və CI qaydaları
+- Commit mesajı ingilis dilində, `type: short description` formatındadır (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`).
+- Push yalnız istifadəçi istədikdə və ya tapşırıq tələb etdikdə edilir (istifadəçi öz Git Bash terminalından `git push` edə bilər).
+- `.github/workflows/android-build.yml` istənilən branch-a `push` və `pull_request` zamanı avtomatik işə düşür və `nota-debug-apk`, `nota-release-apk` (imzalı) və `nota-lint-test-reports` artifact-larını yaradır.
+- Repo tarixçəsi silinmir və yenidən yazılmır (`git push --force` və `rebase` ilə tarixçə dəyişdirilmir).
+- Kredensial, API açarı, keystore və ya token heç vaxt commit olunmur.
 
-## Git qaydaları
-- Commit yalnız bütün qapılar keçəndən sonra edilir.
-- Commit mesajı ingilis dilində, `tip: qısa təsvir` formatındadır (məsələn, `feat: ...`, `chore: ...`, `test: ...`).
-- Push yalnız mərhələ promptunda açıq göstərildikdə edilir.
-- Push sonrası GitHub Actions run yoxlanılır. Xəta varsa, eyni 3 cəhd limiti ilə düzəldilir.
-- Repo tarixçəsi silinmir, yenidən yazılmır (`force push` və `rebase` ilə tarixçə dəyişdirilmir).
-- Kredensial təxmin olunmur. Token və ya açar commit olunmur.
-
-## İcazələr və manifest
+## İcazələr və Manifest
 - API 33+: `READ_MEDIA_AUDIO`
-- API 32 və aşağı: `READ_EXTERNAL_STORAGE`, `android:maxSdkVersion="32"`
+- API 32 və aşağı: `READ_EXTERNAL_STORAGE` (`android:maxSdkVersion="32"`)
 - `POST_NOTIFICATIONS` (API 33+, runtime sorğusu ilə)
 - `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` (API 34+)
-- Runtime icazə sorğusu yalnız scanner mərhələsində əlavə olunur.
+- `INTERNET` (onlayn söz axtarışı, Gemini audio transkripsiyası və tərcümə üçün)
 
 ## .gitignore (minimum)
-
 ```
 build/
 .gradle/
@@ -50,15 +51,8 @@ keystore.properties
 *.iml
 ```
 
-## Dayanma şərtləri
-Aşağıdakılardan biri olduqda dayanılır və hesabat verilir:
-- Repo, Gradle və ya lazımi icazə/kredensial mövcud deyil
-- Hər hansı qapı 3 cəhddən sonra keçmir
-- Mövcud istifadəçi faylları və ya repo tarixçəsi silinməli olur
-
 ## Hesabat formatı
-- Dəyişdirilən və ya yaradılan fayllar (qısa siyahı)
-- Hər qapının nəticəsi: keçdi/keçmədi, cəhd sayı
+- Dəyişdirilən və ya yaradılan faylların siyahısı
+- Yoxlama / keyfiyyət qapılarının nəticəsi (lokal token auditi, CI və ya ADB QA)
 - Commit hash (varsa) və push statusu
-- Açıq məsələlər və fərziyyələr
-- Növbəti mərhələ üçün tövsiyə
+- Açıq məsələlər (varsa)
