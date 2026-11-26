@@ -50,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import android.net.Uri
@@ -173,7 +174,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.22f))
+        Spacer(modifier = Modifier.weight(if (lyricsExpanded) 0.04f else 0.22f))
 
         Column(
             Modifier.fillMaxWidth(),
@@ -322,7 +323,45 @@ fun NowPlayingScreen(
         }
 
         AnimatedVisibility(visible = lyricsExpanded) {
-            Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    Text(
+                        text = formatDuration(displayPositionMs),
+                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Slider(
+                        value = displayProgress,
+                        onValueChange = { next ->
+                            isDragging = true
+                            dragProgress = next
+                        },
+                        onValueChangeFinished = {
+                            isDragging = false
+                            if (duration > 0L) {
+                                viewModel.seek((dragProgress * duration).toLong())
+                            }
+                        },
+                        enabled = duration > 0L,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(AppDimens.LyricsScrubberHeight),
+                    )
+                    Text(
+                        text = formatDuration(duration),
+                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+            }
         }
 
         GlassSurface(

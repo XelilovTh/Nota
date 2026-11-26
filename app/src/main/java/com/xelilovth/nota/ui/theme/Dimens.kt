@@ -75,4 +75,7 @@ object AppDimens {
     val LyricsPlainFontSize = 19.sp
     val LyricsActiveLineFontSize = 23.sp
     val LyricsInactiveLineFontSize = 18.sp
+    val LyricsHeaderHeight = 48.dp
+    val LyricsEdgeFadeHeight = 28.dp
+    val LyricsScrubberHeight = 20.dp
 }

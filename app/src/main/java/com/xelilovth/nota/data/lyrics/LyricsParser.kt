@@ -11,6 +11,10 @@ import org.yaml.snakeyaml.constructor.SafeConstructor
 
 internal object LyricsParser {
     private val lrcTimestamp = Regex("""\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?]\s*(.*)""")
+    private val leadingPlusMarker = Regex("""^\+\s+""")
+
+    private fun cleanLineText(raw: String): String =
+        raw.trimStart().replace(leadingPlusMarker, "").trim()
 
     fun fromLrc(value: String, durationMs: Long): List<LyricLine> {
         val parsed = value.lineSequence().mapNotNull { raw ->
@@ -22,7 +26,7 @@ internal object LyricsParser {
                 ?.padEnd(3, '0')
                 ?.take(3)
                 ?.toLongOrNull() ?: 0L
-            val text = match.groupValues[4].trim()
+            val text = cleanLineText(match.groupValues[4])
             if (text.isBlank()) return@mapNotNull null
             LyricLine(
                 text = text,
@@ -36,7 +40,7 @@ internal object LyricsParser {
 
     fun fromPlain(value: String): List<LyricLine> = value
         .lineSequence()
-        .map(String::trim)
+        .map(::cleanLineText)
         .filter(String::isNotBlank)
         .map { LyricLine(it) }
         .toList()
@@ -132,7 +136,17 @@ internal object LyricsParser {
             else -> 0
         }
         if (expectedAlbum.isNotBlank() && candidateAlbum == expectedAlbum) score += 5
-        if (targetDurationSeconds > 0 && kotlin.math.abs(durationSeconds - targetDurationSeconds) <= 3) score += 5
+        if (targetDurationSeconds > 0 && durationSeconds > 0) {
+            val diff = kotlin.math.abs(durationSeconds - targetDurationSeconds)
+            score += when {
+                diff <= 1 -> 20
+                diff <= 2 -> 14
+                diff <= 4 -> 8
+                diff <= 8 -> 2
+                diff > 12 -> -15
+                else -> 0
+            }
+        }
         return score
     }
 

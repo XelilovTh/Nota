@@ -57,7 +57,9 @@ import com.xelilovth.nota.domain.model.LyricLine
 import com.xelilovth.nota.domain.model.LyricsSyncType
 import com.xelilovth.nota.domain.model.TrackLyrics
 import com.xelilovth.nota.ui.components.GlassSurface
+import com.xelilovth.nota.ui.components.verticalEdgeFade
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalGlassColors
 import java.util.Locale
 
 private const val OFFSET_STEP_MS = 500L
@@ -133,7 +135,8 @@ private fun LyricsHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = AppDimens.ElementSpacing, vertical = AppDimens.ShapeExtraSmall)
+            .height(AppDimens.LyricsHeaderHeight)
+            .padding(horizontal = AppDimens.ElementSpacing)
             .pointerInput(Unit) {
                 var dragDistance = 0f
                 detectVerticalDragGestures(
@@ -148,6 +151,7 @@ private fun LyricsHeader(
                     onDragCancel = { dragDistance = 0f },
                 )
             },
+        contentAlignment = Alignment.Center,
     ) {
         IconButton(
             onClick = onCollapse,
@@ -189,7 +193,7 @@ private fun LyricsHeader(
                 }
                 Text(
                     text = formatSyncOffset(syncOffsetMs),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium,
                 )
@@ -320,10 +324,13 @@ private fun LyricsContent(
         }
     }
 
+    val isLightGlass = LocalGlassColors.current.subtleRowBorder
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .clipToBounds(),
+            .clipToBounds()
+            .verticalEdgeFade(AppDimens.LyricsEdgeFadeHeight),
         state = listState,
         contentPadding = PaddingValues(
             horizontal = AppDimens.LyricsContentHorizontalPadding,
@@ -358,6 +365,7 @@ private fun LyricsContent(
                 val alphaTarget = when {
                     lyrics.syncType == LyricsSyncType.PLAIN -> 0.72f
                     isActive -> 1f
+                    isLightGlass -> 0.45f
                     else -> 0.32f
                 }
                 val alpha by animateFloatAsState(
@@ -404,22 +412,22 @@ private fun SyncedWordLine(
 
     val onSurface = MaterialTheme.colorScheme.onSurface
     val primary = MaterialTheme.colorScheme.primary
+    val upcomingAlpha = if (LocalGlassColors.current.subtleRowBorder) 0.45f else 0.35f
 
     val annotatedLine = buildAnnotatedString {
         line.words.forEachIndexed { index, word ->
             if (index > 0) append(" ")
             val style = when {
                 index < activeWordIndex -> SpanStyle(
-                    color = onSurface.copy(alpha = 0.88f),
+                    color = onSurface.copy(alpha = 0.85f),
                     fontWeight = FontWeight.SemiBold,
                 )
                 index == activeWordIndex -> SpanStyle(
                     color = primary,
                     fontWeight = FontWeight.ExtraBold,
-                    background = primary.copy(alpha = 0.18f),
                 )
                 else -> SpanStyle(
-                    color = onSurface.copy(alpha = 0.45f),
+                    color = onSurface.copy(alpha = upcomingAlpha),
                     fontWeight = FontWeight.Medium,
                 )
             }
@@ -454,31 +462,40 @@ internal fun LyricsSwipeHint(
         modifier = modifier,
         contentAlignment = Alignment.BottomCenter,
     ) {
-        GlassSurface(
-            modifier = Modifier
-                .padding(bottom = AppDimens.ShapeExtraSmall)
-                .size(AppDimens.LyricsSwipeHintSize),
-            shape = CircleShape,
-            subtle = true,
-            blurBackdrop = true,
-            onClick = onExpand,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppDimens.ShapeExtraSmall),
+            modifier = Modifier.padding(bottom = AppDimens.ShapeExtraSmall),
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
+            GlassSurface(
+                modifier = Modifier.size(AppDimens.LyricsSwipeHintSize),
+                shape = CircleShape,
+                subtle = true,
+                blurBackdrop = true,
+                onClick = onExpand,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.KeyboardArrowUp,
-                    contentDescription = "Swipe up to show lyrics",
-                    modifier = Modifier
-                        .size(AppDimens.LyricsSwipeArrowSize)
-                        .graphicsLayer {
-                            translationY = -progress * AppDimens.LyricsSwipeTravel.toPx()
-                            alpha = 0.58f + progress * 0.42f
-                        },
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowUp,
+                        contentDescription = "Swipe up to show lyrics",
+                        modifier = Modifier
+                            .size(AppDimens.LyricsSwipeArrowSize)
+                            .graphicsLayer {
+                                translationY = -progress * AppDimens.LyricsSwipeTravel.toPx()
+                                alpha = 0.58f + progress * 0.42f
+                            },
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
+            Text(
+                text = "Lyrics",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

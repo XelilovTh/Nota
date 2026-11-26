@@ -176,6 +176,59 @@ class LyricsParserTest {
         )
 
         assertTrue(exact > weak)
-        assertEquals(100, exact)
+        assertEquals(115, exact)
+    }
+
+    @Test
+    fun stripsLeadingPlusMarkersInLrcAndPlainLyrics() {
+        val lrcLines = LyricsParser.fromLrc(
+            """[00:05.00] + First line
+                |[00:10.00]+   Second line
+                |[00:12.00] + 
+                |[00:15.00] +1 keeps plus without space""".trimMargin(),
+            durationMs = 20_000L,
+        )
+        val plainLines = LyricsParser.fromPlain(
+            """+ Plain one
+                |  + Plain two
+                |Normal line""".trimMargin(),
+        )
+
+        assertEquals(
+            listOf("First line", "Second line", "+1 keeps plus without space"),
+            lrcLines.map { it.text },
+        )
+        assertEquals(
+            listOf("Plain one", "Plain two", "Normal line"),
+            plainLines.map { it.text },
+        )
+    }
+
+    @Test
+    fun prefersExactDurationOverMismatchedDuration() {
+        val exactDuration = LyricsParser.matchScore(
+            title = "Böyle İyi",
+            artist = "No.1",
+            album = "Siyah Bayrak",
+            durationSeconds = 210,
+            targetTitle = "Böyle İyi",
+            targetArtist = "No.1",
+            targetAlbum = "Siyah Bayrak",
+            targetDurationSeconds = 211,
+        )
+        val mismatchedDuration = LyricsParser.matchScore(
+            title = "Böyle İyi",
+            artist = "No.1",
+            album = "Siyah Bayrak",
+            durationSeconds = 226,
+            targetTitle = "Böyle İyi",
+            targetArtist = "No.1",
+            targetAlbum = "Siyah Bayrak",
+            targetDurationSeconds = 211,
+        )
+
+        assertTrue(exactDuration > mismatchedDuration)
+        assertEquals(115, exactDuration)
+        assertEquals(80, mismatchedDuration)
     }
 }
