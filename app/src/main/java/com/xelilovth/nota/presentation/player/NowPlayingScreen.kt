@@ -65,7 +65,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -74,6 +73,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -104,6 +104,7 @@ import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
 import com.xelilovth.nota.ui.components.AudioWaveformVisualizer
+import com.xelilovth.nota.ui.components.GlassBottomSheet
 import com.xelilovth.nota.ui.components.GlassDropdownMenu
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.OfflineDownloadDialog
@@ -111,6 +112,9 @@ import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalGlassColors
+import com.xelilovth.nota.ui.theme.LocalHazeState
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -213,10 +217,14 @@ fun NowPlayingScreen(
         pendingDeleteTrackId = null
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(lyricsExpanded) {
+    val playerHazeState = remember { HazeState() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .hazeSource(state = playerHazeState)
+                .pointerInput(lyricsExpanded) {
                 if (!lyricsExpanded) {
                     detectVerticalDragGestures(
                         onVerticalDrag = { change, dragAmount ->
@@ -716,71 +724,72 @@ fun NowPlayingScreen(
         }
 
         Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
-    }
+        }
 
-    if (showQueueSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showQueueSheet = false },
-            containerColor = LocalGlassColors.current.sheetBackground,
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
-                Text(
-                    "Up Next",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = AppDimens.ElementSpacing),
-                )
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = AppDimens.ScreenPadding),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-                ) {
-                    items(queueTracks, key = Track::id, contentType = { "queue_track" }) { track ->
-                        val isCurrent = track.id == state.track?.id
-                        GlassSurface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium,
-                            subtle = !isCurrent,
-                            onClick = {
-                                viewModel.onRowClick(track, queueTracks)
-                                showQueueSheet = false
-                            },
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal = AppDimens.CardPadding,
-                                        vertical = AppDimens.RowVerticalPadding,
-                                    ),
-                                verticalAlignment = Alignment.CenterVertically,
+        CompositionLocalProvider(LocalHazeState provides playerHazeState) {
+            GlassBottomSheet(
+                visible = showQueueSheet,
+                onDismissRequest = { showQueueSheet = false },
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
+                    Text(
+                        "Up Next",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = AppDimens.ElementSpacing),
+                    )
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = AppDimens.ScreenPadding),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        items(queueTracks, key = Track::id, contentType = { "queue_track" }) { track ->
+                            val isCurrent = track.id == state.track?.id
+                            GlassSurface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium,
+                                subtle = !isCurrent,
+                                onClick = {
+                                    viewModel.onRowClick(track, queueTracks)
+                                    showQueueSheet = false
+                                },
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        track.title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        track.artist,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                if (isCurrent) {
-                                    Icon(
-                                        Icons.Outlined.GraphicEq,
-                                        contentDescription = "Playing",
-                                        modifier = Modifier.size(AppDimens.IconSizeSmall),
-                                    )
-                                } else {
-                                    Text(
-                                        formatDuration(track.durationMs),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            horizontal = AppDimens.CardPadding,
+                                            vertical = AppDimens.RowVerticalPadding,
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            track.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            track.artist,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    if (isCurrent) {
+                                        Icon(
+                                            Icons.Outlined.GraphicEq,
+                                            contentDescription = "Playing",
+                                            modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                        )
+                                    } else {
+                                        Text(
+                                            formatDuration(track.durationMs),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }
