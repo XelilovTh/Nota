@@ -12,6 +12,8 @@ interface SettingsRepository {
     val geminiApiKey: StateFlow<String> get() = MutableStateFlow("")
     val favoriteTrackIds: StateFlow<Set<Long>> get() = MutableStateFlow(emptySet())
     val playCounts: StateFlow<Map<Long, Int>> get() = MutableStateFlow(emptyMap())
+    val listenDurationsMs: StateFlow<Map<Long, Long>> get() = MutableStateFlow(emptyMap())
+    val lyricsTranslationLanguage: StateFlow<String> get() = MutableStateFlow("Azerbaijani")
     val excludedFolders: StateFlow<Set<String>> get() = MutableStateFlow(emptySet())
     val metadataOverrides: StateFlow<Map<Long, TrackMetadataOverride>> get() = MutableStateFlow(emptyMap())
 
@@ -22,6 +24,8 @@ interface SettingsRepository {
     fun setGeminiApiKey(key: String) = Unit
     fun toggleFavorite(trackId: Long) = Unit
     fun incrementPlayCount(trackId: Long) = Unit
+    fun addListenDuration(trackId: Long, deltaMs: Long) = Unit
+    fun setLyricsTranslationLanguage(language: String) = Unit
     fun setFolderExcluded(folder: String, excluded: Boolean) = Unit
     fun setTrackMetadataOverride(trackId: Long, override: TrackMetadataOverride?) = Unit
 }

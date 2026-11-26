@@ -233,7 +233,12 @@ class LyricsRepositoryImpl @Inject constructor(
     ): TrackLyrics? = withContext(ioDispatcher) {
         val trimmedKey = apiKey.trim()
         if (lyrics.lines.isEmpty() || trimmedKey.isBlank()) return@withContext null
-        if (lyrics.lines.any { !it.translatedText.isNullOrBlank() }) return@withContext lyrics
+        if (
+            lyrics.translatedLanguage == targetLanguage &&
+            lyrics.lines.any { !it.translatedText.isNullOrBlank() }
+        ) {
+            return@withContext lyrics
+        }
 
         val numberedLines = lyrics.lines
             .mapIndexed { index, line -> "$index|${line.text}" }
@@ -301,7 +306,7 @@ class LyricsRepositoryImpl @Inject constructor(
             val translation = translationsByIndex[index]
             if (translation != null) line.copy(translatedText = translation) else line
         }
-        val updated = lyrics.copy(lines = updatedLines)
+        val updated = lyrics.copy(lines = updatedLines, translatedLanguage = targetLanguage)
         writeDiskCache(track.id, updated)
         cache[track.id] = CachedLyrics(updated, System.currentTimeMillis())
         updated
@@ -357,6 +362,9 @@ class LyricsRepositoryImpl @Inject constructor(
         put("source", lyrics.source.name)
         put("syncType", lyrics.syncType.name)
         put("instrumental", lyrics.instrumental)
+        if (!lyrics.translatedLanguage.isNullOrBlank()) {
+            put("translatedLanguage", lyrics.translatedLanguage)
+        }
         put(
             "lines",
             JSONArray().apply {
@@ -394,6 +402,7 @@ class LyricsRepositoryImpl @Inject constructor(
         val source = LyricsSource.valueOf(json.getString("source"))
         val syncType = LyricsSyncType.valueOf(json.getString("syncType"))
         val instrumental = json.optBoolean("instrumental", false)
+        val translatedLanguage = json.optString("translatedLanguage").takeUnless { it.isBlank() }
         val linesArray = json.optJSONArray("lines") ?: JSONArray()
         val lines = (0 until linesArray.length()).mapNotNull { lineIndex ->
             val lineObj = linesArray.optJSONObject(lineIndex) ?: return@mapNotNull null
@@ -437,6 +446,7 @@ class LyricsRepositoryImpl @Inject constructor(
             source = source,
             syncType = syncType,
             instrumental = instrumental,
+            translatedLanguage = translatedLanguage,
         )
     }
 

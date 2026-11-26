@@ -33,4 +33,5 @@ data class TrackLyrics(
     val source: LyricsSource,
     val syncType: LyricsSyncType,
     val instrumental: Boolean = false,
+    val translatedLanguage: String? = null,
 )

@@ -1,8 +1,11 @@
 package com.xelilovth.nota.presentation.player
 
 import androidx.lifecycle.ViewModel
+import com.xelilovth.nota.domain.model.DeleteTrackResult
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.domain.model.TrackLyrics
+import com.xelilovth.nota.domain.repository.LibraryRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.repository.LyricsRepository
 import com.xelilovth.nota.domain.repository.SettingsRepository
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.map
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repository: PlaybackRepository,
+    private val libraryRepository: LibraryRepository,
     private val lyricsRepository: LyricsRepository,
     private val settingsRepository: SettingsRepository,
     private val playTrack: PlayTrackUseCase,
@@ -39,6 +43,7 @@ class PlayerViewModel @Inject constructor(
 ) : ViewModel() {
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
     val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
+    val translationLanguage: StateFlow<String> = settingsRepository.lyricsTranslationLanguage
     val favoriteTrackIds: StateFlow<Set<Long>> = settingsRepository.favoriteTrackIds
     private val _lyricsState = MutableStateFlow(LyricsUiState())
     val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
@@ -172,15 +177,50 @@ class PlayerViewModel @Inject constructor(
             _lyricsState.value = current.copy(showTranslation = false)
             return
         }
-        if (currentLyrics.lines.any { !it.translatedText.isNullOrBlank() }) {
+        val targetLanguage = translationLanguage.value
+        if (currentLyrics.translatedLanguage == targetLanguage &&
+            currentLyrics.lines.any { !it.translatedText.isNullOrBlank() }
+        ) {
             _lyricsState.value = current.copy(showTranslation = true)
             return
         }
         val key = (apiKeyOverride ?: geminiApiKey.value).trim()
         if (key.isBlank()) return
-        _lyricsState.value = current.copy(isTranslating = true, errorMessage = null)
+        translateLyricsInto(track, currentLyrics, key, targetLanguage)
+    }
+
+    fun setTranslationLanguage(language: String, track: Track?, apiKeyOverride: String? = null) {
+        settingsRepository.setLyricsTranslationLanguage(language)
+        val current = _lyricsState.value
+        val currentLyrics = current.lyrics ?: return
+        if (track == null || current.isTranslating) return
+        if (currentLyrics.translatedLanguage == language &&
+            currentLyrics.lines.any { !it.translatedText.isNullOrBlank() }
+        ) {
+            _lyricsState.value = current.copy(showTranslation = true)
+            return
+        }
+        val key = (apiKeyOverride ?: geminiApiKey.value).trim()
+        if (key.isBlank()) return
+        translateLyricsInto(track, currentLyrics, key, language)
+    }
+
+    private fun translateLyricsInto(
+        track: Track,
+        currentLyrics: TrackLyrics,
+        apiKey: String,
+        targetLanguage: String,
+    ) {
+        _lyricsState.value = _lyricsState.value.copy(isTranslating = true, errorMessage = null)
         viewModelScope.launch {
-            val translated = runCatching { lyricsRepository.translateLyrics(track, currentLyrics, key) }.getOrNull()
+            val translated = runCatching {
+                lyricsRepository.translateLyrics(
+                    track = track,
+                    lyrics = currentLyrics,
+                    apiKey = apiKey,
+                    targetLanguage = targetLanguage,
+                )
+            }.getOrNull()
             if (_lyricsState.value.trackId == track.id) {
                 val latest = _lyricsState.value
                 _lyricsState.value = latest.copy(
@@ -191,6 +231,16 @@ class PlayerViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun deleteTrack(trackId: Long, onResult: (DeleteTrackResult) -> Unit) {
+        viewModelScope.launch {
+            onResult(libraryRepository.deleteTrack(trackId))
+        }
+    }
+
+    fun confirmTrackDeleted(trackId: Long) {
+        libraryRepository.onTrackDeletedFromDevice(trackId)
     }
     fun onRowClick(track: Track, libraryTracks: List<Track>) {
         val queue = if (libraryTracks.any { it.id == track.id }) libraryTracks else listOf(track)

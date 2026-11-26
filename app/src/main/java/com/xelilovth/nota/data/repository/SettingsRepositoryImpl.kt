@@ -28,6 +28,14 @@ class SettingsRepositoryImpl @Inject constructor(
     override val favoriteTrackIds: StateFlow<Set<Long>> = _favoriteTrackIds.asStateFlow()
     private val _playCounts = MutableStateFlow(loadPlayCounts())
     override val playCounts: StateFlow<Map<Long, Int>> = _playCounts.asStateFlow()
+    private val _listenDurationsMs = MutableStateFlow(loadListenDurationsMs())
+    override val listenDurationsMs: StateFlow<Map<Long, Long>> = _listenDurationsMs.asStateFlow()
+    private val _lyricsTranslationLanguage = MutableStateFlow(
+        prefs.getString(KEY_LYRICS_TRANSLATION_LANGUAGE, DEFAULT_LYRICS_TRANSLATION_LANGUAGE)
+            ?.takeUnless { it.isBlank() }
+            ?: DEFAULT_LYRICS_TRANSLATION_LANGUAGE,
+    )
+    override val lyricsTranslationLanguage: StateFlow<String> = _lyricsTranslationLanguage.asStateFlow()
     private val _excludedFolders = MutableStateFlow(loadExcludedFolders())
     override val excludedFolders: StateFlow<Set<String>> = _excludedFolders.asStateFlow()
     private val _metadataOverrides = MutableStateFlow(loadMetadataOverrides())
@@ -73,6 +81,22 @@ class SettingsRepositoryImpl @Inject constructor(
         updated.forEach { (id, count) -> json.put(id.toString(), count) }
         prefs.edit().putString(KEY_PLAY_COUNTS, json.toString()).apply()
         _playCounts.value = updated
+    }
+
+    override fun addListenDuration(trackId: Long, deltaMs: Long) {
+        if (deltaMs <= 0L) return
+        val current = _listenDurationsMs.value
+        val updated = current + (trackId to ((current[trackId] ?: 0L) + deltaMs))
+        val json = JSONObject()
+        updated.forEach { (id, totalMs) -> json.put(id.toString(), totalMs) }
+        prefs.edit().putString(KEY_LISTEN_DURATIONS_MS, json.toString()).apply()
+        _listenDurationsMs.value = updated
+    }
+
+    override fun setLyricsTranslationLanguage(language: String) {
+        val normalized = language.trim().ifBlank { DEFAULT_LYRICS_TRANSLATION_LANGUAGE }
+        prefs.edit().putString(KEY_LYRICS_TRANSLATION_LANGUAGE, normalized).apply()
+        _lyricsTranslationLanguage.value = normalized
     }
 
     override fun setFolderExcluded(folder: String, excluded: Boolean) {
@@ -143,6 +167,22 @@ class SettingsRepositoryImpl @Inject constructor(
         }.getOrDefault(emptyMap())
     }
 
+    private fun loadListenDurationsMs(): Map<Long, Long> {
+        val raw = prefs.getString(KEY_LISTEN_DURATIONS_MS, null) ?: return emptyMap()
+        return runCatching {
+            val obj = JSONObject(raw)
+            buildMap {
+                val keys = obj.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val id = key.toLongOrNull() ?: continue
+                    val totalMs = obj.optLong(key, 0L)
+                    if (totalMs > 0L) put(id, totalMs)
+                }
+            }
+        }.getOrDefault(emptyMap())
+    }
+
     private fun loadExcludedFolders(): Set<String> {
         return prefs.getStringSet(KEY_EXCLUDED_FOLDERS, emptySet())?.toSet() ?: emptySet()
     }
@@ -179,6 +219,9 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_GEMINI_API_KEY = "gemini_api_key"
         const val KEY_FAVORITE_TRACK_IDS = "favorite_track_ids"
         const val KEY_PLAY_COUNTS = "play_counts"
+        const val KEY_LISTEN_DURATIONS_MS = "listen_durations_ms"
+        const val KEY_LYRICS_TRANSLATION_LANGUAGE = "lyrics_translation_language"
+        const val DEFAULT_LYRICS_TRANSLATION_LANGUAGE = "Azerbaijani"
         const val KEY_EXCLUDED_FOLDERS = "excluded_folders"
         const val KEY_METADATA_OVERRIDES = "metadata_overrides"
     }

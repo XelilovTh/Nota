@@ -84,7 +84,7 @@ fun HomeScreen(
     val favoriteTrackIds by viewModel.favoriteTrackIds.collectAsStateWithLifecycle()
     val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
     val mostPlayedTracks by viewModel.mostPlayedTracks.collectAsStateWithLifecycle()
-    val playCounts by viewModel.playCounts.collectAsStateWithLifecycle()
+    val listenDurationsMs by viewModel.listenDurationsMs.collectAsStateWithLifecycle()
     val activeTrackId = playbackState.track?.id
     val isScanning by libraryViewModel.isScanning.collectAsStateWithLifecycle()
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -325,7 +325,7 @@ fun HomeScreen(
                                     isPlaying = track.id == activeTrackId && playbackState.isPlaying,
                                     isFavorite = track.id in favoriteTrackIds,
                                     onToggleFavorite = { viewModel.toggleFavorite(track.id) },
-                                    playCount = playCounts[track.id],
+                                    listenDurationMs = listenDurationsMs[track.id] ?: 0L,
                                 ) {
                                     onPlayWithNotificationPermission { viewModel.playTracks(mostPlayedTracks, track) }
                                 }
@@ -363,7 +363,7 @@ internal fun CompactTrackRow(
     isPlaying: Boolean = false,
     isFavorite: Boolean = false,
     onToggleFavorite: (() -> Unit)? = null,
-    playCount: Int? = null,
+    listenDurationMs: Long? = null,
     onClick: () -> Unit,
 ) {
     GlassSurface(
@@ -394,9 +394,9 @@ internal fun CompactTrackRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (playCount != null && playCount > 0) {
+            if (listenDurationMs != null && listenDurationMs > 0L) {
                 Text(
-                    "${playCount}×",
+                    formatDuration(listenDurationMs),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(end = AppDimens.ElementSpacing),

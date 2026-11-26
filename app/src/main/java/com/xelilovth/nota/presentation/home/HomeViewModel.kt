@@ -30,13 +30,14 @@ class HomeViewModel @Inject constructor(
     val playbackState: StateFlow<PlaybackState> = playbackRepository.playbackState
     val favoriteTrackIds: StateFlow<Set<Long>> = settingsRepository.favoriteTrackIds
     val playCounts: StateFlow<Map<Long, Int>> = settingsRepository.playCounts
+    val listenDurationsMs: StateFlow<Map<Long, Long>> = settingsRepository.listenDurationsMs
     val favoriteTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.favoriteTrackIds) { libraryTracks, favIds ->
         libraryTracks.filter { it.id in favIds }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val mostPlayedTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.playCounts) { libraryTracks, counts ->
+    val mostPlayedTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.listenDurationsMs) { libraryTracks, durations ->
         libraryTracks
-            .filter { (counts[it.id] ?: 0) > 0 }
-            .sortedByDescending { counts[it.id] ?: 0 }
+            .filter { (durations[it.id] ?: 0L) > 0L }
+            .sortedByDescending { durations[it.id] ?: 0L }
             .take(10)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val recentlyPlayed: StateFlow<List<Track>> = combine(tracks, settingsRepository.recentTrackIds) { libraryTracks, recentIds ->

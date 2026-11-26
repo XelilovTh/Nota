@@ -96,8 +96,13 @@ class PlayerViewModelTest {
         }
     }
 
+    private class FakeLibraryRepository : com.xelilovth.nota.domain.repository.LibraryRepository {
+        override val tracks = MutableStateFlow(emptyList<Track>())
+        override suspend fun scan(): List<Track> = emptyList()
+    }
+
     private fun viewModel(repository: FakeRepository) = PlayerViewModel(
-        repository, FakeLyricsRepository(), FakeSettingsRepository(), PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+        repository, FakeLibraryRepository(), FakeLyricsRepository(), FakeSettingsRepository(), PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
         SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
         ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
     )
@@ -188,7 +193,7 @@ class PlayerViewModelTest {
         }
         val settingsRepository = FakeSettingsRepository()
         val viewModel = PlayerViewModel(
-            repository, lyricsRepository, settingsRepository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+            repository, FakeLibraryRepository(), lyricsRepository, settingsRepository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
             SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
             ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
         )
@@ -224,7 +229,7 @@ class PlayerViewModelTest {
         }
         val settingsRepository = FakeSettingsRepository()
         val viewModel = PlayerViewModel(
-            repository, lyricsRepository, settingsRepository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+            repository, FakeLibraryRepository(), lyricsRepository, settingsRepository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
             SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
             ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
         )

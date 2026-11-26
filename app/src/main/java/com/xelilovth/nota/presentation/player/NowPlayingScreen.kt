@@ -1,5 +1,10 @@
 package com.xelilovth.nota.presentation.player
 
+import android.app.Activity
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -28,6 +33,7 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -36,6 +42,7 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Settings
@@ -49,6 +56,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,8 +70,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -82,12 +89,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import com.xelilovth.nota.R
+import com.xelilovth.nota.domain.model.DeleteTrackResult
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
@@ -135,7 +144,9 @@ fun NowPlayingScreen(
     var lyricsExpanded by remember { mutableStateOf(false) }
     val lyricsUiState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    val translationLanguage by viewModel.translationLanguage.collectAsStateWithLifecycle()
     val favoriteTrackIds by viewModel.favoriteTrackIds.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var showGeminiKeyDialog by remember { mutableStateOf(false) }
     var pendingGeminiAction by remember { mutableStateOf<PendingGeminiAction?>(null) }
@@ -163,6 +174,26 @@ fun NowPlayingScreen(
     }
     var showQueueSheet by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
+    var showTrackMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var pendingDeleteTrackId by remember { mutableStateOf<Long?>(null) }
+    val deleteLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            pendingDeleteTrackId?.let { id ->
+                viewModel.confirmTrackDeleted(id)
+                Toast.makeText(context, "Track deleted", Toast.LENGTH_SHORT).show()
+                if (queueTracks.size > 1) {
+                    viewModel.next()
+                } else {
+                    viewModel.dismiss()
+                    onBack()
+                }
+            }
+        }
+        pendingDeleteTrackId = null
+    }
 
     Column(
         Modifier
@@ -238,8 +269,35 @@ fun NowPlayingScreen(
                         tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = { showAddToPlaylist = true }) {
-                    Icon(Icons.AutoMirrored.Outlined.PlaylistAdd, contentDescription = "Add to playlist")
+                Box {
+                    IconButton(onClick = { showTrackMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More options")
+                    }
+                    DropdownMenu(
+                        expanded = showTrackMenu,
+                        onDismissRequest = { showTrackMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Add to playlist") },
+                            leadingIcon = {
+                                Icon(Icons.AutoMirrored.Outlined.PlaylistAdd, contentDescription = null)
+                            },
+                            onClick = {
+                                showTrackMenu = false
+                                showAddToPlaylist = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete from device") },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                            },
+                            onClick = {
+                                showTrackMenu = false
+                                showDeleteConfirm = true
+                            },
+                        )
+                    }
                 }
             }
             IconButton(onClick = onSettings) {
@@ -337,17 +395,35 @@ fun NowPlayingScreen(
                 .weight(if (lyricsExpanded) 0.72f else 0.28f)
                 .pointerInput(lyricsExpanded, state.track?.id) {
                     if (!lyricsExpanded && state.track != null) {
-                        var dragDistance = 0f
+                        var upwardDrag = 0f
                         detectVerticalDragGestures(
                             onVerticalDrag = { change, dragAmount ->
-                                dragDistance += dragAmount
+                                if (dragAmount < 0f && dragOffsetY == 0f) {
+                                    upwardDrag += dragAmount
+                                } else if (dragAmount > 0f || dragOffsetY > 0f) {
+                                    upwardDrag = 0f
+                                    isDismissDragging = true
+                                    dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
+                                }
                                 change.consume()
                             },
                             onDragEnd = {
-                                if (dragDistance < -AppDimens.LyricsDragThreshold.toPx()) lyricsExpanded = true
-                                dragDistance = 0f
+                                if (dragOffsetY > 0f) {
+                                    val threshold = AppDimens.SwipeDismissThreshold.toPx()
+                                    val shouldDismiss = dragOffsetY > threshold
+                                    isDismissDragging = false
+                                    dragOffsetY = 0f
+                                    if (shouldDismiss) onBack()
+                                } else if (upwardDrag < -AppDimens.LyricsDragThreshold.toPx()) {
+                                    lyricsExpanded = true
+                                }
+                                upwardDrag = 0f
                             },
-                            onDragCancel = { dragDistance = 0f },
+                            onDragCancel = {
+                                upwardDrag = 0f
+                                isDismissDragging = false
+                                dragOffsetY = 0f
+                            },
                         )
                     }
                 },
@@ -371,6 +447,7 @@ fun NowPlayingScreen(
                         state = lyricsUiState,
                         positionMs = position,
                         isPlaying = state.isPlaying,
+                        translationLanguage = translationLanguage,
                         onCollapse = { lyricsExpanded = false },
                         onSeekTo = viewModel::seek,
                         onAdjustOffset = { delta ->
@@ -396,15 +473,30 @@ fun NowPlayingScreen(
                         onToggleTranslation = {
                             val track = state.track
                             if (track != null) {
-                                val hasTranslations = lyricsUiState.lyrics?.lines?.any {
-                                    !it.translatedText.isNullOrBlank()
-                                } == true
+                                val hasTranslations = lyricsUiState.lyrics?.translatedLanguage == translationLanguage &&
+                                    lyricsUiState.lyrics?.lines?.any { !it.translatedText.isNullOrBlank() } == true
                                 if (!lyricsUiState.showTranslation && !hasTranslations && geminiApiKey.isBlank()) {
                                     pendingGeminiAction = PendingGeminiAction.TRANSLATE
                                     showGeminiKeyDialog = true
                                 } else {
                                     viewModel.toggleLyricsTranslation(track)
                                 }
+                            }
+                        },
+                        onSelectTranslationLanguage = { language ->
+                            val track = state.track
+                            if (track != null) {
+                                val hasTranslationsForLang = lyricsUiState.lyrics?.translatedLanguage == language &&
+                                    lyricsUiState.lyrics?.lines?.any { !it.translatedText.isNullOrBlank() } == true
+                                if (!hasTranslationsForLang && geminiApiKey.isBlank()) {
+                                    viewModel.setTranslationLanguage(language, null)
+                                    pendingGeminiAction = PendingGeminiAction.TRANSLATE
+                                    showGeminiKeyDialog = true
+                                } else {
+                                    viewModel.setTranslationLanguage(language, track)
+                                }
+                            } else {
+                                viewModel.setTranslationLanguage(language, null)
                             }
                         },
                         modifier = Modifier.fillMaxSize(),
@@ -678,6 +770,68 @@ fun NowPlayingScreen(
             track = activeTrack,
             onDismiss = { showAddToPlaylist = false },
         )
+    }
+
+    if (showDeleteConfirm && activeTrack != null) {
+        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
+                ) {
+                    Text("Delete from device", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Delete \"${activeTrack.title}\" permanently from your device storage?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing, Alignment.End),
+                    ) {
+                        TextButton(onClick = { showDeleteConfirm = false }) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                showDeleteConfirm = false
+                                viewModel.deleteTrack(activeTrack.id) { res ->
+                                    when (res) {
+                                        is DeleteTrackResult.Deleted -> {
+                                            Toast.makeText(context, "Track deleted", Toast.LENGTH_SHORT).show()
+                                            if (queueTracks.size > 1) {
+                                                viewModel.next()
+                                            } else {
+                                                viewModel.dismiss()
+                                                onBack()
+                                            }
+                                        }
+                                        is DeleteTrackResult.RequiresPermission -> {
+                                            pendingDeleteTrackId = activeTrack.id
+                                            deleteLauncher.launch(
+                                                IntentSenderRequest.Builder(res.intentSender).build(),
+                                            )
+                                        }
+                                        is DeleteTrackResult.Failed -> {
+                                            Toast.makeText(context, "Could not delete track", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            },
+                        ) {
+                            Text("Delete")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     if (showGeminiKeyDialog) {

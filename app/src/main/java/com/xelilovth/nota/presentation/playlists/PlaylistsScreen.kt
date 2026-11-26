@@ -112,14 +112,14 @@ fun PlaylistsScreen(
                     title = "Favorites",
                     subtitle = "${favoriteTracks.size} tracks",
                     icon = if (favoriteTracks.isNotEmpty()) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    onClick = { viewModel.playTracks(favoriteTracks) },
+                    onClick = { onOpenPlaylist("smart:favorites") },
                 )
                 SmartCollectionCard(
                     modifier = Modifier.weight(1f),
                     title = "Most Played",
                     subtitle = "${mostPlayedTracks.size} tracks",
                     icon = Icons.Outlined.GraphicEq,
-                    onClick = { viewModel.playTracks(mostPlayedTracks) },
+                    onClick = { onOpenPlaylist("smart:most_played") },
                 )
             }
         }

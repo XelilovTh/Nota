@@ -7,7 +7,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +28,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Add
@@ -36,6 +39,8 @@ import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,13 +49,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -68,12 +78,14 @@ import com.xelilovth.nota.ui.theme.LocalGlassColors
 import java.util.Locale
 
 private const val OFFSET_STEP_MS = 500L
+private val TRANSLATION_LANGUAGES = listOf("English", "Russian", "Azerbaijani", "Turkish")
 
 @Composable
 internal fun LyricsPanel(
     state: LyricsUiState,
     positionMs: Long,
     isPlaying: Boolean,
+    translationLanguage: String,
     onCollapse: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onAdjustOffset: (Long) -> Unit,
@@ -81,6 +93,7 @@ internal fun LyricsPanel(
     onGenerateWithGemini: () -> Unit,
     onDeleteLyrics: () -> Unit,
     onToggleTranslation: () -> Unit,
+    onSelectTranslationLanguage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val showOffsetControls = state.lyrics != null &&
@@ -105,11 +118,13 @@ internal fun LyricsPanel(
                 canTranslate = canTranslate,
                 showTranslation = state.showTranslation,
                 isTranslating = state.isTranslating,
+                translationLanguage = translationLanguage,
                 onCollapse = onCollapse,
                 onAdjustOffset = onAdjustOffset,
                 onImportLyrics = onImportLyrics,
                 onDeleteLyrics = onDeleteLyrics,
                 onToggleTranslation = onToggleTranslation,
+                onSelectTranslationLanguage = onSelectTranslationLanguage,
             )
 
             when {
@@ -141,6 +156,7 @@ internal fun LyricsPanel(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LyricsHeader(
     syncOffsetMs: Long,
@@ -149,12 +165,16 @@ private fun LyricsHeader(
     canTranslate: Boolean,
     showTranslation: Boolean,
     isTranslating: Boolean,
+    translationLanguage: String,
     onCollapse: () -> Unit,
     onAdjustOffset: (Long) -> Unit,
     onImportLyrics: () -> Unit,
     onDeleteLyrics: () -> Unit,
     onToggleTranslation: () -> Unit,
+    onSelectTranslationLanguage: (String) -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
+    var showLanguageMenu by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -225,27 +245,63 @@ private fun LyricsHeader(
                 }
             }
             if (canTranslate) {
-                IconButton(
-                    onClick = onToggleTranslation,
-                    enabled = !isTranslating,
-                    modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
-                ) {
-                    if (isTranslating) {
-                        CircularProgressIndicator(
-                            strokeWidth = AppDimens.MiniPlayerProgressHeight,
-                            modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Outlined.Translate,
-                            contentDescription = "Translate lyrics",
-                            modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
-                            tint = if (showTranslation) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .size(AppDimens.LyricsToolbarButtonSize)
+                            .clip(CircleShape)
+                            .combinedClickable(
+                                enabled = !isTranslating,
+                                onClick = onToggleTranslation,
+                                onLongClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    showLanguageMenu = true
+                                },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isTranslating) {
+                            CircularProgressIndicator(
+                                strokeWidth = AppDimens.MiniPlayerProgressHeight,
+                                modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Outlined.Translate,
+                                contentDescription = "Translate lyrics",
+                                modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                                tint = if (showTranslation) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = showLanguageMenu,
+                        onDismissRequest = { showLanguageMenu = false },
+                    ) {
+                        TRANSLATION_LANGUAGES.forEach { language ->
+                            DropdownMenuItem(
+                                text = { Text(language) },
+                                trailingIcon = if (language == translationLanguage) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                                onClick = {
+                                    showLanguageMenu = false
+                                    onSelectTranslationLanguage(language)
+                                },
+                            )
+                        }
                     }
                 }
             }

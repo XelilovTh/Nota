@@ -3,6 +3,7 @@ package com.xelilovth.nota.data.repository
 import androidx.annotation.OptIn
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -50,6 +51,9 @@ class PlaybackRepositoryImpl @Inject constructor(
     private var fadeJob: Job? = null
     private var cachedMediaId: Long? = null
     private var cachedTrack: Track? = null
+    private var listeningTrackId: Long? = null
+    private var lastListeningTickMs: Long = 0L
+    private var accumulatedListenMs: Long = 0L
     @Volatile
     private var lyricsSyncActive = false
     @Volatile
@@ -60,6 +64,7 @@ class PlaybackRepositoryImpl @Inject constructor(
             if (isPlaying) {
                 startProgressUpdates()
             } else {
+                flushListeningTime(resetTick = true)
                 progressJob?.cancel()
                 fadeJob?.cancel()
                 player.volume = 1.0f
@@ -67,6 +72,7 @@ class PlaybackRepositoryImpl @Inject constructor(
             publishState()
         }
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            flushListeningTime(resetTick = !player.isPlaying)
             if (crossfadeSeconds > 0 && player.isPlaying) {
                 startFadeIn()
             } else if (player.volume != 1.0f) {
@@ -145,6 +151,7 @@ class PlaybackRepositoryImpl @Inject constructor(
     }
 
     override fun stopPlayback() {
+        flushListeningTime(resetTick = true)
         progressJob?.cancel()
         fadeJob?.cancel()
         player.volume = 1.0f
@@ -172,11 +179,64 @@ class PlaybackRepositoryImpl @Inject constructor(
     private fun startProgressUpdates() {
         if (progressJob?.isActive == true) return
         progressJob = scope.launch {
+            listeningTrackId = player.currentMediaItem?.mediaId?.toLongOrNull()
+            lastListeningTickMs = SystemClock.elapsedRealtime()
+            accumulatedListenMs = 0L
             while (isActive && player.isPlaying) {
+                accumulateAndMaybeFlushListeningTime()
                 updateCrossfadeVolume()
                 publishState()
                 delay(if (lyricsSyncActive) 50L else 250L)
             }
+        }
+    }
+
+    private fun accumulateAndMaybeFlushListeningTime() {
+        val now = SystemClock.elapsedRealtime()
+        val currentTrackId = player.currentMediaItem?.mediaId?.toLongOrNull()
+        if (listeningTrackId != null && listeningTrackId != currentTrackId) {
+            flushListeningTime(resetTick = false)
+            return
+        }
+        if (currentTrackId == null) {
+            listeningTrackId = null
+            lastListeningTickMs = now
+            accumulatedListenMs = 0L
+            return
+        }
+        if (listeningTrackId == null) {
+            listeningTrackId = currentTrackId
+            lastListeningTickMs = now
+            accumulatedListenMs = 0L
+            return
+        }
+        if (lastListeningTickMs > 0L) {
+            accumulatedListenMs += (now - lastListeningTickMs).coerceAtLeast(0L)
+        }
+        lastListeningTickMs = now
+        if (accumulatedListenMs >= LISTEN_FLUSH_THRESHOLD_MS) {
+            settingsRepository.addListenDuration(currentTrackId, accumulatedListenMs)
+            accumulatedListenMs = 0L
+        }
+    }
+
+    private fun flushListeningTime(resetTick: Boolean) {
+        val trackId = listeningTrackId
+        if (trackId != null && lastListeningTickMs > 0L) {
+            val now = SystemClock.elapsedRealtime()
+            val delta = (now - lastListeningTickMs).coerceAtLeast(0L)
+            val total = accumulatedListenMs + delta
+            if (total > 0L) {
+                settingsRepository.addListenDuration(trackId, total)
+            }
+        }
+        accumulatedListenMs = 0L
+        if (resetTick) {
+            lastListeningTickMs = 0L
+            listeningTrackId = null
+        } else {
+            lastListeningTickMs = SystemClock.elapsedRealtime()
+            listeningTrackId = player.currentMediaItem?.mediaId?.toLongOrNull()
         }
     }
 
@@ -237,6 +297,7 @@ class PlaybackRepositoryImpl @Inject constructor(
         .build()
 
     internal fun handlePlayerError(error: PlaybackException) {
+        flushListeningTime(resetTick = true)
         progressJob?.cancel()
         _playbackState.value = _playbackState.value.copy(
             isPlaying = false,
@@ -278,5 +339,9 @@ class PlaybackRepositoryImpl @Inject constructor(
             shuffle = player.shuffleModeEnabled,
             repeatMode = player.repeatMode,
         ).copy(errorMessage = _playbackState.value.errorMessage, queue = queue)
+    }
+
+    private companion object {
+        const val LISTEN_FLUSH_THRESHOLD_MS = 2_000L
     }
 }
