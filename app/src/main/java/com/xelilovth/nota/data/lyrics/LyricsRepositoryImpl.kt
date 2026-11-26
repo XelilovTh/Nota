@@ -430,6 +430,11 @@ class LyricsRepositoryImpl @Inject constructor(
                 LyricWord(text = wordText, startMs = wordStartMs, endMs = wordEndMs)
             }
             val translatedText = lineObj.optString("translatedText").takeUnless { it.isBlank() }
+            if (words.isEmpty()) {
+                LyricsParser.parseInlineWordLine(text, startMs, endMs)?.let { repaired ->
+                    return@mapNotNull repaired.copy(translatedText = translatedText)
+                }
+            }
             LyricLine(
                 text = text,
                 startMs = startMs,
@@ -439,10 +444,15 @@ class LyricsRepositoryImpl @Inject constructor(
             )
         }
         if (!instrumental && lines.isEmpty()) return null
+        val resolvedSyncType = if (lines.any { it.words.isNotEmpty() }) {
+            LyricsSyncType.WORD
+        } else {
+            syncType
+        }
         return TrackLyrics(
             lines = lines,
             source = source,
-            syncType = syncType,
+            syncType = resolvedSyncType,
             instrumental = instrumental,
             translatedLanguage = translatedLanguage,
         )

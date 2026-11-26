@@ -110,14 +110,14 @@ fun PlaylistsScreen(
                 SmartCollectionCard(
                     modifier = Modifier.weight(1f),
                     title = "Favorites",
-                    subtitle = "${favoriteTracks.size} tracks",
+                    subtitle = formatTrackCount(favoriteTracks.size),
                     icon = if (favoriteTracks.isNotEmpty()) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                     onClick = { onOpenPlaylist("smart:favorites") },
                 )
                 SmartCollectionCard(
                     modifier = Modifier.weight(1f),
                     title = "Most Played",
-                    subtitle = "${mostPlayedTracks.size} tracks",
+                    subtitle = formatTrackCount(mostPlayedTracks.size),
                     icon = Icons.Outlined.GraphicEq,
                     onClick = { onOpenPlaylist("smart:most_played") },
                 )
@@ -371,3 +371,5 @@ private fun CustomPlaylistRow(
         }
     }
 }
+
+private fun formatTrackCount(count: Int): String = "$count ${if (count == 1) "track" else "tracks"}"

@@ -348,4 +348,40 @@ class LyricsParserTest {
         assertEquals(2, trackLyrics.lines.size)
         assertEquals(2, trackLyrics.lines[0].words.size)
     }
+
+    @Test
+    fun parsesSquareBracketInlineWordTimestampsWithLeadingWord() {
+        val inlineLrc = """
+            |[01:17.98] Bir-birindən [01:18.08] də [01:18.58] gözəl
+            |[01:20.00] İkinci sətir
+        """.trimMargin()
+
+        val trackLyrics = LyricsParser.buildTrackLyrics(
+            plainLyrics = null,
+            syncedLyrics = inlineLrc,
+            lyricsFile = null,
+            hasWordSync = false,
+            durationMs = 90_000L,
+            source = LyricsSource.LRCLIB,
+        )!!
+
+        assertEquals(LyricsSyncType.WORD, trackLyrics.syncType)
+        assertEquals(2, trackLyrics.lines.size)
+
+        val firstLine = trackLyrics.lines[0]
+        assertEquals("Bir-birindən də gözəl", firstLine.text)
+        assertTrue(!firstLine.text.contains("[") && !firstLine.text.contains("]"))
+        assertEquals(77_980L, firstLine.startMs)
+        assertEquals(80_000L, firstLine.endMs)
+        assertEquals(3, firstLine.words.size)
+        assertEquals("Bir-birindən", firstLine.words[0].text)
+        assertEquals(77_980L, firstLine.words[0].startMs)
+        assertEquals(78_080L, firstLine.words[0].endMs)
+        assertEquals("də", firstLine.words[1].text)
+        assertEquals(78_080L, firstLine.words[1].startMs)
+        assertEquals(78_580L, firstLine.words[1].endMs)
+        assertEquals("gözəl", firstLine.words[2].text)
+        assertEquals(78_580L, firstLine.words[2].startMs)
+        assertEquals(80_000L, firstLine.words[2].endMs)
+    }
 }
