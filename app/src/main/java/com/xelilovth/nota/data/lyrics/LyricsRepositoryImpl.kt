@@ -1,7 +1,11 @@
 package com.xelilovth.nota.data.lyrics
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Base64
 import com.xelilovth.nota.di.IoDispatcher
 import com.xelilovth.nota.domain.model.LyricLine
@@ -293,6 +297,9 @@ class LyricsRepositoryImpl @Inject constructor(
             } ?: return@withContext null
 
             writeDiskCache(track.id, parsed)
+            if (!parsed.instrumental) {
+                saveGeminiLrcFile(track, cleaned)
+            }
             cache[track.id] = CachedLyrics(parsed, System.currentTimeMillis())
             parsed
         }
@@ -880,8 +887,59 @@ class LyricsRepositoryImpl @Inject constructor(
         }
     }
 
+    private fun saveGeminiLrcFile(track: Track, lrcContent: String) {
+        val fileName = "${buildLrcBaseName(track)}.lrc"
+        runCatching {
+            val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
+            val lrcDir = File(baseDir, GEMINI_LYRICS_DIR)
+            if (!lrcDir.exists()) lrcDir.mkdirs()
+            File(lrcDir, fileName).writeText(lrcContent, Charsets.UTF_8)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            runCatching {
+                val resolver = context.contentResolver
+                val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
+                val selectionArgs = arrayOf("$PUBLIC_LYRICS_RELATIVE_PATH%", fileName)
+                resolver.delete(collection, selection, selectionArgs)
+
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, PUBLIC_LYRICS_RELATIVE_PATH)
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+                val itemUri = resolver.insert(collection, values) ?: return@runCatching
+                try {
+                    resolver.openOutputStream(itemUri)?.use { output ->
+                        output.write(lrcContent.toByteArray(Charsets.UTF_8))
+                    } ?: throw IOException("Failed to open MediaStore output stream")
+                    val doneValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    }
+                    resolver.update(itemUri, doneValues, null, null)
+                } catch (t: Throwable) {
+                    resolver.delete(itemUri, null, null)
+                    throw t
+                }
+            }
+        }
+    }
+
+    private fun buildLrcBaseName(track: Track): String {
+        val safeArtist = sanitizeFileName(track.artist)
+        val safeTitle = sanitizeFileName(track.title)
+        val combined = listOf(safeArtist, safeTitle).filter { it.isNotBlank() }.joinToString(" - ")
+        return combined.ifBlank { "track_${track.id}" }.take(80)
+    }
+
+    private fun sanitizeFileName(raw: String): String =
+        raw.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim()
+
     private companion object {
         const val LYRICS_CACHE_DIR = "lyrics_cache"
+        const val GEMINI_LYRICS_DIR = "gemini_lyrics"
+        val PUBLIC_LYRICS_RELATIVE_PATH = "${Environment.DIRECTORY_DOCUMENTS}/Nota/Lyrics"
         const val OFFSETS_PREFS_NAME = "nota_lyrics_offsets"
         const val CONNECT_TIMEOUT_MS = 5_000
         const val READ_TIMEOUT_MS = 7_000
