@@ -1,44 +1,94 @@
 # Nota
 
-**Nota** is a modern offline-first Android music player built with Kotlin, Jetpack Compose, Media3 (ExoPlayer), and a custom Liquid Glass UI.
+**Nota** is an Android music player that brings your local music library and online music discovery together in one place. It is built with Kotlin, Jetpack Compose, AndroidX Media3, and a custom Liquid Glass interface.
 
-## Key Features
-- **Local Audio Library**: MediaStore scanning, search, metadata overrides, track deletion, and quick-play/shuffle.
-- **Media3 Playback**: Background `MediaSessionService`, gapless/exact MP3 seeking (`SeekParameters.EXACT`), queue management, repeat/shuffle modes, and widget support (`NotaWidgetProvider`).
-- **Smart & Custom Playlists**: Custom user playlists plus auto-playlists for **Favorites** and **Most Played** (ranked by cumulative listening time).
-- **Synced & Word-Level Lyrics**:
-  - Embedded tags, local `.lrc` import, and online lookup (`BetterLyrics` TTML, `LRCLIB`, `lyrics.ovh`).
-  - **Gemini Audio Transcription**: Optional Gemini API key (`gemini-2.5-flash`) to transcribe songs into Enhanced LRC with word-by-word sync.
-  - **Multi-Tier Offline-Cached Translation**: Translates lyrics into **English**, **Russian**, **Azerbaijani**, or **Turkish** via Google Translate (`gtx`) -> Lingva -> MyMemory with rate-limit throttling and persistent per-language caching (no Gemini quota spent).
-- **Liquid Glass UI**: Floating `MiniPlayer`, `LiquidGlassBottomBar` with drag-to-switch lens physics, `BreathingAmbientBackground`, modal `NowPlayingScreen`, and glass dialogs/sheets.
-- **Sleep Timer**: Configurable countdown timer integrated with playback.
+> **Current release: v0.3.0**
+> Android 8.0 (API 26) and newer.
 
-## Tech Stack
-- **Language / UI**: Kotlin, Jetpack Compose (Material 3)
-- **Media**: AndroidX Media3 (`ExoPlayer`, `MediaSessionService`)
-- **DI**: Hilt (`dagger.hilt.android`)
-- **Navigation**: Navigation Compose (`AppRoute`) + Modal `NowPlayingScreen` overlay
-- **Build**: Gradle Kotlin DSL + Version Catalog, `minSdk 26` / `targetSdk 35`, JDK 17
+## Features
 
-## Project Structure
-- `data/` — MediaStore scanner, Media3 player/service, `LyricsParser`, `LyricsRepositoryImpl`, repositories
-- `domain/` — Domain models (`Track`, `TrackLyrics`, `PlaybackState`, `AutoPlaylist`, `CustomPlaylist`) & use cases
-- `presentation/` — `NotaApp`, `HomeScreen`, `PlaylistsScreen`, `SearchScreen`, `LibraryScreen`, `NowPlayingScreen`, `SettingsScreen`, `SleepTimerScreen`, ViewModels
-- `ui/theme/` — **Single source of truth** for colors, typography, shapes, and dimensions (`Dimens.kt`, `Color.kt`, `Type.kt`, `Shape.kt`, `Theme.kt`)
-- `ui/components/` — Reusable `GlassSurface`, `GlassDialog`, `LiquidGlassBottomBar`, `TrackArtwork`
-- `di/` — Hilt modules
-- `widget/` — Home screen music widget (`NotaWidgetProvider`)
+### Music playback
+- Scan and play audio stored on your device with Android MediaStore.
+- Background playback through Media3 `MediaSessionService`, with notification and lock-screen controls.
+- Queue management, play/pause, next/previous, shuffle, repeat, and precise seeking.
+- Home-screen playback widget.
+- Sleep timer.
 
-## Documentation for Developers & AI Agents
-- [[AGENTS|AGENTS.md]] — Mandatory playbook for AI coding agents
-- [[PROJECT_RULES|PROJECT_RULES.md]] — Engineering rules, quality gates, and Git/CI rules
-- [[docs/ARCHITECTURE|ARCHITECTURE.md]] — Detailed architecture, data flows, and guardrails
-- [[docs/DESIGN_SYSTEM|DESIGN_SYSTEM.md]] — Liquid Glass & `ui/theme/` token reference
+### Online music
+- Search for online music and stream audio through NewPipe Extractor, with Piped instances as a fallback.
+- Save online tracks for offline listening.
+- Choose app-private storage or your public Music folder for offline downloads.
+- Track download progress and manage saved tracks.
 
-## Build & CI
+### Library and playlists
+- Search your local library.
+- Create and manage custom playlists.
+- Favorites and Most Played smart playlists.
+- Recently Played tracking.
+
+### Lyrics and translation
+- Read embedded lyrics, import local `.lrc` files, and look up synced lyrics online through supported providers.
+- Generate word-timed lyrics from downloaded audio with **Gemini** or **Groq Whisper** (an API key from the selected provider is required).
+- Translate lyrics into English, Russian, Azerbaijani, or Turkish using the app's online translation fallback services.
+
+### Interface
+- Dark-first monochrome visual identity and the Nota adaptive launcher icon.
+- Liquid Glass surfaces, floating mini-player, and animated bottom navigation.
+- System, light, and dark theme support.
+
+## Download
+
+Get the latest APK from [GitHub Releases](https://github.com/XelilovTh/Nota/releases).
+
+For this version, download **Nota-v0.3.0.apk** from the [v0.3.0 release page](https://github.com/XelilovTh/Nota/releases/tag/v0.3.0).
+
+To install manually:
+1. Download the APK to your Android device.
+2. Allow your browser or file manager to install apps from that source if Android asks.
+3. Open the downloaded APK and follow the installation steps.
+
+## Optional AI lyrics setup
+
+AI transcription is optional. To generate word-synchronized lyrics:
+1. Open Nota's lyrics controls while playing a downloaded track.
+2. Select Gemini or Groq Whisper.
+3. Add your own API key for the selected provider when prompted.
+
+API keys are user-provided inside the app. Do not commit API keys or other credentials to this repository.
+
+## Tech stack
+
+- **Language:** Kotlin
+- **UI:** Jetpack Compose, Material 3, Haze
+- **Playback:** AndroidX Media3 / ExoPlayer and MediaSession
+- **Architecture:** Clean Architecture, MVVM, Hilt
+- **Online extraction:** NewPipe Extractor with Piped fallback
+- **Build:** Gradle Kotlin DSL, Version Catalog, JDK 17
+- **Android:** minSdk 26, targetSdk 35
+
+## Project structure
+
+- `data/` — MediaStore, playback service, online music, lyrics, and repository implementations.
+- `domain/` — Models, repository contracts, and use cases.
+- `presentation/` — Compose screens and ViewModels.
+- `ui/theme/` — Centralized colors, typography, shapes, and dimensions.
+- `ui/components/` — Reusable glass components and playback UI.
+- `di/` — Hilt dependency-injection modules.
+- `widget/` — Android home-screen music widget.
+
+## Build and verification
+
+Build, lint, and test commands:
+
 ```bash
 ./gradlew --no-daemon assembleDebug
 ./gradlew --no-daemon lint
 ./gradlew --no-daemon testDebugUnitTest
+./gradlew --no-daemon assembleRelease
 ```
-GitHub Actions (`.github/workflows/android-build.yml`) runs debug build, lint, unit tests, and signed release APK verification on every `push` and `pull_request` to any branch.
+
+GitHub Actions runs the debug build, lint, unit tests, signed release build, and APK signature verification on pushes and pull requests. Build artifacts and reports are available from the [Actions page](https://github.com/XelilovTh/Nota/actions).
+
+## License
+
+No license has been specified for this repository yet. All rights remain with the project owner unless a license is added.
