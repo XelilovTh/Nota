@@ -34,6 +34,8 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -57,6 +59,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -165,6 +168,8 @@ fun NowPlayingScreen(
     val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
     val translationLanguage by viewModel.translationLanguage.collectAsStateWithLifecycle()
     val favoriteTrackIds by viewModel.favoriteTrackIds.collectAsStateWithLifecycle()
+    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
+    val downloadedOnlineIds by viewModel.downloadedOnlineIds.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var showGeminiKeyDialog by remember { mutableStateOf(false) }
@@ -256,6 +261,36 @@ fun NowPlayingScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             if (state.track != null) {
+                if (state.track.isOnline) {
+                    val isDownloaded = state.track.onlineId != null && state.track.onlineId in downloadedOnlineIds
+                    val progress = downloadProgress[state.track.id]
+                    IconButton(
+                        enabled = progress == null && !isDownloaded,
+                        onClick = {
+                            viewModel.downloadTrackForOffline(state.track) { result ->
+                                val msg = if (result.isSuccess) {
+                                    "Saved for offline listening"
+                                } else {
+                                    "Offline download failed"
+                                }
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                    ) {
+                        if (progress != null) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                strokeWidth = AppDimens.BorderWidth,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (isDownloaded) Icons.Filled.DownloadDone else Icons.Outlined.DownloadForOffline,
+                                contentDescription = if (isDownloaded) "Saved offline" else "Save for offline",
+                                tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
                 val isFavorite = state.track.id in favoriteTrackIds
                 IconButton(onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1003,6 +1038,7 @@ private fun CircularArcPlayerArt(
             TrackArtwork(
                 trackId = track?.id,
                 trackUri = track?.uri,
+                artworkUrl = track?.artworkUrl,
                 modifier = Modifier.fillMaxSize(),
                 shape = CircleShape,
                 iconPadding = AppDimens.ScreenPadding,

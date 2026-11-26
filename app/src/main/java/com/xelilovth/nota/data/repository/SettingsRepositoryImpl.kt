@@ -2,6 +2,7 @@ package com.xelilovth.nota.data.repository
 
 import android.content.Context
 import com.xelilovth.nota.domain.model.AppSettings
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.domain.model.TrackMetadataOverride
 import com.xelilovth.nota.domain.repository.SettingsRepository
@@ -54,6 +55,17 @@ class SettingsRepositoryImpl @Inject constructor(
     override fun setCrossfadeSeconds(seconds: Int) {
         prefs.edit().putInt(KEY_CROSSFADE_SECONDS, seconds).apply()
         _settings.value = _settings.value.copy(crossfadeSeconds = seconds)
+    }
+
+    override fun setOfflineStorageLocation(location: OfflineStorageLocation) {
+        prefs.edit().putString(KEY_OFFLINE_STORAGE_LOCATION, location.name).apply()
+        _settings.value = _settings.value.copy(offlineStorageLocation = location)
+    }
+
+    override fun setStreamCacheSizeMb(sizeMb: Int) {
+        val coerced = sizeMb.coerceIn(100, 2048)
+        prefs.edit().putInt(KEY_STREAM_CACHE_SIZE_MB, coerced).apply()
+        _settings.value = _settings.value.copy(streamCacheSizeMb = coerced)
     }
 
     override fun addRecentTrack(trackId: Long) {
@@ -129,10 +141,16 @@ class SettingsRepositoryImpl @Inject constructor(
         val themeMode = ThemeMode.entries.firstOrNull { it.name == themeName } ?: ThemeMode.SYSTEM
         val hideShort = prefs.getBoolean(KEY_HIDE_SHORT_TRACKS, true)
         val crossfadeSeconds = prefs.getInt(KEY_CROSSFADE_SECONDS, 0)
+        val storageName = prefs.getString(KEY_OFFLINE_STORAGE_LOCATION, OfflineStorageLocation.APP_INTERNAL.name)
+        val storageLocation = OfflineStorageLocation.entries.firstOrNull { it.name == storageName }
+            ?: OfflineStorageLocation.APP_INTERNAL
+        val streamCacheSizeMb = prefs.getInt(KEY_STREAM_CACHE_SIZE_MB, 500)
         return AppSettings(
             themeMode = themeMode,
             hideShortTracks = hideShort,
             crossfadeSeconds = crossfadeSeconds,
+            offlineStorageLocation = storageLocation,
+            streamCacheSizeMb = streamCacheSizeMb,
         )
     }
 
@@ -224,5 +242,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val DEFAULT_LYRICS_TRANSLATION_LANGUAGE = "Azerbaijani"
         const val KEY_EXCLUDED_FOLDERS = "excluded_folders"
         const val KEY_METADATA_OVERRIDES = "metadata_overrides"
+        const val KEY_OFFLINE_STORAGE_LOCATION = "offline_storage_location"
+        const val KEY_STREAM_CACHE_SIZE_MB = "stream_cache_size_mb"
     }
 }

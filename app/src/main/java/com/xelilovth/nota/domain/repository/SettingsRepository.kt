@@ -1,6 +1,7 @@
 package com.xelilovth.nota.domain.repository
 
 import com.xelilovth.nota.domain.model.AppSettings
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.domain.model.TrackMetadataOverride
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,8 @@ interface SettingsRepository {
     fun setThemeMode(mode: ThemeMode)
     fun setHideShortTracks(hide: Boolean)
     fun setCrossfadeSeconds(seconds: Int) = Unit
+    fun setOfflineStorageLocation(location: OfflineStorageLocation) = Unit
+    fun setStreamCacheSizeMb(sizeMb: Int) = Unit
     fun addRecentTrack(trackId: Long)
     fun setGeminiApiKey(key: String) = Unit
     fun toggleFavorite(trackId: Long) = Unit

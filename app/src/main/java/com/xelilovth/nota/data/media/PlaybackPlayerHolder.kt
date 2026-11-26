@@ -1,7 +1,7 @@
 package com.xelilovth.nota.data.media
 
-import androidx.annotation.OptIn
 import android.content.Context
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
@@ -19,8 +19,9 @@ object PlaybackPlayerHolder {
             val appContext = context.applicationContext
             val extractorsFactory = DefaultExtractorsFactory()
                 .setConstantBitrateSeekingEnabled(true)
+            val dataSourceFactory = StreamCacheHolder.createDataSourceFactory(appContext)
             ExoPlayer.Builder(appContext)
-                .setMediaSourceFactory(DefaultMediaSourceFactory(appContext, extractorsFactory))
+                .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory))
                 .setWakeMode(C.WAKE_MODE_LOCAL)
                 .build()
                 .apply {

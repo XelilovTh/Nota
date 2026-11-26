@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.xelilovth.nota.data.media.SleepTimerManager
 import com.xelilovth.nota.domain.model.AppSettings
 import com.xelilovth.nota.domain.model.DeleteTrackResult
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.LibraryRepository
@@ -44,6 +45,12 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setFolderExcluded(folder, excluded)
 
     fun setCrossfadeSeconds(seconds: Int) = settingsRepository.setCrossfadeSeconds(seconds)
+
+    fun setOfflineStorageLocation(location: OfflineStorageLocation) =
+        settingsRepository.setOfflineStorageLocation(location)
+
+    fun setStreamCacheSizeMb(sizeMb: Int) =
+        settingsRepository.setStreamCacheSizeMb(sizeMb)
 
     fun setGeminiApiKey(key: String) = settingsRepository.setGeminiApiKey(key.trim())
 

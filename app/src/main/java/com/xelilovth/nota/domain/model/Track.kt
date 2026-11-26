@@ -1,6 +1,8 @@
 package com.xelilovth.nota.domain.model
 
+import androidx.compose.runtime.Immutable
 
+@Immutable
 data class Track(
     val id: Long,
     val uri: String,
@@ -9,4 +11,7 @@ data class Track(
     val album: String,
     val durationMs: Long,
     val folder: String,
+    val isOnline: Boolean = false,
+    val onlineId: String? = null,
+    val artworkUrl: String? = null,
 )

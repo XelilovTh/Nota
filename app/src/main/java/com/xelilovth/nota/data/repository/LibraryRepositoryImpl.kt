@@ -9,6 +9,7 @@ import com.xelilovth.nota.data.media.AudioScanner
 import com.xelilovth.nota.domain.model.DeleteTrackResult
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.LibraryRepository
+import com.xelilovth.nota.domain.repository.OnlineMusicRepository
 import com.xelilovth.nota.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,7 +29,13 @@ class LibraryRepositoryImpl @Inject constructor(
     private val scanner: AudioScanner,
     private val settingsRepository: SettingsRepository,
     @ApplicationContext private val context: Context,
+    private val onlineMusicRepository: OnlineMusicRepository?,
 ) : LibraryRepository {
+    constructor(
+        scanner: AudioScanner,
+        settingsRepository: SettingsRepository,
+        context: Context,
+    ) : this(scanner, settingsRepository, context, null)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var rawTracks: List<Track> = emptyList()
     private val _tracks = MutableStateFlow<List<Track>>(emptyList())
@@ -42,7 +50,8 @@ class LibraryRepositoryImpl @Inject constructor(
                 settingsRepository.settings,
                 settingsRepository.excludedFolders,
                 settingsRepository.metadataOverrides,
-            ) { _, _, _ -> }.collect {
+                onlineMusicRepository?.offlineTracks ?: flowOf(emptyList()),
+            ) { _, _, _, _ -> }.collect {
                 publishFilteredTracks()
             }
         }
@@ -55,6 +64,12 @@ class LibraryRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteTrack(trackId: Long): DeleteTrackResult {
+        val offlineMatch = onlineMusicRepository?.offlineTracks?.value?.firstOrNull { it.id == trackId }
+        if (offlineMatch != null) {
+            onlineMusicRepository.removeOfflineTrack(offlineMatch)
+            publishFilteredTracks()
+            return DeleteTrackResult.Deleted
+        }
         val track = rawTracks.firstOrNull { it.id == trackId } ?: return DeleteTrackResult.Failed
         val uri = Uri.parse(track.uri)
         return try {
@@ -94,8 +109,11 @@ class LibraryRepositoryImpl @Inject constructor(
         val settings = settingsRepository.settings.value
         val excludedFolders = settingsRepository.excludedFolders.value
         val overrides = settingsRepository.metadataOverrides.value
+        val offlineTracks = onlineMusicRepository?.offlineTracks?.value.orEmpty()
+        val seenUris = rawTracks.mapTo(HashSet()) { it.uri }
+        val mergedRaw = rawTracks + offlineTracks.filterNot { it.uri in seenUris }
 
-        val filtered = rawTracks
+        val filtered = mergedRaw
             .let { list ->
                 if (settings.hideShortTracks) {
                     list.filter { it.durationMs >= SHORT_TRACK_THRESHOLD_MS }

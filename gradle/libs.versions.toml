@@ -16,6 +16,8 @@ robolectric = "4.14.1"
 media3 = "1.5.1"
 haze = "1.6.10"
 snakeyaml = "2.4"
+newpipeExtractor = "v0.27.1"
+desugarJdkLibs = "2.1.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -40,6 +42,8 @@ media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", versi
 media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
 haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
 snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
+newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version.ref = "newpipeExtractor" }
+desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs_nio", version.ref = "desugarJdkLibs" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

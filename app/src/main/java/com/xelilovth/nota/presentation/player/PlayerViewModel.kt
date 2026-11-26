@@ -6,6 +6,7 @@ import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.TrackLyrics
 import com.xelilovth.nota.domain.repository.LibraryRepository
+import com.xelilovth.nota.domain.repository.OnlineMusicRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.repository.LyricsRepository
 import com.xelilovth.nota.domain.repository.SettingsRepository
@@ -40,11 +41,43 @@ class PlayerViewModel @Inject constructor(
     private val seekToUseCase: SeekToUseCase,
     private val toggleShuffleUseCase: ToggleShuffleUseCase,
     private val cycleRepeatModeUseCase: CycleRepeatModeUseCase,
+    private val onlineMusicRepository: OnlineMusicRepository?,
 ) : ViewModel() {
+    constructor(
+        repository: PlaybackRepository,
+        libraryRepository: LibraryRepository,
+        lyricsRepository: LyricsRepository,
+        settingsRepository: SettingsRepository,
+        playTrack: PlayTrackUseCase,
+        togglePlayPauseUseCase: TogglePlayPauseUseCase,
+        skipNextUseCase: SkipNextUseCase,
+        skipPreviousUseCase: SkipPreviousUseCase,
+        seekToUseCase: SeekToUseCase,
+        toggleShuffleUseCase: ToggleShuffleUseCase,
+        cycleRepeatModeUseCase: CycleRepeatModeUseCase,
+    ) : this(
+        repository,
+        libraryRepository,
+        lyricsRepository,
+        settingsRepository,
+        playTrack,
+        togglePlayPauseUseCase,
+        skipNextUseCase,
+        skipPreviousUseCase,
+        seekToUseCase,
+        toggleShuffleUseCase,
+        cycleRepeatModeUseCase,
+        null,
+    )
+
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
     val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
     val translationLanguage: StateFlow<String> = settingsRepository.lyricsTranslationLanguage
     val favoriteTrackIds: StateFlow<Set<Long>> = settingsRepository.favoriteTrackIds
+    val downloadProgress: StateFlow<Map<Long, Int>> =
+        onlineMusicRepository?.downloadProgress ?: MutableStateFlow(emptyMap())
+    val downloadedOnlineIds: StateFlow<Set<String>> =
+        onlineMusicRepository?.downloadedOnlineIds ?: MutableStateFlow(emptySet())
     private val _lyricsState = MutableStateFlow(LyricsUiState())
     val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
     private var lyricsJob: Job? = null
@@ -249,6 +282,14 @@ class PlayerViewModel @Inject constructor(
 
     fun confirmTrackDeleted(trackId: Long) {
         libraryRepository.onTrackDeletedFromDevice(trackId)
+    }
+
+    fun downloadTrackForOffline(track: Track, onResult: (Result<Track>) -> Unit) {
+        val repo = onlineMusicRepository ?: return
+        viewModelScope.launch {
+            val location = settingsRepository.settings.value.offlineStorageLocation
+            onResult(repo.downloadForOffline(track, location))
+        }
     }
     fun onRowClick(track: Track, libraryTracks: List<Track>) {
         val queue = if (libraryTracks.any { it.id == track.id }) libraryTracks else listOf(track)

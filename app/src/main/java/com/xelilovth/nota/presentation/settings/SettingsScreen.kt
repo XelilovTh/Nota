@@ -58,6 +58,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.R
 import com.xelilovth.nota.domain.model.DeleteTrackResult
+import com.xelilovth.nota.data.media.StreamCacheHolder
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.formatDuration
@@ -348,6 +350,125 @@ fun SettingsScreen(
                             Icons.Outlined.Key,
                             contentDescription = stringResource(R.string.lyrics_gemini_key_title),
                         )
+                    }
+                }
+            }
+        }
+
+        item {
+            SectionLabel("Online & Offline Storage")
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
+            ) {
+                var cacheBytes by remember { mutableStateOf(StreamCacheHolder.getCacheSizeBytes(context)) }
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(AppDimens.CardPadding),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        Text("Offline download location", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (settings.offlineStorageLocation == OfflineStorageLocation.PUBLIC_MUSIC) {
+                                "Saved to Music/Nota on device storage"
+                            } else {
+                                "Saved privately inside Nota"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                        ) {
+                            listOf(
+                                OfflineStorageLocation.APP_INTERNAL to "App Internal",
+                                OfflineStorageLocation.PUBLIC_MUSIC to "Music / Nota",
+                            ).forEach { (location, label) ->
+                                val selected = settings.offlineStorageLocation == location
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { viewModel.setOfflineStorageLocation(location) },
+                                    border = null,
+                                    label = {
+                                        Text(
+                                            label,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(AppDimens.CardPadding),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        Text("Stream cache limit", style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                        ) {
+                            listOf(250 to "250 MB", 500 to "500 MB", 1024 to "1 GB").forEach { (sizeMb, label) ->
+                                val selected = settings.streamCacheSizeMb == sizeMb
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { viewModel.setStreamCacheSizeMb(sizeMb) },
+                                    border = null,
+                                    label = {
+                                        Text(
+                                            label,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                StreamCacheHolder.clearCache(context)
+                                cacheBytes = StreamCacheHolder.getCacheSizeBytes(context)
+                                Toast.makeText(context, "Stream cache cleared", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(AppDimens.CardPadding),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Clear stream cache", style = MaterialTheme.typography.titleMedium)
+                            val cacheMb = cacheBytes / (1024L * 1024L)
+                            Text(
+                                "Currently using $cacheMb MB",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "Clear stream cache")
                     }
                 }
             }
