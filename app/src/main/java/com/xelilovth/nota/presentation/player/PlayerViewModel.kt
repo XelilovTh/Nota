@@ -21,6 +21,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
@@ -37,9 +39,27 @@ class PlayerViewModel @Inject constructor(
 ) : ViewModel() {
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
     val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
+    val favoriteTrackIds: StateFlow<Set<Long>> = settingsRepository.favoriteTrackIds
     private val _lyricsState = MutableStateFlow(LyricsUiState())
     val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
     private var lyricsJob: Job? = null
+    private var lastCountedTrackId: Long? = null
+
+    init {
+        viewModelScope.launch {
+            playbackState
+                .map { it.track?.id to it.isPlaying }
+                .distinctUntilChanged()
+                .collect { (trackId, isPlaying) ->
+                    if (isPlaying && trackId != null && trackId != lastCountedTrackId) {
+                        lastCountedTrackId = trackId
+                        settingsRepository.incrementPlayCount(trackId)
+                    }
+                }
+        }
+    }
+
+    fun toggleFavorite(trackId: Long) = settingsRepository.toggleFavorite(trackId)
 
     fun loadLyrics(track: Track) {
         val current = _lyricsState.value
@@ -141,6 +161,35 @@ class PlayerViewModel @Inject constructor(
         _lyricsState.value = current.copy(syncOffsetMs = updatedOffset)
         viewModelScope.launch {
             lyricsRepository.setSyncOffsetMs(trackId, updatedOffset)
+        }
+    }
+
+    fun toggleLyricsTranslation(track: Track, apiKeyOverride: String? = null) {
+        val current = _lyricsState.value
+        val currentLyrics = current.lyrics ?: return
+        if (current.isTranslating) return
+        if (current.showTranslation) {
+            _lyricsState.value = current.copy(showTranslation = false)
+            return
+        }
+        if (currentLyrics.lines.any { !it.translatedText.isNullOrBlank() }) {
+            _lyricsState.value = current.copy(showTranslation = true)
+            return
+        }
+        val key = (apiKeyOverride ?: geminiApiKey.value).trim()
+        if (key.isBlank()) return
+        _lyricsState.value = current.copy(isTranslating = true, errorMessage = null)
+        viewModelScope.launch {
+            val translated = runCatching { lyricsRepository.translateLyrics(track, currentLyrics, key) }.getOrNull()
+            if (_lyricsState.value.trackId == track.id) {
+                val latest = _lyricsState.value
+                _lyricsState.value = latest.copy(
+                    lyrics = translated ?: latest.lyrics,
+                    showTranslation = translated != null,
+                    isTranslating = false,
+                    errorMessage = if (translated == null) "Could not translate lyrics" else null,
+                )
+            }
         }
     }
     fun onRowClick(track: Track, libraryTracks: List<Track>) {

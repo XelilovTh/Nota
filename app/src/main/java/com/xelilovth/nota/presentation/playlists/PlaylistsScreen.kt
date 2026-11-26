@@ -14,9 +14,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -53,6 +56,8 @@ fun PlaylistsScreen(
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val customPlaylists by viewModel.customPlaylists.collectAsStateWithLifecycle()
     val hiddenAutoGroupIds by viewModel.hiddenAutoGroupIds.collectAsStateWithLifecycle()
+    val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
+    val mostPlayedTracks by viewModel.mostPlayedTracks.collectAsStateWithLifecycle()
     val groups = remember(tracks, hiddenAutoGroupIds) { groupTracksIntoPlaylists(tracks).filterNot { it.id in hiddenAutoGroupIds } }
     val userPlaylists = customPlaylists.filter { it.type == PlaylistCollectionType.PLAYLIST }
     val userCollections = customPlaylists.filter { it.type != PlaylistCollectionType.PLAYLIST }
@@ -94,6 +99,28 @@ fun PlaylistsScreen(
                 IconButton(onClick = { showCreateMenu = true }) {
                     Icon(Icons.Filled.Add, contentDescription = "Create playlist or album")
                 }
+            }
+        }
+
+        item(key = "smart_collections") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+            ) {
+                SmartCollectionCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Favorites",
+                    subtitle = "${favoriteTracks.size} tracks",
+                    icon = if (favoriteTracks.isNotEmpty()) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    onClick = { viewModel.playTracks(favoriteTracks) },
+                )
+                SmartCollectionCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Most Played",
+                    subtitle = "${mostPlayedTracks.size} tracks",
+                    icon = Icons.Outlined.GraphicEq,
+                    onClick = { viewModel.playTracks(mostPlayedTracks) },
+                )
             }
         }
 
@@ -225,6 +252,50 @@ fun PlaylistsScreen(
                 deleteTarget = null
             },
         )
+    }
+}
+
+@Composable
+private fun SmartCollectionCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+) {
+    GlassSurface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        subtle = false,
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(AppDimens.IconSizeMedium),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 

@@ -78,4 +78,11 @@ object AppDimens {
     val LyricsHeaderHeight = 48.dp
     val LyricsEdgeFadeHeight = 28.dp
     val LyricsScrubberHeight = 20.dp
+
+    val VisualizerWidth = 44.dp
+    val VisualizerHeight = 18.dp
+    val VisualizerBarWidth = 3.dp
+    val VisualizerBarSpacing = 3.dp
+    val SwipeDismissThreshold = 140.dp
+    val AmbientArtworkBlur = 48.dp
 }

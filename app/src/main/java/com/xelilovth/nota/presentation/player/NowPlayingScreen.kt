@@ -22,9 +22,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.animation.AnimatedContent
@@ -75,7 +78,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,6 +91,7 @@ import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
+import com.xelilovth.nota.ui.components.AudioWaveformVisualizer
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
@@ -97,6 +104,11 @@ import kotlin.math.sin
 
 private const val ARC_START_ANGLE = 135f
 private const val ARC_SWEEP_ANGLE = 270f
+
+private enum class PendingGeminiAction {
+    TRANSCRIBE,
+    TRANSLATE,
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +134,18 @@ fun NowPlayingScreen(
     var lyricsExpanded by remember { mutableStateOf(false) }
     val lyricsUiState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    val favoriteTrackIds by viewModel.favoriteTrackIds.collectAsStateWithLifecycle()
+    val haptic = LocalHapticFeedback.current
     var showGeminiKeyDialog by remember { mutableStateOf(false) }
+    var pendingGeminiAction by remember { mutableStateOf<PendingGeminiAction?>(null) }
+
+    var isDismissDragging by remember { mutableStateOf(false) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    val animatedDismissOffsetY by animateFloatAsState(
+        targetValue = if (isDismissDragging) dragOffsetY else 0f,
+        label = "nowPlayingDismissOffset",
+    )
+    val effectiveDismissOffsetY = if (isDismissDragging) dragOffsetY else animatedDismissOffsetY
 
     LaunchedEffect(state.track?.id) {
         val track = state.track
@@ -143,6 +166,37 @@ fun NowPlayingScreen(
     Column(
         Modifier
             .fillMaxSize()
+            .graphicsLayer {
+                translationY = effectiveDismissOffsetY
+                val s = 1f - (effectiveDismissOffsetY / 2400f).coerceIn(0f, 0.06f)
+                scaleX = s
+                scaleY = s
+            }
+            .pointerInput(lyricsExpanded) {
+                if (!lyricsExpanded) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            val next = (dragOffsetY + dragAmount).coerceAtLeast(0f)
+                            if (next > 0f) {
+                                isDismissDragging = true
+                                dragOffsetY = next
+                                change.consume()
+                            }
+                        },
+                        onDragEnd = {
+                            val threshold = AppDimens.SwipeDismissThreshold.toPx()
+                            val shouldDismiss = dragOffsetY > threshold
+                            isDismissDragging = false
+                            dragOffsetY = 0f
+                            if (shouldDismiss) onBack()
+                        },
+                        onDragCancel = {
+                            isDismissDragging = false
+                            dragOffsetY = 0f
+                        },
+                    )
+                }
+            }
             .navigationBarsPadding()
             .padding(
                 start = AppDimens.ScreenPadding,
@@ -172,6 +226,17 @@ fun NowPlayingScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             if (state.track != null) {
+                val isFavorite = state.track.id in favoriteTrackIds
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.toggleFavorite(state.track.id)
+                }) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 IconButton(onClick = { showAddToPlaylist = true }) {
                     Icon(Icons.AutoMirrored.Outlined.PlaylistAdd, contentDescription = "Add to playlist")
                 }
@@ -242,7 +307,9 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
+                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+                AudioWaveformVisualizer(isPlaying = state.isPlaying)
+                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
 
                 CircularArcPlayerArt(
                     track = state.track,
@@ -315,6 +382,7 @@ fun NowPlayingScreen(
                             val track = state.track
                             if (track != null) {
                                 if (geminiApiKey.isBlank()) {
+                                    pendingGeminiAction = PendingGeminiAction.TRANSCRIBE
                                     showGeminiKeyDialog = true
                                 } else {
                                     viewModel.generateLyricsWithGemini(track)
@@ -323,6 +391,20 @@ fun NowPlayingScreen(
                         },
                         onDeleteLyrics = {
                             state.track?.let { viewModel.deleteLyrics(it.id) }
+                        },
+                        onToggleTranslation = {
+                            val track = state.track
+                            if (track != null) {
+                                val hasTranslations = lyricsUiState.lyrics?.lines?.any {
+                                    !it.translatedText.isNullOrBlank()
+                                } == true
+                                if (!lyricsUiState.showTranslation && !hasTranslations && geminiApiKey.isBlank()) {
+                                    pendingGeminiAction = PendingGeminiAction.TRANSLATE
+                                    showGeminiKeyDialog = true
+                                } else {
+                                    viewModel.toggleLyricsTranslation(track)
+                                }
+                            }
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -397,11 +479,17 @@ fun NowPlayingScreen(
                         tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = viewModel::previous) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.previous()
+                }) {
                     Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(AppDimens.IconSizeLarge))
                 }
                 Surface(
-                    onClick = viewModel::togglePlayPause,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        viewModel.togglePlayPause()
+                    },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -415,7 +503,10 @@ fun NowPlayingScreen(
                         )
                     }
                 }
-                IconButton(onClick = viewModel::next) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.next()
+                }) {
                     Icon(Icons.Filled.SkipNext, contentDescription = "Next", modifier = Modifier.size(AppDimens.IconSizeLarge))
                 }
                 IconButton(onClick = viewModel::cycleRepeatMode) {
@@ -587,7 +678,10 @@ fun NowPlayingScreen(
 
     if (showGeminiKeyDialog) {
         var keyInput by remember { mutableStateOf("") }
-        Dialog(onDismissRequest = { showGeminiKeyDialog = false }) {
+        Dialog(onDismissRequest = {
+            showGeminiKeyDialog = false
+            pendingGeminiAction = null
+        }) {
             GlassSurface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
@@ -629,7 +723,10 @@ fun NowPlayingScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing, Alignment.End),
                     ) {
-                        TextButton(onClick = { showGeminiKeyDialog = false }) {
+                        TextButton(onClick = {
+                            showGeminiKeyDialog = false
+                            pendingGeminiAction = null
+                        }) {
                             Text("Cancel")
                         }
                         Button(
@@ -637,11 +734,24 @@ fun NowPlayingScreen(
                                 val trimmedKey = keyInput.trim()
                                 viewModel.saveGeminiApiKey(trimmedKey)
                                 showGeminiKeyDialog = false
-                                state.track?.let { viewModel.generateLyricsWithGemini(it, trimmedKey) }
+                                val action = pendingGeminiAction
+                                pendingGeminiAction = null
+                                state.track?.let { track ->
+                                    when (action) {
+                                        PendingGeminiAction.TRANSLATE -> viewModel.toggleLyricsTranslation(track, trimmedKey)
+                                        PendingGeminiAction.TRANSCRIBE, null -> viewModel.generateLyricsWithGemini(track, trimmedKey)
+                                    }
+                                }
                             },
                             enabled = keyInput.isNotBlank(),
                         ) {
-                            Text("Save & Transcribe")
+                            Text(
+                                if (pendingGeminiAction == PendingGeminiAction.TRANSLATE) {
+                                    "Save & Translate"
+                                } else {
+                                    "Save & Transcribe"
+                                },
+                            )
                         }
                     }
                 }

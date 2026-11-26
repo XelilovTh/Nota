@@ -225,6 +225,88 @@ class LyricsRepositoryImpl @Inject constructor(
             parsed
         }
 
+    override suspend fun translateLyrics(
+        track: Track,
+        lyrics: TrackLyrics,
+        apiKey: String,
+        targetLanguage: String,
+    ): TrackLyrics? = withContext(ioDispatcher) {
+        val trimmedKey = apiKey.trim()
+        if (lyrics.lines.isEmpty() || trimmedKey.isBlank()) return@withContext null
+        if (lyrics.lines.any { !it.translatedText.isNullOrBlank() }) return@withContext lyrics
+
+        val numberedLines = lyrics.lines
+            .mapIndexed { index, line -> "$index|${line.text}" }
+            .joinToString("\n")
+        val prompt = buildString {
+            append("Translate each numbered lyric line naturally into $targetLanguage.\n")
+            append("Keep the exact index|translated text format on each line, preserving the index number and | separator.\n")
+            append("Do not include any markdown formatting, code fences, or explanations.\n\n")
+            append(numberedLines)
+        }
+        val requestBody = JSONObject().apply {
+            put(
+                "contents",
+                JSONArray().put(
+                    JSONObject().apply {
+                        put(
+                            "parts",
+                            JSONArray().put(
+                                JSONObject().apply {
+                                    put("text", prompt)
+                                },
+                            ),
+                        )
+                    },
+                ),
+            )
+        }
+
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${Uri.encode(trimmedKey)}"
+        val responseJson = try {
+            postJson(url, requestBody)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        } ?: return@withContext null
+
+        val rawText = responseJson
+            .optJSONArray("candidates")
+            ?.optJSONObject(0)
+            ?.optJSONObject("content")
+            ?.optJSONArray("parts")
+            ?.optJSONObject(0)
+            ?.optString("text")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: return@withContext null
+
+        val cleaned = stripMarkdownFences(rawText).trim()
+        if (cleaned.isBlank()) return@withContext null
+
+        val translationsByIndex = mutableMapOf<Int, String>()
+        cleaned.lines().forEach { rawLine ->
+            val sep = rawLine.indexOf('|')
+            if (sep <= 0) return@forEach
+            val index = rawLine.substring(0, sep).trim().toIntOrNull() ?: return@forEach
+            val translation = rawLine.substring(sep + 1).trim()
+            if (index in lyrics.lines.indices && translation.isNotBlank()) {
+                translationsByIndex[index] = translation
+            }
+        }
+        if (translationsByIndex.isEmpty()) return@withContext null
+
+        val updatedLines = lyrics.lines.mapIndexed { index, line ->
+            val translation = translationsByIndex[index]
+            if (translation != null) line.copy(translatedText = translation) else line
+        }
+        val updated = lyrics.copy(lines = updatedLines)
+        writeDiskCache(track.id, updated)
+        cache[track.id] = CachedLyrics(updated, System.currentTimeMillis())
+        updated
+    }
+
     override suspend fun deleteLyrics(trackId: Long) {
         withContext(ioDispatcher) {
             cache.remove(trackId)
@@ -284,6 +366,9 @@ class LyricsRepositoryImpl @Inject constructor(
                             put("text", line.text)
                             if (line.startMs != null) put("startMs", line.startMs)
                             if (line.endMs != null) put("endMs", line.endMs)
+                            if (!line.translatedText.isNullOrBlank()) {
+                                put("translatedText", line.translatedText)
+                            }
                             put(
                                 "words",
                                 JSONArray().apply {
@@ -337,7 +422,14 @@ class LyricsRepositoryImpl @Inject constructor(
                 }
                 LyricWord(text = wordText, startMs = wordStartMs, endMs = wordEndMs)
             }
-            LyricLine(text = text, startMs = startMs, endMs = endMs, words = words)
+            val translatedText = lineObj.optString("translatedText").takeUnless { it.isBlank() }
+            LyricLine(
+                text = text,
+                startMs = startMs,
+                endMs = endMs,
+                words = words,
+                translatedText = translatedText,
+            )
         }
         if (!instrumental && lines.isEmpty()) return null
         return TrackLyrics(

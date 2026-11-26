@@ -25,6 +25,7 @@ data class LyricLine(
     val startMs: Long? = null,
     val endMs: Long? = null,
     val words: List<LyricWord> = emptyList(),
+    val translatedText: String? = null,
 )
 
 data class TrackLyrics(

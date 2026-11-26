@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -80,11 +81,13 @@ internal fun LyricsPanel(
     onImportLyrics: () -> Unit,
     onGenerateWithGemini: () -> Unit,
     onDeleteLyrics: () -> Unit,
+    onToggleTranslation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val showOffsetControls = state.lyrics != null &&
         !state.lyrics.instrumental &&
         state.lyrics.syncType != LyricsSyncType.PLAIN
+    val canTranslate = state.lyrics != null && !state.lyrics.instrumental
 
     GlassSurface(
         modifier = modifier.fillMaxSize(),
@@ -100,10 +103,14 @@ internal fun LyricsPanel(
                 syncOffsetMs = state.syncOffsetMs,
                 showOffsetControls = showOffsetControls,
                 hasLyrics = state.lyrics != null,
+                canTranslate = canTranslate,
+                showTranslation = state.showTranslation,
+                isTranslating = state.isTranslating,
                 onCollapse = onCollapse,
                 onAdjustOffset = onAdjustOffset,
                 onImportLyrics = onImportLyrics,
                 onDeleteLyrics = onDeleteLyrics,
+                onToggleTranslation = onToggleTranslation,
             )
 
             when {
@@ -126,6 +133,7 @@ internal fun LyricsPanel(
                     lyrics = state.lyrics,
                     positionMs = positionMs,
                     syncOffsetMs = state.syncOffsetMs,
+                    showTranslation = state.showTranslation,
                     isPlaying = isPlaying,
                     onSeekTo = onSeekTo,
                 )
@@ -139,10 +147,14 @@ private fun LyricsHeader(
     syncOffsetMs: Long,
     showOffsetControls: Boolean,
     hasLyrics: Boolean,
+    canTranslate: Boolean,
+    showTranslation: Boolean,
+    isTranslating: Boolean,
     onCollapse: () -> Unit,
     onAdjustOffset: (Long) -> Unit,
     onImportLyrics: () -> Unit,
     onDeleteLyrics: () -> Unit,
+    onToggleTranslation: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -219,6 +231,31 @@ private fun LyricsHeader(
                         modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+            if (canTranslate) {
+                IconButton(
+                    onClick = onToggleTranslation,
+                    enabled = !isTranslating,
+                    modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
+                ) {
+                    if (isTranslating) {
+                        CircularProgressIndicator(
+                            strokeWidth = AppDimens.MiniPlayerProgressHeight,
+                            modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.Translate,
+                            contentDescription = "Translate lyrics",
+                            modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                            tint = if (showTranslation) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
                 }
             }
             if (hasLyrics) {
@@ -335,6 +372,7 @@ private fun LyricsContent(
     lyrics: TrackLyrics,
     positionMs: Long,
     syncOffsetMs: Long,
+    showTranslation: Boolean,
     @Suppress("UNUSED_PARAMETER") isPlaying: Boolean,
     onSeekTo: (Long) -> Unit,
 ) {
@@ -410,46 +448,61 @@ private fun LyricsContent(
                 scaleY = lineScale
             }
 
-            if (isActive && lyrics.syncType == LyricsSyncType.WORD && line.words.isNotEmpty()) {
-                SyncedWordLine(
-                    line = line,
-                    effectivePositionMs = effectivePositionMs,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(scaleModifier)
-                        .then(clickableModifier),
-                )
-            } else {
-                val alphaTarget = when {
-                    lyrics.syncType == LyricsSyncType.PLAIN -> 0.78f
-                    isActive -> 1f
-                    isLightGlass -> 0.45f
-                    else -> 0.32f
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(scaleModifier)
+                    .then(clickableModifier),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (isActive && lyrics.syncType == LyricsSyncType.WORD && line.words.isNotEmpty()) {
+                    SyncedWordLine(
+                        line = line,
+                        effectivePositionMs = effectivePositionMs,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    val alphaTarget = when {
+                        lyrics.syncType == LyricsSyncType.PLAIN -> 0.78f
+                        isActive -> 1f
+                        isLightGlass -> 0.45f
+                        else -> 0.32f
+                    }
+                    val alpha by animateFloatAsState(
+                        targetValue = alphaTarget,
+                        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                        label = "lyric-line-alpha",
+                    )
+                    Text(
+                        text = line.text,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                        fontSize = when (lyrics.syncType) {
+                            LyricsSyncType.PLAIN -> AppDimens.LyricsPlainFontSize
+                            LyricsSyncType.WORD, LyricsSyncType.LINE -> AppDimens.LyricsWordFontSize
+                        },
+                        lineHeight = AppDimens.LyricsLineHeight,
+                        textAlign = TextAlign.Center,
+                        fontWeight = when {
+                            isActive && lyrics.syncType == LyricsSyncType.LINE -> FontWeight.Bold
+                            isActive -> FontWeight.SemiBold
+                            else -> FontWeight.Normal
+                        },
+                    )
                 }
-                val alpha by animateFloatAsState(
-                    targetValue = alphaTarget,
-                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-                    label = "lyric-line-alpha",
-                )
-                Text(
-                    text = line.text,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(scaleModifier)
-                        .then(clickableModifier),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-                    fontSize = when (lyrics.syncType) {
-                        LyricsSyncType.PLAIN -> AppDimens.LyricsPlainFontSize
-                        LyricsSyncType.WORD, LyricsSyncType.LINE -> AppDimens.LyricsWordFontSize
-                    },
-                    lineHeight = AppDimens.LyricsLineHeight,
-                    textAlign = TextAlign.Center,
-                    fontWeight = when {
-                        isActive && lyrics.syncType == LyricsSyncType.LINE -> FontWeight.Bold
-                        isActive -> FontWeight.SemiBold
-                        else -> FontWeight.Normal
-                    },
-                )
+                if (showTranslation && !line.translatedText.isNullOrBlank()) {
+                    Text(
+                        text = line.translatedText,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = AppDimens.ShapeExtraSmall),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                            alpha = if (isActive) 0.9f else 0.55f,
+                        ),
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }

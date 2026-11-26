@@ -8,5 +8,7 @@ data class LyricsUiState(
     val lyrics: TrackLyrics? = null,
     val notFound: Boolean = false,
     val syncOffsetMs: Long = 0L,
+    val showTranslation: Boolean = false,
+    val isTranslating: Boolean = false,
     val errorMessage: String? = null,
 )

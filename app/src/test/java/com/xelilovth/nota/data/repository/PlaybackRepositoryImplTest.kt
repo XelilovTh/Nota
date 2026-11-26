@@ -11,8 +11,11 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.xelilovth.nota.data.media.PlaybackService
+import com.xelilovth.nota.domain.model.AppSettings
+import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.LibraryRepository
+import com.xelilovth.nota.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -42,6 +45,16 @@ class PlaybackRepositoryImplTest {
         override suspend fun scan(): List<Track> = tracks.value
     }
 
+    private class FakeSettingsRepository(
+        initialSettings: AppSettings = AppSettings(),
+    ) : SettingsRepository {
+        override val settings = MutableStateFlow(initialSettings)
+        override val recentTrackIds = MutableStateFlow<List<Long>>(emptyList())
+        override fun setThemeMode(mode: ThemeMode) = Unit
+        override fun setHideShortTracks(hide: Boolean) = Unit
+        override fun addRecentTrack(trackId: Long) = Unit
+    }
+
     private val player: ExoPlayer = ExoPlayer.Builder(RuntimeEnvironment.getApplication()).build()
 
     @After
@@ -56,7 +69,12 @@ class PlaybackRepositoryImplTest {
             Track(id, "content://audio/$id", "Song $id", "Artist", "Album", 10_000L, "Music")
         }
         val context = RecordingContext(application)
-        val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository(tracks))
+        val repository = PlaybackRepositoryImpl(
+            context,
+            player,
+            FakeLibraryRepository(tracks),
+            FakeSettingsRepository(),
+        )
 
         repository.playTrack(tracks[1], tracks)
 
@@ -68,7 +86,12 @@ class PlaybackRepositoryImplTest {
     @Test
     fun emptyQueueDoesNotStartPlaybackServiceOrSetMediaItems() {
         val context = RecordingContext(RuntimeEnvironment.getApplication())
-        val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository())
+        val repository = PlaybackRepositoryImpl(
+            context,
+            player,
+            FakeLibraryRepository(),
+            FakeSettingsRepository(),
+        )
         val track = Track(
             1L,
             "content://audio/1",
@@ -91,7 +114,12 @@ class PlaybackRepositoryImplTest {
         val application = RuntimeEnvironment.getApplication()
         shadowOf(application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
         val context = RecordingContext(application)
-        val repository = PlaybackRepositoryImpl(context, player, FakeLibraryRepository())
+        val repository = PlaybackRepositoryImpl(
+            context,
+            player,
+            FakeLibraryRepository(),
+            FakeSettingsRepository(),
+        )
         val track = Track(
             2L,
             "content://audio/2",
@@ -118,6 +146,7 @@ class PlaybackRepositoryImplTest {
             RuntimeEnvironment.getApplication(),
             player,
             FakeLibraryRepository(),
+            FakeSettingsRepository(),
         )
         val error = PlaybackException(
             "decoder exploded",
@@ -138,7 +167,12 @@ class PlaybackRepositoryImplTest {
                 throw IllegalStateException("Background start not allowed")
             }
         }
-        val repository = PlaybackRepositoryImpl(throwingContext, player, FakeLibraryRepository())
+        val repository = PlaybackRepositoryImpl(
+            throwingContext,
+            player,
+            FakeLibraryRepository(),
+            FakeSettingsRepository(),
+        )
         val track = Track(
             3L,
             "content://audio/3",

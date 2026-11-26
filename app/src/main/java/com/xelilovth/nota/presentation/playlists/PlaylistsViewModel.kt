@@ -8,11 +8,16 @@ import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.CustomPlaylistRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
+import com.xelilovth.nota.domain.repository.SettingsRepository
 import com.xelilovth.nota.domain.usecase.ObserveTracksUseCase
 import com.xelilovth.nota.domain.usecase.PlayTrackUseCase
 import com.xelilovth.nota.domain.usecase.ToggleShuffleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,11 +27,21 @@ class PlaylistsViewModel @Inject constructor(
     private val playbackRepository: PlaybackRepository,
     private val playTrack: PlayTrackUseCase,
     private val toggleShuffle: ToggleShuffleUseCase,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     val customPlaylists: StateFlow<List<CustomPlaylist>> = customPlaylistRepository.playlists
     val hiddenAutoGroupIds: StateFlow<Set<String>> = customPlaylistRepository.hiddenAutoGroupIds
     val tracks: StateFlow<List<Track>> = observeTracks()
     val playbackState: StateFlow<PlaybackState> = playbackRepository.playbackState
+    val favoriteTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.favoriteTrackIds) { libraryTracks, favIds ->
+        libraryTracks.filter { it.id in favIds }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val mostPlayedTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.playCounts) { libraryTracks, counts ->
+        libraryTracks
+            .filter { (counts[it.id] ?: 0) > 0 }
+            .sortedByDescending { counts[it.id] ?: 0 }
+            .take(10)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     fun createPlaylist(name: String): CustomPlaylist = customPlaylistRepository.createPlaylist(name)
 

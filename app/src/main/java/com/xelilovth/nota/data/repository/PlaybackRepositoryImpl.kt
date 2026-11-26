@@ -17,6 +17,7 @@ import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.LibraryRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
+import com.xelilovth.nota.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,26 +40,59 @@ class PlaybackRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val player: ExoPlayer,
     private val libraryRepository: LibraryRepository,
+    private val settingsRepository: SettingsRepository,
 ) : PlaybackRepository {
     private val _playbackState = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressJob: Job? = null
+    private var fadeJob: Job? = null
     private var cachedMediaId: Long? = null
     private var cachedTrack: Track? = null
     @Volatile
     private var lyricsSyncActive = false
+    @Volatile
+    private var crossfadeSeconds: Int = settingsRepository.settings.value.crossfadeSeconds
     internal val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = publishState()
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) startProgressUpdates() else progressJob?.cancel()
+            if (isPlaying) {
+                startProgressUpdates()
+            } else {
+                progressJob?.cancel()
+                fadeJob?.cancel()
+                player.volume = 1.0f
+            }
+            publishState()
+        }
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (crossfadeSeconds > 0 && player.isPlaying) {
+                startFadeIn()
+            } else if (player.volume != 1.0f) {
+                player.volume = 1.0f
+            }
             publishState()
         }
         override fun onPlayerError(error: PlaybackException) = handlePlayerError(error)
     }
 
-    init { player.addListener(listener); publishState() }
+    init {
+        player.addListener(listener)
+        scope.launch {
+            settingsRepository.settings
+                .map { it.crossfadeSeconds }
+                .distinctUntilChanged()
+                .collect { seconds ->
+                    crossfadeSeconds = seconds
+                    if (seconds <= 0) {
+                        fadeJob?.cancel()
+                        player.volume = 1.0f
+                    }
+                }
+        }
+        publishState()
+    }
 
     override fun playTrack(track: Track, queue: List<Track>) {
         if (queue.isEmpty()) return
@@ -85,8 +121,18 @@ class PlaybackRepositoryImpl @Inject constructor(
         publishState()
     }
 
-    override fun skipNext() { if (player.hasNextMediaItem()) player.seekToNextMediaItem(); publishState() }
-    override fun skipPrevious() { PlaybackNavigation.skipPrevious(player); publishState() }
+    override fun skipNext() {
+        if (player.hasNextMediaItem()) {
+            player.seekToNextMediaItem()
+            if (crossfadeSeconds > 0 && player.isPlaying) startFadeIn()
+        }
+        publishState()
+    }
+    override fun skipPrevious() {
+        PlaybackNavigation.skipPrevious(player)
+        if (crossfadeSeconds > 0 && player.isPlaying) startFadeIn()
+        publishState()
+    }
     override fun seekTo(positionMs: Long) { player.seekTo(positionMs.coerceAtLeast(0L)); publishState() }
     override fun toggleShuffle() { player.shuffleModeEnabled = !player.shuffleModeEnabled; publishState() }
     override fun cycleRepeatMode() {
@@ -100,6 +146,8 @@ class PlaybackRepositoryImpl @Inject constructor(
 
     override fun stopPlayback() {
         progressJob?.cancel()
+        fadeJob?.cancel()
+        player.volume = 1.0f
         cachedMediaId = null
         cachedTrack = null
         player.stop()
@@ -125,8 +173,53 @@ class PlaybackRepositoryImpl @Inject constructor(
         if (progressJob?.isActive == true) return
         progressJob = scope.launch {
             while (isActive && player.isPlaying) {
+                updateCrossfadeVolume()
                 publishState()
                 delay(if (lyricsSyncActive) 50L else 250L)
+            }
+        }
+    }
+
+    private fun updateCrossfadeVolume() {
+        val fadeSeconds = crossfadeSeconds
+        if (fadeSeconds <= 0) {
+            if (player.volume != 1.0f) player.volume = 1.0f
+            return
+        }
+        if (fadeJob?.isActive == true) return
+
+        val fadeDurationMs = fadeSeconds * 1_000L
+        val durationMs = player.duration
+        val remainingMs = if (durationMs > 0L) durationMs - player.currentPosition else 0L
+        val canTransition = player.hasNextMediaItem() ||
+            player.repeatMode == Player.REPEAT_MODE_ONE ||
+            player.repeatMode == Player.REPEAT_MODE_ALL
+        if (canTransition && remainingMs in 1..fadeDurationMs) {
+            val progress = (remainingMs.toFloat() / fadeDurationMs.toFloat()).coerceIn(0f, 1f)
+            player.volume = (0.2f + 0.8f * progress).coerceIn(0.2f, 1.0f)
+        } else if (player.volume != 1.0f) {
+            player.volume = 1.0f
+        }
+    }
+
+    private fun startFadeIn() {
+        val fadeSeconds = crossfadeSeconds
+        if (fadeSeconds <= 0) {
+            player.volume = 1.0f
+            return
+        }
+        fadeJob?.cancel()
+        val fadeInDurationMs = (fadeSeconds * 500L).coerceIn(300L, 2_000L)
+        val steps = 10
+        val stepDelayMs = (fadeInDurationMs / steps).coerceAtLeast(20L)
+        fadeJob = scope.launch {
+            for (step in 0..steps) {
+                if (!isActive || !player.isPlaying || crossfadeSeconds <= 0) {
+                    player.volume = 1.0f
+                    return@launch
+                }
+                player.volume = (0.2f + 0.8f * (step.toFloat() / steps)).coerceIn(0.2f, 1.0f)
+                if (step < steps) delay(stepDelayMs)
             }
         }
     }

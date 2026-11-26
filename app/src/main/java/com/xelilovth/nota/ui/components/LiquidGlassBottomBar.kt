@@ -39,8 +39,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -66,6 +68,7 @@ fun LiquidGlassBottomBar(
     if (tabs.isEmpty()) return
 
     val glass = LocalGlassColors.current
+    val haptic = LocalHapticFeedback.current
     val tabCount = tabs.size
     val clampedSelectedIndex = selectedIndex.coerceIn(0, tabCount - 1)
 
@@ -153,6 +156,7 @@ fun LiquidGlassBottomBar(
                             onDragEnd = {
                                 val target = dragFraction.roundToInt().coerceIn(0, tabCount - 1)
                                 isDragging = false
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onSelectTab(target)
                             },
                             onDragCancel = {
@@ -209,7 +213,10 @@ fun LiquidGlassBottomBar(
                                 .clickable(
                                     interactionSource = interactionSources[index],
                                     indication = null,
-                                    onClick = { onSelectTab(index) },
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectTab(index)
+                                    },
                                 ),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,

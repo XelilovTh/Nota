@@ -1,9 +1,12 @@
 package com.xelilovth.nota.presentation.library
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,8 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.Sort
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Refresh
@@ -32,6 +35,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,12 +46,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.xelilovth.nota.domain.model.DeleteTrackResult
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
 import com.xelilovth.nota.ui.components.GlassSurface
@@ -76,6 +85,18 @@ fun LibraryScreen(
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var playlistTargetTrack by remember { mutableStateOf<Track?>(null) }
+    var editTargetTrack by remember { mutableStateOf<Track?>(null) }
+    var deleteTargetTrack by remember { mutableStateOf<Track?>(null) }
+    var pendingDeleteTrackId by remember { mutableStateOf<Long?>(null) }
+
+    val deleteLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            pendingDeleteTrackId?.let { viewModel.confirmTrackDeleted(it) }
+        }
+        pendingDeleteTrackId = null
+    }
 
     val sortedTracks = remember(tracks, sortOrder) {
         when (sortOrder) {
@@ -198,6 +219,8 @@ fun LibraryScreen(
                             isPlaying = track.id == activeTrackId && isPlaying,
                             onPlay = { onPlayTrack(track) },
                             onAddToPlaylist = { playlistTargetTrack = track },
+                            onEditInfo = { editTargetTrack = track },
+                            onDeleteFromDevice = { deleteTargetTrack = track },
                         )
                     }
                 }
@@ -211,6 +234,166 @@ fun LibraryScreen(
             onDismiss = { playlistTargetTrack = null },
         )
     }
+
+    editTargetTrack?.let { target ->
+        var titleInput by remember(target.id) { mutableStateOf(target.title) }
+        var artistInput by remember(target.id) { mutableStateOf(target.artist) }
+        var albumInput by remember(target.id) { mutableStateOf(target.album) }
+        Dialog(onDismissRequest = { editTargetTrack = null }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    Text("Edit track info", style = MaterialTheme.typography.titleLarge)
+                    GlassSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        subtle = true,
+                    ) {
+                        TextField(
+                            value = titleInput,
+                            onValueChange = { titleInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Title") },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
+                            ),
+                        )
+                    }
+                    GlassSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        subtle = true,
+                    ) {
+                        TextField(
+                            value = artistInput,
+                            onValueChange = { artistInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Artist") },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
+                            ),
+                        )
+                    }
+                    GlassSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        subtle = true,
+                    ) {
+                        TextField(
+                            value = albumInput,
+                            onValueChange = { albumInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Album") },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
+                            ),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = AppDimens.ElementSpacing),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing, Alignment.End),
+                    ) {
+                        TextButton(onClick = { editTargetTrack = null }) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.editTrackMetadata(target.id, titleInput, artistInput, albumInput)
+                                editTargetTrack = null
+                            },
+                        ) {
+                            Text("Save")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    deleteTargetTrack?.let { target ->
+        Dialog(onDismissRequest = { deleteTargetTrack = null }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
+                ) {
+                    Text("Delete from device", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Delete \"${target.title}\" permanently from your device storage?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing, Alignment.End),
+                    ) {
+                        TextButton(onClick = { deleteTargetTrack = null }) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                deleteTargetTrack = null
+                                viewModel.deleteTrack(target) { res ->
+                                    when (res) {
+                                        is DeleteTrackResult.Deleted -> {
+                                            Toast.makeText(context, "Track deleted", Toast.LENGTH_SHORT).show()
+                                        }
+                                        is DeleteTrackResult.RequiresPermission -> {
+                                            pendingDeleteTrackId = target.id
+                                            deleteLauncher.launch(
+                                                IntentSenderRequest.Builder(res.intentSender).build(),
+                                            )
+                                        }
+                                        is DeleteTrackResult.Failed -> {
+                                            Toast.makeText(context, "Could not delete track", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            },
+                        ) {
+                            Text("Delete")
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -220,7 +403,10 @@ private fun TrackRow(
     isPlaying: Boolean,
     onPlay: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    onEditInfo: () -> Unit,
+    onDeleteFromDevice: () -> Unit,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     GlassSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
@@ -273,12 +459,40 @@ private fun TrackRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = onAddToPlaylist) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.PlaylistAdd,
-                    contentDescription = "Add to playlist",
-                    modifier = Modifier.size(AppDimens.IconSizeSmall),
-                )
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = "Track options",
+                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Add to playlist") },
+                        onClick = {
+                            menuExpanded = false
+                            onAddToPlaylist()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Edit info") },
+                        onClick = {
+                            menuExpanded = false
+                            onEditInfo()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete from device") },
+                        onClick = {
+                            menuExpanded = false
+                            onDeleteFromDevice()
+                        },
+                    )
+                }
             }
         }
     }

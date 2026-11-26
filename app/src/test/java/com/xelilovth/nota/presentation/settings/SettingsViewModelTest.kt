@@ -52,6 +52,7 @@ class SettingsViewModelTest {
         val sleepTimer = SleepTimerManager(FakePlaybackRepository())
         val viewModel = SettingsViewModel(
             settingsRepo,
+            libraryRepo,
             ScanLibraryUseCase(libraryRepo),
             ObserveTracksUseCase(libraryRepo),
             sleepTimer,
@@ -76,6 +77,7 @@ class SettingsViewModelTest {
         val sleepTimer = SleepTimerManager(FakePlaybackRepository())
         val viewModel = SettingsViewModel(
             settingsRepo,
+            libraryRepo,
             ScanLibraryUseCase(libraryRepo),
             ObserveTracksUseCase(libraryRepo),
             sleepTimer,

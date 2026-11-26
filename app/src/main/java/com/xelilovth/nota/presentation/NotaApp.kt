@@ -60,7 +60,7 @@ import com.xelilovth.nota.presentation.search.SearchScreen
 import com.xelilovth.nota.presentation.settings.SettingsScreen
 import com.xelilovth.nota.presentation.settings.SettingsViewModel
 import com.xelilovth.nota.presentation.settings.SleepTimerScreen
-import com.xelilovth.nota.ui.components.GlassAmbientBackground
+import com.xelilovth.nota.ui.components.BreathingAmbientBackground
 import com.xelilovth.nota.ui.components.LiquidGlassBottomBar
 import com.xelilovth.nota.ui.components.LiquidNavTab
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -154,7 +154,17 @@ fun NotaApp() {
                     .fillMaxSize()
                     .hazeSource(state = hazeState),
             ) {
-                GlassAmbientBackground(modifier = Modifier.fillMaxSize())
+                val ambientState by remember(playerViewModel) {
+                    playerViewModel.playbackState
+                        .map { Triple(it.isPlaying, it.track?.id, it.track?.uri) }
+                        .distinctUntilChanged()
+                }.collectAsStateWithLifecycle(initialValue = Triple(false, null, null))
+                BreathingAmbientBackground(
+                    isPlaying = ambientState.first,
+                    trackId = ambientState.second,
+                    trackUri = ambientState.third,
+                    modifier = Modifier.fillMaxSize(),
+                )
                 NavHost(
                     navController = navController,
                     startDestination = AppRoute.HOME,
