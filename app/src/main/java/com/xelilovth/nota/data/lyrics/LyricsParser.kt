@@ -18,30 +18,97 @@ import org.yaml.snakeyaml.constructor.SafeConstructor
 
 internal object LyricsParser {
     private val lrcTimestamp = Regex("""\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?]\s*(.*)""")
+    private val inlineWordTimestamp = Regex("""[<\[](\d{1,2}):(\d{2})(?:\.(\d{1,3}))?[>\]]""")
     private val leadingPlusMarker = Regex("""^\+(?:\s+|$)""")
 
     private fun cleanLineText(raw: String): String =
-        raw.trimStart().replace(leadingPlusMarker, "").trim()
+        raw.replace(inlineWordTimestamp, " ")
+            .trimStart()
+            .replace(leadingPlusMarker, "")
+            .trim()
+
+    internal fun parseInlineWordLine(
+        body: String,
+        lineStartMs: Long?,
+        lineEndMs: Long?,
+    ): LyricLine? {
+        val matches = inlineWordTimestamp.findAll(body).toList()
+        if (matches.isEmpty()) return null
+
+        val rawWords = mutableListOf<LyricWord>()
+        val prefix = cleanLineText(body.substring(0, matches.first().range.first))
+        if (prefix.isNotBlank() && lineStartMs != null) {
+            rawWords.add(LyricWord(text = prefix, startMs = lineStartMs))
+        }
+
+        for (i in matches.indices) {
+            val match = matches[i]
+            val timestampMs = parseTimestampMs(
+                match.groupValues[1],
+                match.groupValues[2],
+                match.groupValues[3],
+            ) ?: continue
+            val segmentEnd = matches.getOrNull(i + 1)?.range?.first ?: body.length
+            val wordText = cleanLineText(body.substring(match.range.last + 1, segmentEnd))
+            if (wordText.isNotBlank()) {
+                rawWords.add(LyricWord(text = wordText, startMs = timestampMs))
+            }
+        }
+
+        if (rawWords.isEmpty()) return null
+
+        val words = rawWords.mapIndexed { index, word ->
+            val wordEndMs = (rawWords.getOrNull(index + 1)?.startMs ?: lineEndMs)
+                ?.takeIf { it > word.startMs }
+            word.copy(endMs = wordEndMs)
+        }
+        val text = words.joinToString(" ") { it.text }
+        if (text.isBlank()) return null
+
+        return LyricLine(
+            text = text,
+            startMs = lineStartMs ?: words.firstOrNull()?.startMs,
+            endMs = lineEndMs,
+            words = words,
+        )
+    }
+
+    private fun parseTimestampMs(minutesStr: String, secondsStr: String, fractionStr: String): Long? {
+        val minutes = minutesStr.toLongOrNull() ?: return null
+        val seconds = secondsStr.toLongOrNull() ?: return null
+        val millis = fractionStr.takeIf(String::isNotEmpty)
+            ?.padEnd(3, '0')
+            ?.take(3)
+            ?.toLongOrNull() ?: 0L
+        return minutes * 60_000L + seconds * 1_000L + millis
+    }
 
     fun fromLrc(value: String, durationMs: Long): List<LyricLine> {
         val parsed = value.lineSequence().mapNotNull { raw ->
             val match = lrcTimestamp.matchEntire(raw.trim()) ?: return@mapNotNull null
-            val minutes = match.groupValues[1].toLongOrNull() ?: return@mapNotNull null
-            val seconds = match.groupValues[2].toLongOrNull() ?: return@mapNotNull null
-            val fraction = match.groupValues[3]
-            val millis = fraction.takeIf(String::isNotEmpty)
-                ?.padEnd(3, '0')
-                ?.take(3)
-                ?.toLongOrNull() ?: 0L
-            val text = cleanLineText(match.groupValues[4])
-            if (text.isBlank()) return@mapNotNull null
-            LyricLine(
-                text = text,
-                startMs = minutes * 60_000L + seconds * 1_000L + millis,
-            )
+            val startMs = parseTimestampMs(
+                match.groupValues[1],
+                match.groupValues[2],
+                match.groupValues[3],
+            ) ?: return@mapNotNull null
+            val rawBody = match.groupValues[4]
+            parseInlineWordLine(rawBody, startMs, null) ?: run {
+                val text = cleanLineText(rawBody)
+                if (text.isBlank()) return@mapNotNull null
+                LyricLine(
+                    text = text,
+                    startMs = startMs,
+                )
+            }
         }.sortedBy { it.startMs }.toList()
         return parsed.mapIndexed { index, line ->
-            line.copy(endMs = parsed.getOrNull(index + 1)?.startMs ?: durationMs.takeIf { it > 0L })
+            val lineEndMs = parsed.getOrNull(index + 1)?.startMs ?: durationMs.takeIf { it > 0L }
+            val normalizedWords = line.words.mapIndexed { wordIndex, word ->
+                val wordEndMs = (line.words.getOrNull(wordIndex + 1)?.startMs ?: lineEndMs)
+                    ?.takeIf { it > word.startMs }
+                word.copy(endMs = wordEndMs)
+            }
+            line.copy(endMs = lineEndMs, words = normalizedWords)
         }
     }
 
@@ -173,7 +240,14 @@ internal object LyricsParser {
         }
         if (!syncedLyrics.isNullOrBlank()) {
             val syncedLines = fromLrc(syncedLyrics, durationMs)
-            if (syncedLines.isNotEmpty()) return TrackLyrics(syncedLines, source, LyricsSyncType.LINE)
+            if (syncedLines.isNotEmpty()) {
+                val syncType = if (syncedLines.any { it.words.isNotEmpty() }) {
+                    LyricsSyncType.WORD
+                } else {
+                    LyricsSyncType.LINE
+                }
+                return TrackLyrics(syncedLines, source, syncType)
+            }
         }
         if (!plainLyrics.isNullOrBlank()) {
             val plainLines = fromPlain(plainLyrics)

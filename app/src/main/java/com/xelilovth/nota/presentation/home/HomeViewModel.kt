@@ -28,6 +28,18 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     val tracks: StateFlow<List<Track>> = observeTracks()
     val playbackState: StateFlow<PlaybackState> = playbackRepository.playbackState
+    val favoriteTrackIds: StateFlow<Set<Long>> = settingsRepository.favoriteTrackIds
+    val playCounts: StateFlow<Map<Long, Int>> = settingsRepository.playCounts
+    val listenDurationsMs: StateFlow<Map<Long, Long>> = settingsRepository.listenDurationsMs
+    val favoriteTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.favoriteTrackIds) { libraryTracks, favIds ->
+        libraryTracks.filter { it.id in favIds }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val mostPlayedTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.listenDurationsMs) { libraryTracks, durations ->
+        libraryTracks
+            .filter { (durations[it.id] ?: 0L) > 0L }
+            .sortedByDescending { durations[it.id] ?: 0L }
+            .take(10)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val recentlyPlayed: StateFlow<List<Track>> = combine(tracks, settingsRepository.recentTrackIds) { libraryTracks, recentIds ->
         val byId = libraryTracks.associateBy(Track::id)
         recentIds.mapNotNull(byId::get)
@@ -57,6 +69,15 @@ class HomeViewModel @Inject constructor(
         val library = tracks.value
         val queue = if (library.any { it.id == track.id }) library else listOf(track)
         playTrack(track, queue)
+    }
+
+    fun toggleFavorite(trackId: Long) = settingsRepository.toggleFavorite(trackId)
+
+    fun playTracks(queue: List<Track>, startTrack: Track? = null) {
+        if (queue.isEmpty()) return
+        val selected = startTrack ?: queue.first()
+        val resolvedQueue = if (queue.any { it.id == selected.id }) queue else listOf(selected)
+        playTrack(selected, resolvedQueue)
     }
 
     fun playPlaylist(playlist: AutoPlaylist) {

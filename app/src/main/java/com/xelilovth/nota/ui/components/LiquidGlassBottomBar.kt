@@ -1,6 +1,7 @@
 package com.xelilovth.nota.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -29,9 +30,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,8 +40,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -48,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalGlassColors
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 data class LiquidNavTab(
@@ -66,6 +70,7 @@ fun LiquidGlassBottomBar(
     if (tabs.isEmpty()) return
 
     val glass = LocalGlassColors.current
+    val haptic = LocalHapticFeedback.current
     val tabCount = tabs.size
     val clampedSelectedIndex = selectedIndex.coerceIn(0, tabCount - 1)
 
@@ -87,11 +92,18 @@ fun LiquidGlassBottomBar(
             val tabWidthPx = with(LocalDensity.current) { tabWidthDp.toPx() }.coerceAtLeast(1f)
 
             var isDragging by remember { mutableStateOf(false) }
-            var dragFraction by remember { mutableFloatStateOf(clampedSelectedIndex.toFloat()) }
+            val lensOffset = remember { Animatable(clampedSelectedIndex.toFloat()) }
+            val coroutineScope = rememberCoroutineScope()
+            var pendingTargetIndex by remember { mutableStateOf<Int?>(null) }
 
-            LaunchedEffect(clampedSelectedIndex, isDragging) {
-                if (!isDragging) {
-                    dragFraction = clampedSelectedIndex.toFloat()
+            LaunchedEffect(clampedSelectedIndex) {
+                if (pendingTargetIndex == clampedSelectedIndex) {
+                    pendingTargetIndex = null
+                } else if (!isDragging && pendingTargetIndex == null) {
+                    lensOffset.animateTo(
+                        targetValue = clampedSelectedIndex.toFloat(),
+                        animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+                    )
                 }
             }
 
@@ -102,12 +114,7 @@ fun LiquidGlassBottomBar(
             val anyTabPressed = pressedStates.any { it }
             val isInteracting = isDragging || anyTabPressed
 
-            val settledIndex by animateFloatAsState(
-                targetValue = clampedSelectedIndex.toFloat(),
-                animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
-                label = "liquidLensIndex",
-            )
-            val animatedIndex = if (isDragging) dragFraction else settledIndex
+            val animatedIndex = lensOffset.value
 
             val lensScale by animateFloatAsState(
                 targetValue = if (isInteracting) 1.12f else 1.0f,
@@ -142,21 +149,43 @@ fun LiquidGlassBottomBar(
                         detectHorizontalDragGestures(
                             onDragStart = { offset ->
                                 isDragging = true
-                                dragFraction = ((offset.x / tabWidthPx) - 0.5f)
+                                pendingTargetIndex = null
+                                val newFraction = ((offset.x / tabWidthPx) - 0.5f)
                                     .coerceIn(0f, (tabCount - 1).toFloat())
+                                coroutineScope.launch {
+                                    lensOffset.snapTo(newFraction)
+                                }
                             },
                             onHorizontalDrag = { change, dragAmount ->
                                 change.consume()
-                                dragFraction = (dragFraction + dragAmount / tabWidthPx)
+                                val newFraction = (lensOffset.value + dragAmount / tabWidthPx)
                                     .coerceIn(0f, (tabCount - 1).toFloat())
+                                coroutineScope.launch {
+                                    lensOffset.snapTo(newFraction)
+                                }
                             },
                             onDragEnd = {
-                                val target = dragFraction.roundToInt().coerceIn(0, tabCount - 1)
+                                val target = lensOffset.value.roundToInt().coerceIn(0, tabCount - 1)
                                 isDragging = false
+                                pendingTargetIndex = if (target != clampedSelectedIndex) target else null
+                                coroutineScope.launch {
+                                    lensOffset.animateTo(
+                                        targetValue = target.toFloat(),
+                                        animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+                                    )
+                                }
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 onSelectTab(target)
                             },
                             onDragCancel = {
                                 isDragging = false
+                                pendingTargetIndex = null
+                                coroutineScope.launch {
+                                    lensOffset.animateTo(
+                                        targetValue = clampedSelectedIndex.toFloat(),
+                                        animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+                                    )
+                                }
                             },
                         )
                     },
@@ -209,7 +238,17 @@ fun LiquidGlassBottomBar(
                                 .clickable(
                                     interactionSource = interactionSources[index],
                                     indication = null,
-                                    onClick = { onSelectTab(index) },
+                                    onClick = {
+                                        pendingTargetIndex = if (index != clampedSelectedIndex) index else null
+                                        coroutineScope.launch {
+                                            lensOffset.animateTo(
+                                                targetValue = index.toFloat(),
+                                                animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+                                            )
+                                        }
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onSelectTab(index)
+                                    },
                                 ),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,

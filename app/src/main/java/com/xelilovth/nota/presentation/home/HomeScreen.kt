@@ -19,8 +19,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -28,9 +30,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,6 +81,10 @@ fun HomeScreen(
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
+    val favoriteTrackIds by viewModel.favoriteTrackIds.collectAsStateWithLifecycle()
+    val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
+    val mostPlayedTracks by viewModel.mostPlayedTracks.collectAsStateWithLifecycle()
+    val listenDurationsMs by viewModel.listenDurationsMs.collectAsStateWithLifecycle()
     val activeTrackId = playbackState.track?.id
     val isScanning by libraryViewModel.isScanning.collectAsStateWithLifecycle()
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -202,27 +210,129 @@ fun HomeScreen(
                     "Add audio files to your device, then scan your library.",
                 ) { libraryViewModel.scan() }
             }
-        } else if (recentlyPlayed.isNotEmpty()) {
-            item { SectionHeading("Recently Played") }
-            items(recentlyPlayed, key = { "recent:${it.id}" }, contentType = { "track" }) { track ->
-                CompactTrackRow(
-                    track = track,
-                    isCurrent = track.id == activeTrackId,
-                    isPlaying = track.id == activeTrackId && playbackState.isPlaying,
-                ) {
-                    onPlayWithNotificationPermission { viewModel.play(track) }
+        } else {
+            if (recentlyPlayed.isNotEmpty()) {
+                item { SectionHeading("Recently Played") }
+                items(recentlyPlayed, key = { "recent:${it.id}" }, contentType = { "track" }) { track ->
+                    CompactTrackRow(
+                        track = track,
+                        isCurrent = track.id == activeTrackId,
+                        isPlaying = track.id == activeTrackId && playbackState.isPlaying,
+                        isFavorite = track.id in favoriteTrackIds,
+                        onToggleFavorite = { viewModel.toggleFavorite(track.id) },
+                    ) {
+                        onPlayWithNotificationPermission { viewModel.play(track) }
+                    }
+                }
+            } else {
+                item { SectionHeading("Recently Played") }
+                item {
+                    Text(
+                        "Tracks you play will appear here.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
-        } else {
-            item {
-                SectionHeading("Recently Played")
+            if (favoriteTracks.isNotEmpty()) {
+                item(key = "favorites_section") {
+                    GlassSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
+                            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column {
+                                    Text("Favorites", style = MaterialTheme.typography.titleLarge)
+                                    val unit = if (favoriteTracks.size == 1) "track" else "tracks"
+                                    Text(
+                                        "${favoriteTracks.size} $unit",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                                TextButton(
+                                    onClick = { onPlayWithNotificationPermission { viewModel.playTracks(favoriteTracks) } },
+                                ) {
+                                    Icon(
+                                        Icons.Filled.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                    )
+                                    Text("Play all")
+                                }
+                            }
+                            favoriteTracks.forEach { track ->
+                                CompactTrackRow(
+                                    track = track,
+                                    isCurrent = track.id == activeTrackId,
+                                    isPlaying = track.id == activeTrackId && playbackState.isPlaying,
+                                    isFavorite = true,
+                                    onToggleFavorite = { viewModel.toggleFavorite(track.id) },
+                                ) {
+                                    onPlayWithNotificationPermission { viewModel.playTracks(favoriteTracks, track) }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            item {
-                Text(
-                    "Tracks you play will appear here.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+            if (mostPlayedTracks.isNotEmpty()) {
+                item(key = "most_played_section") {
+                    GlassSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
+                            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column {
+                                    Text("Most Played", style = MaterialTheme.typography.titleLarge)
+                                    Text(
+                                        "Top ${mostPlayedTracks.size}",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                                TextButton(
+                                    onClick = { onPlayWithNotificationPermission { viewModel.playTracks(mostPlayedTracks) } },
+                                ) {
+                                    Icon(
+                                        Icons.Filled.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                    )
+                                    Text("Play all")
+                                }
+                            }
+                            mostPlayedTracks.forEach { track ->
+                                CompactTrackRow(
+                                    track = track,
+                                    isCurrent = track.id == activeTrackId,
+                                    isPlaying = track.id == activeTrackId && playbackState.isPlaying,
+                                    isFavorite = track.id in favoriteTrackIds,
+                                    onToggleFavorite = { viewModel.toggleFavorite(track.id) },
+                                    listenDurationMs = listenDurationsMs[track.id] ?: 0L,
+                                ) {
+                                    onPlayWithNotificationPermission { viewModel.playTracks(mostPlayedTracks, track) }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -251,6 +361,9 @@ internal fun CompactTrackRow(
     track: Track,
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
+    listenDurationMs: Long? = null,
     onClick: () -> Unit,
 ) {
     GlassSurface(
@@ -281,6 +394,14 @@ internal fun CompactTrackRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (listenDurationMs != null && listenDurationMs > 0L) {
+                Text(
+                    formatDuration(listenDurationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = AppDimens.ElementSpacing),
+                )
+            }
             if (isCurrent && isPlaying) {
                 Icon(
                     Icons.Outlined.GraphicEq,
@@ -293,6 +414,16 @@ internal fun CompactTrackRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (onToggleFavorite != null) {
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                    )
+                }
             }
         }
     }

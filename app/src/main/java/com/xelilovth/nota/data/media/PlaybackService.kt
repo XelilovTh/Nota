@@ -21,6 +21,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaStyleNotificationHelper
 import com.xelilovth.nota.MainActivity
 import com.xelilovth.nota.R
+import com.xelilovth.nota.widget.NotaWidgetProvider
 
 @OptIn(UnstableApi::class)
 class PlaybackService : Service() {
@@ -83,6 +84,7 @@ class PlaybackService : Service() {
                 updateNotification()
             }
             ACTION_STOP -> {
+                NotaWidgetProvider.updateWidgets(this, null, null, false)
                 ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
@@ -92,6 +94,7 @@ class PlaybackService : Service() {
                     stopSelf(startId)
                 } else {
                     startForegroundWithNotification(buildMediaNotification(player))
+                    updateWidgetsForPlayer(player)
                 }
             }
         }
@@ -129,6 +132,17 @@ class PlaybackService : Service() {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.notify(NOTIFICATION_ID, notification)
         }
+        updateWidgetsForPlayer(player)
+    }
+
+    private fun updateWidgetsForPlayer(player: Player) {
+        val metadata = player.currentMediaItem?.mediaMetadata
+        NotaWidgetProvider.updateWidgets(
+            this,
+            metadata?.title?.toString(),
+            metadata?.artist?.toString(),
+            player.isPlaying || player.playWhenReady,
+        )
     }
 
     private fun buildMediaNotification(player: Player): Notification {

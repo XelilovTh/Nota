@@ -1,11 +1,17 @@
 package com.xelilovth.nota.presentation.player
 
+import android.app.Activity
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +22,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,7 +32,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -34,6 +43,8 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.animation.AnimatedContent
@@ -45,17 +56,21 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -69,16 +84,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import com.xelilovth.nota.R
+import com.xelilovth.nota.domain.model.DeleteTrackResult
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
+import com.xelilovth.nota.ui.components.AudioWaveformVisualizer
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
@@ -86,11 +109,17 @@ import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalGlassColors
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.sin
 
 private const val ARC_START_ANGLE = 135f
 private const val ARC_SWEEP_ANGLE = 270f
+
+private enum class PendingGeminiAction {
+    TRANSCRIBE,
+    TRANSLATE,
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,6 +130,10 @@ fun NowPlayingScreen(
     onBack: () -> Unit,
     onSleepTimer: () -> Unit,
     onSettings: () -> Unit,
+    onVerticalDrag: (Float) -> Unit = {},
+    onVerticalDragEnd: (Float) -> Unit = {},
+    onVerticalDragCancel: () -> Unit = {},
+    currentDragOffsetPx: () -> Float = { 0f },
 ) {
     val queueTracks = state.queue
     val duration = state.durationMs.coerceAtLeast(0L)
@@ -109,13 +142,33 @@ fun NowPlayingScreen(
 
     var isDragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(0f) }
-    val displayProgress = if (isDragging) dragProgress else playerProgress
-    val displayPositionMs = if (isDragging && duration > 0L) (dragProgress * duration).toLong() else position
+    var pendingSeekProgress by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(position, isDragging) {
+        if (!isDragging && pendingSeekProgress != null) {
+            kotlinx.coroutines.delay(180L)
+            pendingSeekProgress = null
+        }
+    }
+    val displayProgress = when {
+        isDragging -> dragProgress
+        pendingSeekProgress != null -> pendingSeekProgress!!
+        else -> playerProgress
+    }
+    val displayPositionMs = when {
+        (isDragging || pendingSeekProgress != null) && duration > 0L -> (displayProgress * duration).toLong()
+        else -> position
+    }
 
     var showRemaining by remember { mutableStateOf(false) }
     var lyricsExpanded by remember { mutableStateOf(false) }
     val lyricsUiState by viewModel.lyricsState.collectAsStateWithLifecycle()
-    val uriHandler = LocalUriHandler.current
+    val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    val translationLanguage by viewModel.translationLanguage.collectAsStateWithLifecycle()
+    val favoriteTrackIds by viewModel.favoriteTrackIds.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    var showGeminiKeyDialog by remember { mutableStateOf(false) }
+    var pendingGeminiAction by remember { mutableStateOf<PendingGeminiAction?>(null) }
 
     LaunchedEffect(state.track?.id) {
         val track = state.track
@@ -132,10 +185,48 @@ fun NowPlayingScreen(
     }
     var showQueueSheet by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
+    var showTrackMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var pendingDeleteTrackId by remember { mutableStateOf<Long?>(null) }
+    val deleteLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            pendingDeleteTrackId?.let { id ->
+                viewModel.confirmTrackDeleted(id)
+                Toast.makeText(context, "Track deleted", Toast.LENGTH_SHORT).show()
+                if (queueTracks.size > 1) {
+                    viewModel.next()
+                } else {
+                    viewModel.dismiss()
+                    onBack()
+                }
+            }
+        }
+        pendingDeleteTrackId = null
+    }
 
     Column(
         Modifier
             .fillMaxSize()
+            .pointerInput(lyricsExpanded) {
+                if (!lyricsExpanded) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            if (dragAmount > 0f || currentDragOffsetPx() > 0f) {
+                                onVerticalDrag(dragAmount)
+                                change.consume()
+                            }
+                        },
+                        onDragEnd = {
+                            onVerticalDragEnd(AppDimens.SwipeDismissThreshold.toPx())
+                        },
+                        onDragCancel = {
+                            onVerticalDragCancel()
+                        },
+                    )
+                }
+            }
             .navigationBarsPadding()
             .padding(
                 start = AppDimens.ScreenPadding,
@@ -165,8 +256,46 @@ fun NowPlayingScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             if (state.track != null) {
-                IconButton(onClick = { showAddToPlaylist = true }) {
-                    Icon(Icons.AutoMirrored.Outlined.PlaylistAdd, contentDescription = "Add to playlist")
+                val isFavorite = state.track.id in favoriteTrackIds
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.toggleFavorite(state.track.id)
+                }) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box {
+                    IconButton(onClick = { showTrackMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More options")
+                    }
+                    DropdownMenu(
+                        expanded = showTrackMenu,
+                        onDismissRequest = { showTrackMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Add to playlist") },
+                            leadingIcon = {
+                                Icon(Icons.AutoMirrored.Outlined.PlaylistAdd, contentDescription = null)
+                            },
+                            onClick = {
+                                showTrackMenu = false
+                                showAddToPlaylist = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete from device") },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                            },
+                            onClick = {
+                                showTrackMenu = false
+                                showDeleteConfirm = true
+                            },
+                        )
+                    }
                 }
             }
             IconButton(onClick = onSettings) {
@@ -219,9 +348,9 @@ fun NowPlayingScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "|",
+                        "·",
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     )
                     val rightTime = if (showRemaining && duration > 0L) {
                         "-${formatDuration((duration - displayPositionMs).coerceAtLeast(0L))}"
@@ -235,7 +364,9 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
+                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+                AudioWaveformVisualizer(isPlaying = state.isPlaying)
+                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
 
                 CircularArcPlayerArt(
                     track = state.track,
@@ -246,6 +377,7 @@ fun NowPlayingScreen(
                         dragProgress = next
                     },
                     onSeekFinish = { finalProgress ->
+                        pendingSeekProgress = finalProgress
                         isDragging = false
                         if (duration > 0L) {
                             viewModel.seek((finalProgress * duration).toLong())
@@ -262,17 +394,31 @@ fun NowPlayingScreen(
                 .weight(if (lyricsExpanded) 0.72f else 0.28f)
                 .pointerInput(lyricsExpanded, state.track?.id) {
                     if (!lyricsExpanded && state.track != null) {
-                        var dragDistance = 0f
+                        var upwardDrag = 0f
                         detectVerticalDragGestures(
                             onVerticalDrag = { change, dragAmount ->
-                                dragDistance += dragAmount
+                                if (dragAmount < 0f && currentDragOffsetPx() == 0f) {
+                                    upwardDrag += dragAmount
+                                } else if (dragAmount > 0f || currentDragOffsetPx() > 0f) {
+                                    upwardDrag = 0f
+                                    onVerticalDrag(dragAmount)
+                                }
                                 change.consume()
                             },
                             onDragEnd = {
-                                if (dragDistance < -AppDimens.LyricsDragThreshold.toPx()) lyricsExpanded = true
-                                dragDistance = 0f
+                                if (currentDragOffsetPx() > 0f) {
+                                    onVerticalDragEnd(AppDimens.SwipeDismissThreshold.toPx())
+                                } else if (upwardDrag < -AppDimens.LyricsDragThreshold.toPx()) {
+                                    lyricsExpanded = true
+                                }
+                                upwardDrag = 0f
                             },
-                            onDragCancel = { dragDistance = 0f },
+                            onDragCancel = {
+                                upwardDrag = 0f
+                                if (currentDragOffsetPx() > 0f) {
+                                    onVerticalDragCancel()
+                                }
+                            },
                         )
                     }
                 },
@@ -296,6 +442,7 @@ fun NowPlayingScreen(
                         state = lyricsUiState,
                         positionMs = position,
                         isPlaying = state.isPlaying,
+                        translationLanguage = translationLanguage,
                         onCollapse = { lyricsExpanded = false },
                         onSeekTo = viewModel::seek,
                         onAdjustOffset = { delta ->
@@ -304,14 +451,29 @@ fun NowPlayingScreen(
                         onImportLyrics = {
                             lrcLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
                         },
-                        onOpenGenius = {
+                        onGenerateWithGemini = {
                             val track = state.track
                             if (track != null) {
-                                val query = Uri.encode("${track.artist} ${track.title}")
-                                runCatching { uriHandler.openUri("https://genius.com/search?q=$query") }
+                                if (geminiApiKey.isBlank()) {
+                                    pendingGeminiAction = PendingGeminiAction.TRANSCRIBE
+                                    showGeminiKeyDialog = true
+                                } else {
+                                    viewModel.generateLyricsWithGemini(track)
+                                }
                             }
                         },
-                        modifier = Modifier.fillMaxSize(),
+                        onDeleteLyrics = {
+                            state.track?.let { viewModel.deleteLyrics(it.id) }
+                        },
+                        onToggleTranslation = {
+                            state.track?.let { viewModel.toggleLyricsTranslation(it) }
+                        },
+                        onSelectTranslationLanguage = { language ->
+                            viewModel.setTranslationLanguage(language, state.track)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = AppDimens.LyricsPanelMaxHeight),
                     )
                 } else {
                     LyricsSwipeHint(
@@ -344,12 +506,16 @@ fun NowPlayingScreen(
                             dragProgress = next
                         },
                         onValueChangeFinished = {
+                            pendingSeekProgress = dragProgress
                             isDragging = false
                             if (duration > 0L) {
                                 viewModel.seek((dragProgress * duration).toLong())
                             }
                         },
                         enabled = duration > 0L,
+                        colors = SliderDefaults.colors(
+                            inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .height(AppDimens.LyricsScrubberHeight),
@@ -360,7 +526,7 @@ fun NowPlayingScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+                Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
             }
         }
 
@@ -384,11 +550,17 @@ fun NowPlayingScreen(
                         tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = viewModel::previous) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.previous()
+                }) {
                     Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", modifier = Modifier.size(AppDimens.IconSizeLarge))
                 }
                 Surface(
-                    onClick = viewModel::togglePlayPause,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        viewModel.togglePlayPause()
+                    },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -402,7 +574,10 @@ fun NowPlayingScreen(
                         )
                     }
                 }
-                IconButton(onClick = viewModel::next) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    viewModel.next()
+                }) {
                     Icon(Icons.Filled.SkipNext, contentDescription = "Next", modifier = Modifier.size(AppDimens.IconSizeLarge))
                 }
                 IconButton(onClick = viewModel::cycleRepeatMode) {
@@ -416,7 +591,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.12f))
+        Spacer(modifier = Modifier.height(AppDimens.PlayerControlsBottomSpacing))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -489,7 +664,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.weight(0.12f))
+        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
     }
 
     if (showQueueSheet) {
@@ -571,6 +746,151 @@ fun NowPlayingScreen(
             onDismiss = { showAddToPlaylist = false },
         )
     }
+
+    if (showDeleteConfirm && activeTrack != null) {
+        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
+                ) {
+                    Text("Delete from device", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Delete \"${activeTrack.title}\" permanently from your device storage?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing, Alignment.End),
+                    ) {
+                        TextButton(onClick = { showDeleteConfirm = false }) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                showDeleteConfirm = false
+                                viewModel.deleteTrack(activeTrack.id) { res ->
+                                    when (res) {
+                                        is DeleteTrackResult.Deleted -> {
+                                            Toast.makeText(context, "Track deleted", Toast.LENGTH_SHORT).show()
+                                            if (queueTracks.size > 1) {
+                                                viewModel.next()
+                                            } else {
+                                                viewModel.dismiss()
+                                                onBack()
+                                            }
+                                        }
+                                        is DeleteTrackResult.RequiresPermission -> {
+                                            pendingDeleteTrackId = activeTrack.id
+                                            deleteLauncher.launch(
+                                                IntentSenderRequest.Builder(res.intentSender).build(),
+                                            )
+                                        }
+                                        is DeleteTrackResult.Failed -> {
+                                            Toast.makeText(context, "Could not delete track", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            },
+                        ) {
+                            Text("Delete")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showGeminiKeyDialog) {
+        var keyInput by remember { mutableStateOf("") }
+        Dialog(onDismissRequest = {
+            showGeminiKeyDialog = false
+            pendingGeminiAction = null
+        }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
+                ) {
+                    Text(
+                        stringResource(R.string.lyrics_gemini_key_title),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    GlassSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = CircleShape,
+                        subtle = true,
+                    ) {
+                        TextField(
+                            value = keyInput,
+                            onValueChange = { keyInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text(stringResource(R.string.lyrics_gemini_key_hint)) },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
+                            ),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing, Alignment.End),
+                    ) {
+                        TextButton(onClick = {
+                            showGeminiKeyDialog = false
+                            pendingGeminiAction = null
+                        }) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                val trimmedKey = keyInput.trim()
+                                viewModel.saveGeminiApiKey(trimmedKey)
+                                showGeminiKeyDialog = false
+                                val action = pendingGeminiAction
+                                pendingGeminiAction = null
+                                state.track?.let { track ->
+                                    when (action) {
+                                        PendingGeminiAction.TRANSLATE -> viewModel.toggleLyricsTranslation(track, trimmedKey)
+                                        PendingGeminiAction.TRANSCRIBE, null -> viewModel.generateLyricsWithGemini(track, trimmedKey)
+                                    }
+                                }
+                            },
+                            enabled = keyInput.isNotBlank(),
+                        ) {
+                            Text(
+                                if (pendingGeminiAction == PendingGeminiAction.TRANSLATE) {
+                                    "Save & Translate"
+                                } else {
+                                    "Save & Transcribe"
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -595,28 +915,39 @@ private fun CircularArcPlayerArt(
         modifier = modifier
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
-                detectTapGestures { offset ->
-                    val fraction = touchOffsetToArcProgress(offset, size.width.toFloat(), size.height.toFloat())
-                    onSeekFinish(fraction)
+                val strokePx = AppDimens.CircularSeekbarStroke.toPx()
+                val thumbRadiusPx = AppDimens.CircularSeekbarThumbRadius.toPx()
+                val hitSlopPx = AppDimens.CircularSeekbarHitSlop.toPx()
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val w = size.width.toFloat()
+                    val h = size.height.toFloat()
+                    val inset = thumbRadiusPx + strokePx
+                    val ringRadius = (min(w, h) - inset * 2f) / 2f
+                    val dist = hypot(down.position.x - w / 2f, down.position.y - h / 2f)
+                    if (dist < ringRadius - hitSlopPx || dist > ringRadius + hitSlopPx) {
+                        return@awaitEachGesture
+                    }
+                    down.consume()
+                    var currentFraction = touchOffsetToArcProgress(down.position, w, h)
+                    latestProgress = currentFraction
+                    onProgressChange(currentFraction)
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            change.consume()
+                            onSeekFinish(latestProgress)
+                            break
+                        }
+                        if (change.positionChange() != Offset.Zero) {
+                            change.consume()
+                            currentFraction = touchOffsetToArcProgress(change.position, w, h)
+                            latestProgress = currentFraction
+                            onProgressChange(currentFraction)
+                        }
+                    }
                 }
-            }
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val fraction = touchOffsetToArcProgress(offset, size.width.toFloat(), size.height.toFloat())
-                        latestProgress = fraction
-                        onProgressChange(fraction)
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        val fraction = touchOffsetToArcProgress(change.position, size.width.toFloat(), size.height.toFloat())
-                        latestProgress = fraction
-                        onProgressChange(fraction)
-                    },
-                    onDragEnd = { onSeekFinish(latestProgress) },
-                    onDragCancel = { onSeekFinish(latestProgress) },
-                )
             },
         contentAlignment = Alignment.Center,
     ) {

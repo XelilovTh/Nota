@@ -29,8 +29,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import com.xelilovth.nota.domain.model.PlaybackState
+import com.xelilovth.nota.ui.components.AudioWaveformVisualizer
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -44,6 +47,7 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
 ) {
     val track = state.track ?: return
+    val haptic = LocalHapticFeedback.current
     val duration = state.durationMs.coerceAtLeast(0L)
     val progress = if (duration > 0L) (state.positionMs.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
 
@@ -104,16 +108,26 @@ fun MiniPlayer(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    IconButton(onClick = viewModel::previous) {
+                    AudioWaveformVisualizer(isPlaying = state.isPlaying)
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        viewModel.previous()
+                    }) {
                         Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous")
                     }
-                    IconButton(onClick = viewModel::togglePlayPause) {
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        viewModel.togglePlayPause()
+                    }) {
                         Icon(
                             if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (state.isPlaying) "Pause" else "Play",
                         )
                     }
-                    IconButton(onClick = viewModel::next) {
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        viewModel.next()
+                    }) {
                         Icon(Icons.Filled.SkipNext, contentDescription = "Next")
                     }
                 }

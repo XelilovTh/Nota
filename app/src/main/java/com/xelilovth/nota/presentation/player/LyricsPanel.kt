@@ -7,8 +7,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -27,12 +28,16 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,19 +47,25 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.window.Dialog
 import com.xelilovth.nota.R
 import com.xelilovth.nota.domain.model.LyricLine
 import com.xelilovth.nota.domain.model.LyricsSyncType
@@ -66,22 +77,28 @@ import com.xelilovth.nota.ui.theme.LocalGlassColors
 import java.util.Locale
 
 private const val OFFSET_STEP_MS = 500L
+private val TRANSLATION_LANGUAGES = listOf("English", "Russian", "Azerbaijani", "Turkish")
 
 @Composable
 internal fun LyricsPanel(
     state: LyricsUiState,
     positionMs: Long,
     isPlaying: Boolean,
+    translationLanguage: String,
     onCollapse: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onAdjustOffset: (Long) -> Unit,
     onImportLyrics: () -> Unit,
-    onOpenGenius: () -> Unit,
+    onGenerateWithGemini: () -> Unit,
+    onDeleteLyrics: () -> Unit,
+    onToggleTranslation: () -> Unit,
+    onSelectTranslationLanguage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val showOffsetControls = state.lyrics != null &&
         !state.lyrics.instrumental &&
         state.lyrics.syncType != LyricsSyncType.PLAIN
+    val canTranslate = state.lyrics != null && !state.lyrics.instrumental
 
     GlassSurface(
         modifier = modifier.fillMaxSize(),
@@ -96,9 +113,17 @@ internal fun LyricsPanel(
             LyricsHeader(
                 syncOffsetMs = state.syncOffsetMs,
                 showOffsetControls = showOffsetControls,
+                hasLyrics = state.lyrics != null,
+                canTranslate = canTranslate,
+                showTranslation = state.showTranslation,
+                isTranslating = state.isTranslating,
+                translationLanguage = translationLanguage,
                 onCollapse = onCollapse,
                 onAdjustOffset = onAdjustOffset,
                 onImportLyrics = onImportLyrics,
+                onDeleteLyrics = onDeleteLyrics,
+                onToggleTranslation = onToggleTranslation,
+                onSelectTranslationLanguage = onSelectTranslationLanguage,
             )
 
             when {
@@ -106,19 +131,22 @@ internal fun LyricsPanel(
                 state.lyrics?.instrumental == true -> EmptyLyrics(
                     titleRes = R.string.lyrics_instrumental,
                     subtitleRes = R.string.lyrics_instrumental_description,
+                    errorMessage = state.errorMessage,
                     onImportLyrics = onImportLyrics,
-                    onOpenGenius = null,
+                    onGenerateWithGemini = null,
                 )
                 state.lyrics == null -> EmptyLyrics(
                     titleRes = R.string.lyrics_not_available,
                     subtitleRes = R.string.lyrics_not_found_description,
+                    errorMessage = state.errorMessage,
                     onImportLyrics = onImportLyrics,
-                    onOpenGenius = onOpenGenius,
+                    onGenerateWithGemini = onGenerateWithGemini,
                 )
                 else -> LyricsContent(
                     lyrics = state.lyrics,
                     positionMs = positionMs,
                     syncOffsetMs = state.syncOffsetMs,
+                    showTranslation = state.showTranslation,
                     isPlaying = isPlaying,
                     onSeekTo = onSeekTo,
                 )
@@ -127,15 +155,27 @@ internal fun LyricsPanel(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LyricsHeader(
     syncOffsetMs: Long,
     showOffsetControls: Boolean,
+    hasLyrics: Boolean,
+    canTranslate: Boolean,
+    showTranslation: Boolean,
+    isTranslating: Boolean,
+    translationLanguage: String,
     onCollapse: () -> Unit,
     onAdjustOffset: (Long) -> Unit,
     onImportLyrics: () -> Unit,
+    onDeleteLyrics: () -> Unit,
+    onToggleTranslation: () -> Unit,
+    onSelectTranslationLanguage: (String) -> Unit,
 ) {
-    Box(
+    val haptic = LocalHapticFeedback.current
+    var showLanguageMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(AppDimens.LyricsHeaderHeight)
@@ -154,13 +194,11 @@ private fun LyricsHeader(
                     onDragCancel = { dragDistance = 0f },
                 )
             },
-        contentAlignment = Alignment.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(
             onClick = onCollapse,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .size(AppDimens.LyricsToolbarButtonSize),
+            modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
         ) {
             Icon(
                 imageVector = Icons.Filled.KeyboardArrowDown,
@@ -170,15 +208,9 @@ private fun LyricsHeader(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(width = AppDimens.LyricsHandleWidth, height = AppDimens.LyricsHandleThickness)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f), CircleShape),
-        )
+        Spacer(modifier = Modifier.weight(1f))
 
         Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppDimens.ShapeExtraSmall),
         ) {
@@ -212,6 +244,53 @@ private fun LyricsHeader(
                     )
                 }
             }
+            if (canTranslate) {
+                Box(
+                    modifier = Modifier
+                        .size(AppDimens.LyricsToolbarButtonSize)
+                        .clip(CircleShape)
+                        .combinedClickable(
+                            enabled = !isTranslating,
+                            onClick = onToggleTranslation,
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showLanguageMenu = true
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isTranslating) {
+                        CircularProgressIndicator(
+                            strokeWidth = AppDimens.MiniPlayerProgressHeight,
+                            modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.Translate,
+                            contentDescription = "Translate lyrics",
+                            modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                            tint = if (showTranslation) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+            }
+            if (hasLyrics) {
+                IconButton(
+                    onClick = { showDeleteConfirmDialog = true },
+                    modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DeleteOutline,
+                        contentDescription = stringResource(R.string.lyrics_delete),
+                        modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             IconButton(
                 onClick = onImportLyrics,
                 modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
@@ -222,6 +301,124 @@ private fun LyricsHeader(
                     modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+
+    if (showLanguageMenu) {
+        Dialog(onDismissRequest = { showLanguageMenu = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    Text(
+                        text = "Translation language",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+                    TRANSLATION_LANGUAGES.forEach { lang ->
+                        val isSelected = lang == translationLanguage
+                        GlassSurface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            subtle = !isSelected,
+                            onClick = {
+                                showLanguageMenu = false
+                                onSelectTranslationLanguage(lang)
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        horizontal = AppDimens.CardPadding,
+                                        vertical = AppDimens.RowVerticalPadding,
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    text = lang,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    TextButton(
+                        onClick = { showLanguageMenu = false },
+                        modifier = Modifier.align(Alignment.End),
+                    ) {
+                        Text("Close")
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeleteConfirmDialog) {
+        Dialog(onDismissRequest = { showDeleteConfirmDialog = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
+                ) {
+                    Text(
+                        text = "Delete lyrics?",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        text = "Remove saved lyrics for this track?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            AppDimens.ElementSpacing,
+                            Alignment.End,
+                        ),
+                    ) {
+                        TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                showDeleteConfirmDialog = false
+                                onDeleteLyrics()
+                            },
+                        ) {
+                            Text("Delete")
+                        }
+                    }
+                }
             }
         }
     }
@@ -256,8 +453,9 @@ private fun LoadingLyrics() {
 private fun EmptyLyrics(
     titleRes: Int,
     subtitleRes: Int,
+    errorMessage: String?,
     onImportLyrics: () -> Unit,
-    onOpenGenius: (() -> Unit)?,
+    onGenerateWithGemini: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -281,18 +479,27 @@ private fun EmptyLyrics(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(AppDimens.ElementSpacing))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-            verticalAlignment = Alignment.CenterVertically,
+        if (!errorMessage.isNullOrBlank()) {
+            Spacer(Modifier.height(AppDimens.ElementSpacing))
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(Modifier.height(AppDimens.SectionSpacing))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
         ) {
+            if (onGenerateWithGemini != null) {
+                Button(onClick = onGenerateWithGemini) {
+                    Text(stringResource(R.string.lyrics_generate_gemini))
+                }
+            }
             TextButton(onClick = onImportLyrics) {
                 Text(stringResource(R.string.lyrics_import_lrc))
-            }
-            if (onOpenGenius != null) {
-                TextButton(onClick = onOpenGenius) {
-                    Text(stringResource(R.string.lyrics_search_genius))
-                }
             }
         }
     }
@@ -303,6 +510,7 @@ private fun LyricsContent(
     lyrics: TrackLyrics,
     positionMs: Long,
     syncOffsetMs: Long,
+    showTranslation: Boolean,
     @Suppress("UNUSED_PARAMETER") isPlaying: Boolean,
     onSeekTo: (Long) -> Unit,
 ) {
@@ -378,46 +586,61 @@ private fun LyricsContent(
                 scaleY = lineScale
             }
 
-            if (isActive && lyrics.syncType == LyricsSyncType.WORD && line.words.isNotEmpty()) {
-                SyncedWordLine(
-                    line = line,
-                    effectivePositionMs = effectivePositionMs,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(scaleModifier)
-                        .then(clickableModifier),
-                )
-            } else {
-                val alphaTarget = when {
-                    lyrics.syncType == LyricsSyncType.PLAIN -> 0.78f
-                    isActive -> 1f
-                    isLightGlass -> 0.45f
-                    else -> 0.32f
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(scaleModifier)
+                    .then(clickableModifier),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (isActive && lyrics.syncType == LyricsSyncType.WORD && line.words.isNotEmpty()) {
+                    SyncedWordLine(
+                        line = line,
+                        effectivePositionMs = effectivePositionMs,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    val alphaTarget = when {
+                        lyrics.syncType == LyricsSyncType.PLAIN -> 0.78f
+                        isActive -> 1f
+                        isLightGlass -> 0.45f
+                        else -> 0.32f
+                    }
+                    val alpha by animateFloatAsState(
+                        targetValue = alphaTarget,
+                        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                        label = "lyric-line-alpha",
+                    )
+                    Text(
+                        text = line.text,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                        fontSize = when (lyrics.syncType) {
+                            LyricsSyncType.PLAIN -> AppDimens.LyricsPlainFontSize
+                            LyricsSyncType.WORD, LyricsSyncType.LINE -> AppDimens.LyricsWordFontSize
+                        },
+                        lineHeight = AppDimens.LyricsLineHeight,
+                        textAlign = TextAlign.Center,
+                        fontWeight = when {
+                            isActive && lyrics.syncType == LyricsSyncType.LINE -> FontWeight.Bold
+                            isActive -> FontWeight.SemiBold
+                            else -> FontWeight.Normal
+                        },
+                    )
                 }
-                val alpha by animateFloatAsState(
-                    targetValue = alphaTarget,
-                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-                    label = "lyric-line-alpha",
-                )
-                Text(
-                    text = line.text,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(scaleModifier)
-                        .then(clickableModifier),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-                    fontSize = when (lyrics.syncType) {
-                        LyricsSyncType.PLAIN -> AppDimens.LyricsPlainFontSize
-                        LyricsSyncType.WORD, LyricsSyncType.LINE -> AppDimens.LyricsWordFontSize
-                    },
-                    lineHeight = AppDimens.LyricsLineHeight,
-                    textAlign = TextAlign.Center,
-                    fontWeight = when {
-                        isActive && lyrics.syncType == LyricsSyncType.LINE -> FontWeight.Bold
-                        isActive -> FontWeight.SemiBold
-                        else -> FontWeight.Normal
-                    },
-                )
+                if (showTranslation && !line.translatedText.isNullOrBlank()) {
+                    Text(
+                        text = line.translatedText,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = AppDimens.ShapeExtraSmall),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                            alpha = if (isActive) 0.9f else 0.55f,
+                        ),
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }

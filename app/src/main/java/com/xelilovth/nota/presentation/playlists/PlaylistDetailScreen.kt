@@ -62,26 +62,49 @@ fun PlaylistDetailScreen(
 ) {
     val allTracks by viewModel.tracks.collectAsStateWithLifecycle()
     val customPlaylists by viewModel.customPlaylists.collectAsStateWithLifecycle()
+    val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
+    val mostPlayedTracks by viewModel.mostPlayedTracks.collectAsStateWithLifecycle()
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val activeTrackId = playbackState.track?.id
 
-    val customPlaylist = remember(customPlaylists, playlistId) {
-        customPlaylists.firstOrNull { it.id == playlistId }
+    val isSmartFavorites = playlistId == "smart:favorites"
+    val isSmartMostPlayed = playlistId == "smart:most_played"
+    val isSmartPlaylist = isSmartFavorites || isSmartMostPlayed
+
+    val customPlaylist = remember(customPlaylists, playlistId, isSmartPlaylist) {
+        if (isSmartPlaylist) null else customPlaylists.firstOrNull { it.id == playlistId }
     }
-    val autoPlaylist = remember(allTracks, playlistId, customPlaylist) {
-        if (customPlaylist != null) null
+    val autoPlaylist = remember(allTracks, playlistId, customPlaylist, isSmartPlaylist) {
+        if (isSmartPlaylist || customPlaylist != null) null
         else groupTracksIntoPlaylists(allTracks).firstOrNull { it.id == playlistId }
     }
     val trackById = remember(allTracks) { allTracks.associateBy(Track::id) }
 
-    val playlistTitle = customPlaylist?.name ?: autoPlaylist?.title ?: "Playlist"
+    val playlistTitle = when {
+        isSmartFavorites -> "Favorites"
+        isSmartMostPlayed -> "Most Played"
+        customPlaylist != null -> customPlaylist.name
+        autoPlaylist != null -> autoPlaylist.title
+        else -> "Playlist"
+    }
     val playlistSubtitle = when {
+        isSmartPlaylist -> "smart playlist"
         customPlaylist != null -> customPlaylist.type.name.lowercase()
         autoPlaylist != null -> autoPlaylist.type.name.lowercase()
         else -> ""
     }
-    val playlistTracks = remember(customPlaylist, autoPlaylist, trackById) {
+    val playlistTracks = remember(
+        isSmartFavorites,
+        isSmartMostPlayed,
+        favoriteTracks,
+        mostPlayedTracks,
+        customPlaylist,
+        autoPlaylist,
+        trackById,
+    ) {
         when {
+            isSmartFavorites -> favoriteTracks
+            isSmartMostPlayed -> mostPlayedTracks
             customPlaylist != null -> customPlaylist.trackIds.mapNotNull(trackById::get)
             autoPlaylist != null -> autoPlaylist.tracks
             else -> emptyList()
@@ -107,7 +130,7 @@ fun PlaylistDetailScreen(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (customPlaylist != null || autoPlaylist != null) {
+                if (isSmartPlaylist || customPlaylist != null || autoPlaylist != null) {
                     val count = playlistTracks.size
                     val unit = if (count == 1) "track" else "tracks"
                     Text(
@@ -130,7 +153,7 @@ fun PlaylistDetailScreen(
             }
         }
 
-        if (customPlaylist == null && autoPlaylist == null) {
+        if (!isSmartPlaylist && customPlaylist == null && autoPlaylist == null) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(AppDimens.ScreenPadding),
                 verticalArrangement = Arrangement.Center,

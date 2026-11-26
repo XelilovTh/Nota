@@ -6,10 +6,16 @@ import android.os.Build
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,19 +32,25 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -60,7 +72,7 @@ import com.xelilovth.nota.presentation.search.SearchScreen
 import com.xelilovth.nota.presentation.settings.SettingsScreen
 import com.xelilovth.nota.presentation.settings.SettingsViewModel
 import com.xelilovth.nota.presentation.settings.SleepTimerScreen
-import com.xelilovth.nota.ui.components.GlassAmbientBackground
+import com.xelilovth.nota.ui.components.BreathingAmbientBackground
 import com.xelilovth.nota.ui.components.LiquidGlassBottomBar
 import com.xelilovth.nota.ui.components.LiquidNavTab
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -87,7 +99,7 @@ fun NotaApp() {
         if (!granted) {
             Toast.makeText(
                 context,
-                "Bildiriş icazəsi olmadan arxa planda idarəetmə işləməyəcək",
+                "Notification permission is required for background playback controls",
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -111,7 +123,7 @@ fun NotaApp() {
             } else {
                 Toast.makeText(
                     context,
-                    "Bildiriş icazəsi olmadan arxa planda idarəetmə işləməyəcək",
+                    "Notification permission is required for background playback controls",
                     Toast.LENGTH_LONG,
                 ).show()
                 action()
@@ -127,12 +139,18 @@ fun NotaApp() {
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val showTabs = currentRoute in AppRoute.bottomTabs
     val hazeState = remember { HazeState() }
-    val hasMiniPlayer = currentRoute != AppRoute.NOW_PLAYING &&
-        remember(playerViewModel) {
-            playerViewModel.playbackState
-                .map { it.track != null }
-                .distinctUntilChanged()
-        }.collectAsStateWithLifecycle(initialValue = false).value
+    var isPlayerOpen by rememberSaveable { mutableStateOf(false) }
+    val hasMiniPlayer = remember(playerViewModel) {
+        playerViewModel.playbackState
+            .map { it.track != null }
+            .distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = false).value
+    LaunchedEffect(hasMiniPlayer, isPlayerOpen) {
+        if (!hasMiniPlayer && isPlayerOpen) {
+            isPlayerOpen = false
+        }
+    }
+    BackHandler(enabled = isPlayerOpen) { isPlayerOpen = false }
     val bottomClearance = when {
         showTabs && hasMiniPlayer -> AppDimens.FloatingBottomClearance
         showTabs -> AppDimens.FloatingNavOnlyClearance
@@ -154,7 +172,17 @@ fun NotaApp() {
                     .fillMaxSize()
                     .hazeSource(state = hazeState),
             ) {
-                GlassAmbientBackground(modifier = Modifier.fillMaxSize())
+                val ambientState by remember(playerViewModel) {
+                    playerViewModel.playbackState
+                        .map { Triple(it.isPlaying, it.track?.id, it.track?.uri) }
+                        .distinctUntilChanged()
+                }.collectAsStateWithLifecycle(initialValue = Triple(false, null, null))
+                BreathingAmbientBackground(
+                    isPlaying = ambientState.first,
+                    trackId = ambientState.second,
+                    trackUri = ambientState.third,
+                    modifier = Modifier.fillMaxSize(),
+                )
                 NavHost(
                     navController = navController,
                     startDestination = AppRoute.HOME,
@@ -209,18 +237,6 @@ fun NotaApp() {
                     composable(AppRoute.SLEEP_TIMER) {
                         SleepTimerScreen(onBack = { navController.popBackStack() })
                     }
-                    composable(AppRoute.NOW_PLAYING) {
-                        val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
-                        val sleepSeconds by settingsViewModel.sleepTimerRemainingSeconds.collectAsStateWithLifecycle()
-                        NowPlayingScreen(
-                            state = playbackState,
-                            viewModel = playerViewModel,
-                            sleepTimerRemainingSeconds = sleepSeconds,
-                            onBack = { navController.popBackStack() },
-                            onSleepTimer = { navController.navigate(AppRoute.SLEEP_TIMER) },
-                            onSettings = { navController.navigate(AppRoute.SETTINGS) },
-                        )
-                    }
                 }
             }
 
@@ -264,8 +280,8 @@ fun NotaApp() {
             ) {
                 MiniPlayerHost(
                     playerViewModel = playerViewModel,
-                    visible = currentRoute != AppRoute.NOW_PLAYING,
-                    onOpen = { navController.navigate(AppRoute.NOW_PLAYING) },
+                    visible = !isPlayerOpen,
+                    onOpen = { isPlayerOpen = true },
                     modifier = Modifier.padding(
                         bottom = if (showTabs) AppDimens.FloatingMiniPlayerGap else AppDimens.ElementSpacing,
                     ),
@@ -283,6 +299,79 @@ fun NotaApp() {
                             })
                         },
                     )
+                }
+            }
+
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val screenHeightPx = with(LocalDensity.current) { maxHeight.toPx() }.coerceAtLeast(1f)
+                val playerOffsetY = remember { Animatable(screenHeightPx) }
+                val coroutineScope = rememberCoroutineScope()
+                LaunchedEffect(isPlayerOpen, screenHeightPx) {
+                    if (isPlayerOpen) {
+                        playerOffsetY.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+                    } else if (playerOffsetY.value < screenHeightPx) {
+                        playerOffsetY.animateTo(screenHeightPx, tween(240, easing = FastOutSlowInEasing))
+                    }
+                }
+                if (isPlayerOpen || playerOffsetY.value < screenHeightPx - 1f) {
+                    val bgState by remember(playerViewModel) {
+                        playerViewModel.playbackState
+                            .map { Triple(it.isPlaying, it.track?.id, it.track?.uri) }
+                            .distinctUntilChanged()
+                    }.collectAsStateWithLifecycle(initialValue = Triple(false, null, null))
+                    val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
+                    val sleepSeconds by settingsViewModel.sleepTimerRemainingSeconds.collectAsStateWithLifecycle()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { translationY = playerOffsetY.value },
+                    ) {
+                        BreathingAmbientBackground(
+                            isPlaying = bgState.first,
+                            trackId = bgState.second,
+                            trackUri = bgState.third,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        NowPlayingScreen(
+                            state = playbackState,
+                            viewModel = playerViewModel,
+                            sleepTimerRemainingSeconds = sleepSeconds,
+                            onBack = { isPlayerOpen = false },
+                            onSleepTimer = {
+                                isPlayerOpen = false
+                                navController.navigate(AppRoute.SLEEP_TIMER)
+                            },
+                            onSettings = {
+                                isPlayerOpen = false
+                                navController.navigate(AppRoute.SETTINGS)
+                            },
+                            onVerticalDrag = { delta ->
+                                val next = (playerOffsetY.value + delta).coerceAtLeast(0f)
+                                coroutineScope.launch { playerOffsetY.snapTo(next) }
+                            },
+                            onVerticalDragEnd = { thresholdPx ->
+                                if (playerOffsetY.value > thresholdPx) {
+                                    isPlayerOpen = false
+                                } else {
+                                    coroutineScope.launch {
+                                        playerOffsetY.animateTo(
+                                            0f,
+                                            spring(dampingRatio = 0.8f, stiffness = 420f),
+                                        )
+                                    }
+                                }
+                            },
+                            onVerticalDragCancel = {
+                                coroutineScope.launch {
+                                    playerOffsetY.animateTo(
+                                        0f,
+                                        spring(dampingRatio = 0.8f, stiffness = 420f),
+                                    )
+                                }
+                            },
+                            currentDragOffsetPx = { playerOffsetY.value },
+                        )
+                    }
                 }
             }
         }

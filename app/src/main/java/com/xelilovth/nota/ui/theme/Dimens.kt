@@ -22,10 +22,12 @@ object AppDimens {
     val CircularSeekbarStroke = 3.dp
     val CircularSeekbarThumbRadius = 6.dp
     val CircularSeekbarRingGap = 10.dp
+    val CircularSeekbarHitSlop = 22.dp
     val PlaylistHeaderArtworkSize = 132.dp
     val PlayerArtworkIconSize = 64.dp
     val PlayerControlSpacing = 12.dp
     val PlayerActionHorizontalPadding = 4.dp
+    val PlayerControlsBottomSpacing = 44.dp
     val ShapeExtraSmall = 4.dp
     val ShapeSmall = 8.dp
     val ShapeMedium = 12.dp
@@ -47,7 +49,7 @@ object AppDimens {
     val FloatingMiniPlayerHeight = 64.dp
     val FloatingMiniPlayerGap = 8.dp
     val FloatingBottomClearance = 164.dp
-    val FloatingNavOnlyClearance = 96.dp
+    val FloatingNavOnlyClearance = 116.dp
     val PlayerBottomSafePadding = 32.dp
     val Zero = 0.dp
 
@@ -59,6 +61,7 @@ object AppDimens {
     val LyricsLineSpacing = 22.dp
     val LyricsContentVerticalPadding = 28.dp
     val LyricsContentHorizontalPadding = 20.dp
+    val LyricsPanelMaxHeight = 400.dp
     val LyricsWordCornerRadius = 6.dp
     val LyricsWordHorizontalPadding = 3.dp
     val LyricsWordSpacing = 4.dp
@@ -78,4 +81,11 @@ object AppDimens {
     val LyricsHeaderHeight = 48.dp
     val LyricsEdgeFadeHeight = 28.dp
     val LyricsScrubberHeight = 20.dp
+
+    val VisualizerWidth = 44.dp
+    val VisualizerHeight = 18.dp
+    val VisualizerBarWidth = 3.dp
+    val VisualizerBarSpacing = 3.dp
+    val SwipeDismissThreshold = 140.dp
+    val AmbientArtworkBlur = 48.dp
 }

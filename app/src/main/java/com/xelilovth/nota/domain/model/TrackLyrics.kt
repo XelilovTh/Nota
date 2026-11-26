@@ -5,6 +5,7 @@ enum class LyricsSource(val label: String) {
     LRCLIB("LRCLIB"),
     LYRICS_OVH("Lyrics.ovh"),
     LOCAL_FILE("Local .lrc"),
+    GEMINI("Gemini AI"),
 }
 
 enum class LyricsSyncType {
@@ -24,6 +25,8 @@ data class LyricLine(
     val startMs: Long? = null,
     val endMs: Long? = null,
     val words: List<LyricWord> = emptyList(),
+    val translatedText: String? = null,
+    val translations: Map<String, String> = emptyMap(),
 )
 
 data class TrackLyrics(
@@ -31,4 +34,5 @@ data class TrackLyrics(
     val source: LyricsSource,
     val syncType: LyricsSyncType,
     val instrumental: Boolean = false,
+    val translatedLanguage: String? = null,
 )
