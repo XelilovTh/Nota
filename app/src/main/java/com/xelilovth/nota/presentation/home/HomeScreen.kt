@@ -5,7 +5,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -41,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,6 +93,9 @@ fun HomeScreen(
     val listenDurationsMs by viewModel.listenDurationsMs.collectAsStateWithLifecycle()
     val activeTrackId = playbackState.track?.id
     val isScanning by libraryViewModel.isScanning.collectAsStateWithLifecycle()
+    var favoritesExpanded by rememberSaveable { mutableStateOf(false) }
+    var mostPlayedExpanded by rememberSaveable { mutableStateOf(false) }
+
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasPermission = granted
         permissionDenied = !granted
@@ -237,107 +245,148 @@ fun HomeScreen(
             }
             if (favoriteTracks.isNotEmpty()) {
                 item(key = "favorites_section") {
-                    GlassSurface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.large,
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
-                            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column {
-                                    Text("Favorites", style = MaterialTheme.typography.titleLarge)
-                                    val unit = if (favoriteTracks.size == 1) "track" else "tracks"
-                                    Text(
-                                        "${favoriteTracks.size} $unit",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                                TextButton(
-                                    onClick = { onPlayWithNotificationPermission { viewModel.playTracks(favoriteTracks) } },
-                                ) {
-                                    Icon(
-                                        Icons.Filled.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(AppDimens.IconSizeSmall),
-                                    )
-                                    Text("Play all")
-                                }
-                            }
-                            favoriteTracks.forEach { track ->
-                                CompactTrackRow(
-                                    track = track,
-                                    isCurrent = track.id == activeTrackId,
-                                    isPlaying = track.id == activeTrackId && playbackState.isPlaying,
-                                    isFavorite = true,
-                                    onToggleFavorite = { viewModel.toggleFavorite(track.id) },
-                                ) {
-                                    onPlayWithNotificationPermission { viewModel.playTracks(favoriteTracks, track) }
-                                }
-                            }
-                        }
-                    }
+                    val unit = if (favoriteTracks.size == 1) "track" else "tracks"
+                    CollapsibleHomeCollectionCard(
+                        title = "Favorites",
+                        subtitle = "${favoriteTracks.size} $unit",
+                        tracks = favoriteTracks,
+                        expanded = favoritesExpanded,
+                        onToggleExpand = { favoritesExpanded = !favoritesExpanded },
+                        onPlayAll = { onPlayWithNotificationPermission { viewModel.playTracks(favoriteTracks) } },
+                        activeTrackId = activeTrackId,
+                        isPlaying = playbackState.isPlaying,
+                        favoriteTrackIds = favoriteTrackIds,
+                        onToggleFavorite = viewModel::toggleFavorite,
+                        onTrackClick = { track ->
+                            onPlayWithNotificationPermission { viewModel.playTracks(favoriteTracks, track) }
+                        },
+                    )
                 }
             }
             if (mostPlayedTracks.isNotEmpty()) {
                 item(key = "most_played_section") {
-                    GlassSurface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.large,
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding),
-                            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column {
-                                    Text("Most Played", style = MaterialTheme.typography.titleLarge)
-                                    Text(
-                                        "Top ${mostPlayedTracks.size}",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                                TextButton(
-                                    onClick = { onPlayWithNotificationPermission { viewModel.playTracks(mostPlayedTracks) } },
-                                ) {
-                                    Icon(
-                                        Icons.Filled.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(AppDimens.IconSizeSmall),
-                                    )
-                                    Text("Play all")
-                                }
-                            }
-                            mostPlayedTracks.forEach { track ->
-                                CompactTrackRow(
-                                    track = track,
-                                    isCurrent = track.id == activeTrackId,
-                                    isPlaying = track.id == activeTrackId && playbackState.isPlaying,
-                                    isFavorite = track.id in favoriteTrackIds,
-                                    onToggleFavorite = { viewModel.toggleFavorite(track.id) },
-                                    listenDurationMs = listenDurationsMs[track.id] ?: 0L,
-                                ) {
-                                    onPlayWithNotificationPermission { viewModel.playTracks(mostPlayedTracks, track) }
-                                }
-                            }
-                        }
-                    }
+                    CollapsibleHomeCollectionCard(
+                        title = "Most Played",
+                        subtitle = "Top ${mostPlayedTracks.size}",
+                        tracks = mostPlayedTracks,
+                        expanded = mostPlayedExpanded,
+                        onToggleExpand = { mostPlayedExpanded = !mostPlayedExpanded },
+                        onPlayAll = { onPlayWithNotificationPermission { viewModel.playTracks(mostPlayedTracks) } },
+                        activeTrackId = activeTrackId,
+                        isPlaying = playbackState.isPlaying,
+                        favoriteTrackIds = favoriteTrackIds,
+                        listenDurationsMs = listenDurationsMs,
+                        onToggleFavorite = viewModel::toggleFavorite,
+                        onTrackClick = { track ->
+                            onPlayWithNotificationPermission { viewModel.playTracks(mostPlayedTracks, track) }
+                        },
+                    )
                 }
             }
         }
     }
 }
+
+@Composable
+private fun CollapsibleHomeCollectionCard(
+    title: String,
+    subtitle: String,
+    tracks: List<Track>,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onPlayAll: () -> Unit,
+    activeTrackId: Long?,
+    isPlaying: Boolean,
+    favoriteTrackIds: Set<Long>,
+    listenDurationsMs: Map<Long, Long>? = null,
+    onToggleFavorite: (Long) -> Unit,
+    onTrackClick: (Track) -> Unit,
+) {
+    val canExpand = tracks.size > COLLAPSED_COLLECTION_LIMIT
+    val visibleTracks = if (expanded || !canExpand) tracks else tracks.take(COLLAPSED_COLLECTION_LIMIT)
+
+    GlassSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+                .padding(AppDimens.CardPadding),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(if (canExpand) Modifier.clickable(onClick = onToggleExpand) else Modifier),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    Column {
+                        Text(title, style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            subtitle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    if (canExpand) {
+                        Icon(
+                            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (expanded) "Collapse $title" else "Expand $title",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(AppDimens.IconSizeMedium),
+                        )
+                    }
+                }
+                TextButton(onClick = onPlayAll) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                    )
+                    Text("Play all")
+                }
+            }
+            visibleTracks.forEach { track ->
+                CompactTrackRow(
+                    track = track,
+                    isCurrent = track.id == activeTrackId,
+                    isPlaying = track.id == activeTrackId && isPlaying,
+                    isFavorite = track.id in favoriteTrackIds,
+                    onToggleFavorite = { onToggleFavorite(track.id) },
+                    listenDurationMs = listenDurationsMs?.get(track.id),
+                ) {
+                    onTrackClick(track)
+                }
+            }
+            if (canExpand) {
+                TextButton(
+                    onClick = onToggleExpand,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    Text(
+                        if (expanded) "Show less" else "Show all (${tracks.size})",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private const val COLLAPSED_COLLECTION_LIMIT = 2
 
 @Composable
 private fun EmptyMessage(title: String, message: String, action: () -> Unit) {
