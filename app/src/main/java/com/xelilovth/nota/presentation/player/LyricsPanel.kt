@@ -39,8 +39,6 @@ import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,6 +65,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.window.Dialog
 import com.xelilovth.nota.R
 import com.xelilovth.nota.domain.model.LyricLine
 import com.xelilovth.nota.domain.model.LyricsSyncType
@@ -175,6 +174,7 @@ private fun LyricsHeader(
 ) {
     val haptic = LocalHapticFeedback.current
     var showLanguageMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -245,69 +245,42 @@ private fun LyricsHeader(
                 }
             }
             if (canTranslate) {
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .size(AppDimens.LyricsToolbarButtonSize)
-                            .clip(CircleShape)
-                            .combinedClickable(
-                                enabled = !isTranslating,
-                                onClick = onToggleTranslation,
-                                onLongClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    showLanguageMenu = true
-                                },
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (isTranslating) {
-                            CircularProgressIndicator(
-                                strokeWidth = AppDimens.MiniPlayerProgressHeight,
-                                modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Outlined.Translate,
-                                contentDescription = "Translate lyrics",
-                                modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
-                                tint = if (showTranslation) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = showLanguageMenu,
-                        onDismissRequest = { showLanguageMenu = false },
-                    ) {
-                        TRANSLATION_LANGUAGES.forEach { language ->
-                            DropdownMenuItem(
-                                text = { Text(language) },
-                                trailingIcon = if (language == translationLanguage) {
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Filled.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(AppDimens.IconSizeSmall),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                onClick = {
-                                    showLanguageMenu = false
-                                    onSelectTranslationLanguage(language)
-                                },
-                            )
-                        }
+                Box(
+                    modifier = Modifier
+                        .size(AppDimens.LyricsToolbarButtonSize)
+                        .clip(CircleShape)
+                        .combinedClickable(
+                            enabled = !isTranslating,
+                            onClick = onToggleTranslation,
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showLanguageMenu = true
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isTranslating) {
+                        CircularProgressIndicator(
+                            strokeWidth = AppDimens.MiniPlayerProgressHeight,
+                            modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.Translate,
+                            contentDescription = "Translate lyrics",
+                            modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                            tint = if (showTranslation) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
                     }
                 }
             }
             if (hasLyrics) {
                 IconButton(
-                    onClick = onDeleteLyrics,
+                    onClick = { showDeleteConfirmDialog = true },
                     modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
                 ) {
                     Icon(
@@ -328,6 +301,124 @@ private fun LyricsHeader(
                     modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+
+    if (showLanguageMenu) {
+        Dialog(onDismissRequest = { showLanguageMenu = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    Text(
+                        text = "Translation language",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+                    TRANSLATION_LANGUAGES.forEach { lang ->
+                        val isSelected = lang == translationLanguage
+                        GlassSurface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            subtle = !isSelected,
+                            onClick = {
+                                showLanguageMenu = false
+                                onSelectTranslationLanguage(lang)
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        horizontal = AppDimens.CardPadding,
+                                        vertical = AppDimens.RowVerticalPadding,
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    text = lang,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    TextButton(
+                        onClick = { showLanguageMenu = false },
+                        modifier = Modifier.align(Alignment.End),
+                    ) {
+                        Text("Close")
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeleteConfirmDialog) {
+        Dialog(onDismissRequest = { showDeleteConfirmDialog = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
+                ) {
+                    Text(
+                        text = "Delete lyrics?",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        text = "Remove saved lyrics for this track?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            AppDimens.ElementSpacing,
+                            Alignment.End,
+                        ),
+                    ) {
+                        TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                showDeleteConfirmDialog = false
+                                onDeleteLyrics()
+                            },
+                        ) {
+                            Text("Delete")
+                        }
+                    }
+                }
             }
         }
     }

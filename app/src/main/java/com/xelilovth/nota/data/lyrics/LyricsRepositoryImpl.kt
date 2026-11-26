@@ -134,13 +134,7 @@ class LyricsRepositoryImpl @Inject constructor(
 
             val mimeType = context.contentResolver.getType(trackUri) ?: "audio/mpeg"
             val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
-            val prompt = buildString {
-                append("Listen carefully to this audio track and transcribe the lyrics into synchronized LRC format.\n")
-                append("Output ONLY valid LRC lines with timestamps in [mm:ss.xx] format, e.g.:\n")
-                append("[00:12.34] First line of lyrics\n")
-                append("Do not include any markdown formatting, code fences, explanations, or metadata tags.\n")
-                append("If the track is purely instrumental with no vocals, output ONLY: [INSTRUMENTAL]")
-            }
+            val prompt = "Listen carefully to this audio track and transcribe every sung word accurately in Enhanced LRC format: [mm:ss.xx] <mm:ss.xx>word1 <mm:ss.xx>word2 ... Give each line a [mm:ss.xx] start timestamp and each word inside the line its own <mm:ss.xx> timestamp matching when that word is sung. Output ONLY valid Enhanced LRC lines without markdown code blocks or explanations. If the track is purely instrumental, output exactly [INSTRUMENTAL]."
             val requestBody = JSONObject().apply {
                 put(
                     "contents",
@@ -207,7 +201,11 @@ class LyricsRepositoryImpl @Inject constructor(
                     TrackLyrics(
                         lines = lrcLines,
                         source = LyricsSource.GEMINI,
-                        syncType = LyricsSyncType.LINE,
+                        syncType = if (lrcLines.any { it.words.isNotEmpty() }) {
+                            LyricsSyncType.WORD
+                        } else {
+                            LyricsSyncType.LINE
+                        },
                     )
                 } else {
                     LyricsParser.fromPlain(cleaned).takeIf { it.isNotEmpty() }?.let { plainLines ->

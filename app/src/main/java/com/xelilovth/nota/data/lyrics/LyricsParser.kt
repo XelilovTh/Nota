@@ -18,30 +18,66 @@ import org.yaml.snakeyaml.constructor.SafeConstructor
 
 internal object LyricsParser {
     private val lrcTimestamp = Regex("""\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?]\s*(.*)""")
+    private val enhancedWordTimestamp = Regex("""<(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?>\s*([^<]*)""")
     private val leadingPlusMarker = Regex("""^\+(?:\s+|$)""")
 
     private fun cleanLineText(raw: String): String =
         raw.trimStart().replace(leadingPlusMarker, "").trim()
 
+    private fun parseTimestampMs(minutesStr: String, secondsStr: String, fractionStr: String): Long? {
+        val minutes = minutesStr.toLongOrNull() ?: return null
+        val seconds = secondsStr.toLongOrNull() ?: return null
+        val millis = fractionStr.takeIf(String::isNotEmpty)
+            ?.padEnd(3, '0')
+            ?.take(3)
+            ?.toLongOrNull() ?: 0L
+        return minutes * 60_000L + seconds * 1_000L + millis
+    }
+
     fun fromLrc(value: String, durationMs: Long): List<LyricLine> {
         val parsed = value.lineSequence().mapNotNull { raw ->
             val match = lrcTimestamp.matchEntire(raw.trim()) ?: return@mapNotNull null
-            val minutes = match.groupValues[1].toLongOrNull() ?: return@mapNotNull null
-            val seconds = match.groupValues[2].toLongOrNull() ?: return@mapNotNull null
-            val fraction = match.groupValues[3]
-            val millis = fraction.takeIf(String::isNotEmpty)
-                ?.padEnd(3, '0')
-                ?.take(3)
-                ?.toLongOrNull() ?: 0L
-            val text = cleanLineText(match.groupValues[4])
+            val startMs = parseTimestampMs(
+                match.groupValues[1],
+                match.groupValues[2],
+                match.groupValues[3],
+            ) ?: return@mapNotNull null
+            val body = cleanLineText(match.groupValues[4])
+            val wordMatches = enhancedWordTimestamp.findAll(body).toList()
+            val words = if (wordMatches.isNotEmpty()) {
+                wordMatches.mapNotNull { wordMatch ->
+                    val wordStartMs = parseTimestampMs(
+                        wordMatch.groupValues[1],
+                        wordMatch.groupValues[2],
+                        wordMatch.groupValues[3],
+                    ) ?: return@mapNotNull null
+                    val cleanWordText = cleanLineText(wordMatch.groupValues[4])
+                    if (cleanWordText.isBlank()) return@mapNotNull null
+                    LyricWord(text = cleanWordText, startMs = wordStartMs)
+                }
+            } else {
+                emptyList()
+            }
+            val text = if (wordMatches.isNotEmpty()) {
+                words.joinToString(" ") { it.text }
+            } else {
+                body
+            }
             if (text.isBlank()) return@mapNotNull null
             LyricLine(
                 text = text,
-                startMs = minutes * 60_000L + seconds * 1_000L + millis,
+                startMs = startMs,
+                words = words,
             )
         }.sortedBy { it.startMs }.toList()
         return parsed.mapIndexed { index, line ->
-            line.copy(endMs = parsed.getOrNull(index + 1)?.startMs ?: durationMs.takeIf { it > 0L })
+            val lineEndMs = parsed.getOrNull(index + 1)?.startMs ?: durationMs.takeIf { it > 0L }
+            val normalizedWords = line.words.mapIndexed { wordIndex, word ->
+                val wordEndMs = (line.words.getOrNull(wordIndex + 1)?.startMs ?: lineEndMs)
+                    ?.takeIf { it > word.startMs }
+                word.copy(endMs = wordEndMs)
+            }
+            line.copy(endMs = lineEndMs, words = normalizedWords)
         }
     }
 
@@ -173,7 +209,14 @@ internal object LyricsParser {
         }
         if (!syncedLyrics.isNullOrBlank()) {
             val syncedLines = fromLrc(syncedLyrics, durationMs)
-            if (syncedLines.isNotEmpty()) return TrackLyrics(syncedLines, source, LyricsSyncType.LINE)
+            if (syncedLines.isNotEmpty()) {
+                val syncType = if (syncedLines.any { it.words.isNotEmpty() }) {
+                    LyricsSyncType.WORD
+                } else {
+                    LyricsSyncType.LINE
+                }
+                return TrackLyrics(syncedLines, source, syncType)
+            }
         }
         if (!plainLyrics.isNullOrBlank()) {
             val plainLines = fromPlain(plainLyrics)
