@@ -61,6 +61,7 @@ object AppDimens {
     val LyricsLineSpacing = 22.dp
     val LyricsContentVerticalPadding = 28.dp
     val LyricsContentHorizontalPadding = 20.dp
+    val LyricsPanelMaxHeight = 400.dp
     val LyricsWordCornerRadius = 6.dp
     val LyricsWordHorizontalPadding = 3.dp
     val LyricsWordSpacing = 4.dp
