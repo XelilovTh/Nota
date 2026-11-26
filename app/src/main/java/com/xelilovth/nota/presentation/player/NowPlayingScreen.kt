@@ -27,7 +27,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
@@ -165,19 +168,8 @@ fun NowPlayingScreen(
     var showGeminiKeyDialog by remember { mutableStateOf(false) }
     var pendingGeminiAction by remember { mutableStateOf<PendingGeminiAction?>(null) }
 
-    var isDismissDragging by remember { mutableStateOf(false) }
-    var isDismissing by remember { mutableStateOf(false) }
-    var dismissTargetY by remember { mutableFloatStateOf(0f) }
-    var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    val animatedDismissOffsetY by animateFloatAsState(
-        targetValue = when {
-            isDismissDragging -> dragOffsetY
-            isDismissing -> dismissTargetY
-            else -> 0f
-        },
-        label = "nowPlayingDismissOffset",
-    )
-    val effectiveDismissOffsetY = if (isDismissDragging) dragOffsetY else animatedDismissOffsetY
+    val coroutineScope = rememberCoroutineScope()
+    val dismissOffsetY = remember { Animatable(0f) }
 
     LaunchedEffect(state.track?.id) {
         val track = state.track
@@ -219,8 +211,9 @@ fun NowPlayingScreen(
         Modifier
             .fillMaxSize()
             .graphicsLayer {
-                translationY = effectiveDismissOffsetY
-                val s = 1f - (effectiveDismissOffsetY / 2400f).coerceIn(0f, 0.06f)
+                val offset = dismissOffsetY.value
+                translationY = offset
+                val s = 1f - (offset / 2400f).coerceIn(0f, 0.06f)
                 scaleX = s
                 scaleY = s
             }
@@ -228,29 +221,26 @@ fun NowPlayingScreen(
                 if (!lyricsExpanded) {
                     detectVerticalDragGestures(
                         onVerticalDrag = { change, dragAmount ->
-                            val next = (dragOffsetY + dragAmount).coerceAtLeast(0f)
-                            if (next > 0f) {
-                                isDismissDragging = true
-                                dragOffsetY = next
+                            val next = (dismissOffsetY.value + dragAmount).coerceAtLeast(0f)
+                            if (next > 0f || dismissOffsetY.value > 0f) {
+                                coroutineScope.launch { dismissOffsetY.snapTo(next) }
                                 change.consume()
                             }
                         },
                         onDragEnd = {
                             val threshold = AppDimens.SwipeDismissThreshold.toPx()
-                            val shouldDismiss = dragOffsetY > threshold
-                            if (shouldDismiss) {
-                                dismissTargetY = dragOffsetY + 900f
-                                isDismissing = true
-                                isDismissDragging = false
+                            if (dismissOffsetY.value > threshold) {
                                 onBack()
                             } else {
-                                isDismissDragging = false
-                                dragOffsetY = 0f
+                                coroutineScope.launch {
+                                    dismissOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 420f))
+                                }
                             }
                         },
                         onDragCancel = {
-                            isDismissDragging = false
-                            dragOffsetY = 0f
+                            coroutineScope.launch {
+                                dismissOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 420f))
+                            }
                         },
                     )
                 }
@@ -425,27 +415,24 @@ fun NowPlayingScreen(
                         var upwardDrag = 0f
                         detectVerticalDragGestures(
                             onVerticalDrag = { change, dragAmount ->
-                                if (dragAmount < 0f && dragOffsetY == 0f) {
+                                if (dragAmount < 0f && dismissOffsetY.value == 0f) {
                                     upwardDrag += dragAmount
-                                } else if (dragAmount > 0f || dragOffsetY > 0f) {
+                                } else if (dragAmount > 0f || dismissOffsetY.value > 0f) {
                                     upwardDrag = 0f
-                                    isDismissDragging = true
-                                    dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f)
+                                    val next = (dismissOffsetY.value + dragAmount).coerceAtLeast(0f)
+                                    coroutineScope.launch { dismissOffsetY.snapTo(next) }
                                 }
                                 change.consume()
                             },
                             onDragEnd = {
-                                if (dragOffsetY > 0f) {
+                                if (dismissOffsetY.value > 0f) {
                                     val threshold = AppDimens.SwipeDismissThreshold.toPx()
-                                    val shouldDismiss = dragOffsetY > threshold
-                                    if (shouldDismiss) {
-                                        dismissTargetY = dragOffsetY + 900f
-                                        isDismissing = true
-                                        isDismissDragging = false
+                                    if (dismissOffsetY.value > threshold) {
                                         onBack()
                                     } else {
-                                        isDismissDragging = false
-                                        dragOffsetY = 0f
+                                        coroutineScope.launch {
+                                            dismissOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 420f))
+                                        }
                                     }
                                 } else if (upwardDrag < -AppDimens.LyricsDragThreshold.toPx()) {
                                     lyricsExpanded = true
@@ -454,8 +441,11 @@ fun NowPlayingScreen(
                             },
                             onDragCancel = {
                                 upwardDrag = 0f
-                                isDismissDragging = false
-                                dragOffsetY = 0f
+                                if (dismissOffsetY.value > 0f) {
+                                    coroutineScope.launch {
+                                        dismissOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 420f))
+                                    }
+                                }
                             },
                         )
                     }

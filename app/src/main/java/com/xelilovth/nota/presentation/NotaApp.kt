@@ -8,6 +8,12 @@ import java.nio.charset.StandardCharsets
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -219,7 +225,17 @@ fun NotaApp() {
                     composable(AppRoute.SLEEP_TIMER) {
                         SleepTimerScreen(onBack = { navController.popBackStack() })
                     }
-                    composable(AppRoute.NOW_PLAYING) {
+                    composable(
+                        route = AppRoute.NOW_PLAYING,
+                        enterTransition = {
+                            slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it } +
+                                fadeIn(tween(220))
+                        },
+                        popExitTransition = {
+                            slideOutVertically(tween(260, easing = FastOutSlowInEasing)) { it } +
+                                fadeOut(tween(220))
+                        },
+                    ) {
                         val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
                         val sleepSeconds by settingsViewModel.sleepTimerRemainingSeconds.collectAsStateWithLifecycle()
                         NowPlayingScreen(
