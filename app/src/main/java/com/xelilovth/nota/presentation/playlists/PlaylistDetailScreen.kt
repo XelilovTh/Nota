@@ -2,6 +2,7 @@ package com.xelilovth.nota.presentation.playlists
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,6 +32,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +51,9 @@ import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
+import com.xelilovth.nota.ui.theme.LocalHazeState
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 @Composable
 fun PlaylistDetailScreen(
@@ -111,8 +116,10 @@ fun PlaylistDetailScreen(
     var showAddSongsSheet by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val detailHazeState = remember { HazeState() }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().hazeSource(state = detailHazeState)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ElementSpacing, vertical = AppDimens.ElementSpacing),
             verticalAlignment = Alignment.CenterVertically,
@@ -289,51 +296,54 @@ fun PlaylistDetailScreen(
                 }
             }
         }
-    }
+        }
 
-    GlassBottomSheet(
-        visible = showAddSongsSheet && customPlaylist != null,
-        onDismissRequest = { showAddSongsSheet = false },
-    ) {
-        if (customPlaylist != null) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
-                Text(
-                    "Add songs to ${customPlaylist.name}",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = AppDimens.ElementSpacing),
-                )
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = AppDimens.ScreenPadding),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-                ) {
-                    items(allTracks, key = Track::id, contentType = { "pick_track" }) { track ->
-                        val added = track.id in customPlaylist.trackIds
-                        GlassSurface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium,
-                            subtle = true,
-                            onClick = {
-                                if (added) {
-                                    viewModel.removeTrackFromPlaylist(customPlaylist.id, track.id)
-                                } else {
-                                    viewModel.addTrackToPlaylist(customPlaylist.id, track.id)
-                                }
-                            },
+        CompositionLocalProvider(LocalHazeState provides detailHazeState) {
+            GlassBottomSheet(
+                visible = showAddSongsSheet && customPlaylist != null,
+                onDismissRequest = { showAddSongsSheet = false },
+            ) {
+                if (customPlaylist != null) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
+                        Text(
+                            "Add songs to ${customPlaylist.name}",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(bottom = AppDimens.ElementSpacing),
+                        )
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = LocalBottomContentPadding.current),
+                            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = AppDimens.CardPadding, vertical = AppDimens.RowVerticalPadding),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(track.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(track.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                                if (added) {
-                                    Icon(Icons.Filled.Check, contentDescription = "Added")
-                                } else {
-                                    Icon(Icons.Filled.Add, contentDescription = "Add")
+                            items(allTracks, key = Track::id, contentType = { "pick_track" }) { track ->
+                                val added = track.id in customPlaylist.trackIds
+                                GlassSurface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.medium,
+                                    subtle = true,
+                                    onClick = {
+                                        if (added) {
+                                            viewModel.removeTrackFromPlaylist(customPlaylist.id, track.id)
+                                        } else {
+                                            viewModel.addTrackToPlaylist(customPlaylist.id, track.id)
+                                        }
+                                    },
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = AppDimens.CardPadding, vertical = AppDimens.RowVerticalPadding),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(track.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(track.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                        if (added) {
+                                            Icon(Icons.Filled.Check, contentDescription = "Added")
+                                        } else {
+                                            Icon(Icons.Filled.Add, contentDescription = "Add")
+                                        }
+                                    }
                                 }
                             }
                         }

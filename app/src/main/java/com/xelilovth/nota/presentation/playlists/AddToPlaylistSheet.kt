@@ -36,6 +36,7 @@ import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.ui.components.GlassBottomSheet
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.theme.AppDimens
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 
 @Composable
 fun AddToPlaylistSheet(
@@ -82,7 +83,7 @@ fun AddToPlaylistSheet(
                 }
             }
             LazyColumn(
-                contentPadding = PaddingValues(bottom = AppDimens.ScreenPadding),
+                contentPadding = PaddingValues(bottom = LocalBottomContentPadding.current),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
                 items(customPlaylists, key = CustomPlaylist::id) { playlist ->

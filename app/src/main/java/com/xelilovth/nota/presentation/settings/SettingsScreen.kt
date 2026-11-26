@@ -25,6 +25,8 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +53,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
@@ -688,6 +692,7 @@ fun SettingsScreen(
         var selectedProvider by remember { mutableStateOf(0) } // 0 = Gemini, 1 = Groq
         var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
         var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
+        var showKeyText by remember { mutableStateOf(false) }
         val activeInput = if (selectedProvider == 0) geminiInput else groqInput
         Dialog(onDismissRequest = { showGeminiKeyDialog = false }) {
             GlassSurface(
@@ -734,7 +739,7 @@ fun SettingsScreen(
                     GlassSurface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = CircleShape,
-                        subtle = true,
+                        subtle = false,
                     ) {
                         TextField(
                             value = activeInput,
@@ -749,6 +754,15 @@ fun SettingsScreen(
                                     ),
                                 )
                             },
+                            trailingIcon = {
+                                IconButton(onClick = { showKeyText = !showKeyText }) {
+                                    Icon(
+                                        imageVector = if (showKeyText) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                        contentDescription = if (showKeyText) "Hide API key" else "Show API key",
+                                    )
+                                }
+                            },
+                            visualTransformation = if (showKeyText) VisualTransformation.None else PasswordVisualTransformation(),
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -778,7 +792,7 @@ fun SettingsScreen(
                                 }
                             },
                         ) {
-                            Text("Clear")
+                            Text(if (selectedProvider == 0) "Clear Gemini" else "Clear Groq")
                         }
                         Button(
                             onClick = {

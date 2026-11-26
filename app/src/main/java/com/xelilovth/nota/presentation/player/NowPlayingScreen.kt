@@ -199,6 +199,8 @@ fun NowPlayingScreen(
     var showTrackMenu by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
+    var showAiProviderChooser by remember { mutableStateOf(false) }
+    var selectedAiProvider by remember { mutableStateOf(AiLyricsProvider.GEMINI) }
     var pendingDeleteTrackId by remember { mutableStateOf<Long?>(null) }
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -341,16 +343,29 @@ fun NowPlayingScreen(
                                 showAddToPlaylist = true
                             },
                         )
-                        DropdownMenuItem(
-                            text = { Text("Delete from device") },
-                            leadingIcon = {
-                                Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
-                            },
-                            onClick = {
-                                showTrackMenu = false
-                                showDeleteConfirm = true
-                            },
-                        )
+                        if (!state.track.isOnline && state.track.onlineId == null) {
+                            DropdownMenuItem(
+                                text = { Text("Delete from device") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                                },
+                                onClick = {
+                                    showTrackMenu = false
+                                    showDeleteConfirm = true
+                                },
+                            )
+                        } else if (isDownloaded) {
+                            DropdownMenuItem(
+                                text = { Text("Remove offline download") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                                },
+                                onClick = {
+                                    showTrackMenu = false
+                                    showDeleteConfirm = true
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -508,14 +523,8 @@ fun NowPlayingScreen(
                             lrcLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
                         },
                         onGenerateWithGemini = {
-                            val track = state.track
-                            if (track != null) {
-                                if (geminiApiKey.isBlank() && groqApiKey.isBlank()) {
-                                    pendingGeminiAction = PendingGeminiAction.TRANSCRIBE
-                                    showGeminiKeyDialog = true
-                                } else {
-                                    viewModel.generateLyricsWithAi(track)
-                                }
+                            if (state.track != null) {
+                                showAiProviderChooser = true
                             }
                         },
                         onDeleteLyrics = {
@@ -887,9 +896,84 @@ fun NowPlayingScreen(
         }
     }
 
+    if (showAiProviderChooser) {
+        val track = state.track
+        Dialog(onDismissRequest = { showAiProviderChooser = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    Text("Choose AI provider", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "If the selected provider fails, Nota will automatically fall back to the other if configured.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    listOf(
+                        Triple(AiLyricsProvider.GEMINI, "Gemini AI", geminiApiKey.isNotBlank()),
+                        Triple(AiLyricsProvider.GROQ, "Groq Whisper", groqApiKey.isNotBlank()),
+                    ).forEach { (provider, label, hasKey) ->
+                        GlassSurface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            subtle = true,
+                            onClick = {
+                                showAiProviderChooser = false
+                                selectedAiProvider = provider
+                                if (track != null) {
+                                    if (!hasKey) {
+                                        pendingGeminiAction = PendingGeminiAction.TRANSCRIBE
+                                        showGeminiKeyDialog = true
+                                    } else {
+                                        viewModel.transcribeWithProvider(track, provider)
+                                    }
+                                }
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = AppDimens.CardPadding, vertical = AppDimens.RowVerticalPadding),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(label, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    if (hasKey) "Configured" else "Add API key",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (hasKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = { showAiProviderChooser = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (showGeminiKeyDialog) {
-        var selectedProvider by remember { mutableStateOf(0) } // 0 = Gemini, 1 = Groq
-        var keyInput by remember { mutableStateOf("") }
+        var selectedProvider by remember(selectedAiProvider) {
+            mutableStateOf(if (selectedAiProvider == AiLyricsProvider.GROQ) 1 else 0)
+        }
+        var keyInput by remember(selectedProvider, geminiApiKey, groqApiKey) {
+            mutableStateOf(if (selectedProvider == 0) geminiApiKey else groqApiKey)
+        }
         Dialog(onDismissRequest = {
             showGeminiKeyDialog = false
             pendingGeminiAction = null
@@ -987,11 +1071,8 @@ fun NowPlayingScreen(
                                     when (action) {
                                         PendingGeminiAction.TRANSLATE -> viewModel.toggleLyricsTranslation(track, trimmedKey)
                                         PendingGeminiAction.TRANSCRIBE, null -> {
-                                            if (selectedProvider == 0) {
-                                                viewModel.generateLyricsWithGemini(track, trimmedKey)
-                                            } else {
-                                                viewModel.generateLyricsWithGroq(track, trimmedKey)
-                                            }
+                                            val provider = if (selectedProvider == 0) AiLyricsProvider.GEMINI else AiLyricsProvider.GROQ
+                                            viewModel.transcribeWithProvider(track, provider, trimmedKey)
                                         }
                                     }
                                 }

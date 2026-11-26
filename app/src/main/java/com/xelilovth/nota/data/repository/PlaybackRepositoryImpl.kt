@@ -68,6 +68,7 @@ class PlaybackRepositoryImpl @Inject constructor(
     private val resolvedStreamUris = ConcurrentHashMap<Long, String>()
     private var cachedMediaId: Long? = null
     private var cachedTrack: Track? = null
+    private var lastRecordedRecentTrackId: Long? = null
     private var listeningTrackId: Long? = null
     private var lastListeningTickMs: Long = 0L
     private var accumulatedListenMs: Long = 0L
@@ -412,6 +413,10 @@ class PlaybackRepositoryImpl @Inject constructor(
                 cachedMediaId = mediaId
                 cachedTrack = found
             }
+        }
+        if (track != null && track.id != lastRecordedRecentTrackId) {
+            lastRecordedRecentTrackId = track.id
+            settingsRepository.addRecentTrack(track.id)
         }
         val queue = (0 until player.mediaItemCount).mapNotNull { index ->
             player.getMediaItemAt(index).mediaId.toLongOrNull()?.let(tracksById::get)

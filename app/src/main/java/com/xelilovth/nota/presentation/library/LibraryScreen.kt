@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +68,9 @@ import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
+import com.xelilovth.nota.ui.theme.LocalHazeState
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 @Composable
 fun LibraryScreen(
@@ -120,7 +124,10 @@ fun LibraryScreen(
         if (hasPermission) viewModel.scanIfEmpty() else permissionLauncher.launch(permission)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    val libraryHazeState = remember { HazeState() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().hazeSource(state = libraryHazeState)) {
         when {
             !hasPermission -> CenteredMessage {
                 Text("Audio permission is required", style = MaterialTheme.typography.headlineSmall)
@@ -246,12 +253,15 @@ fun LibraryScreen(
                 }
             }
         }
-    }
+        }
 
-    AddToPlaylistSheet(
-        track = playlistTargetTrack,
-        onDismiss = { playlistTargetTrack = null },
-    )
+        CompositionLocalProvider(LocalHazeState provides libraryHazeState) {
+            AddToPlaylistSheet(
+                track = playlistTargetTrack,
+                onDismiss = { playlistTargetTrack = null },
+            )
+        }
+    }
 
     editTargetTrack?.let { target ->
         var titleInput by remember(target.id) { mutableStateOf(target.title) }
