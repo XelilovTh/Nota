@@ -224,9 +224,9 @@ fun SearchScreen(
                             items(localResults, key = Track::id, contentType = { "track_row" }) { track ->
                                 CompactTrackRow(
                                     track = track,
-                                    isActive = track.id == activeTrackId,
+                                    isCurrent = track.id == activeTrackId,
                                     isPlaying = isPlaying,
-                                    onClick = onPlayTrack,
+                                    onClick = { onPlayTrack(track) },
                                 )
                             }
                         }
