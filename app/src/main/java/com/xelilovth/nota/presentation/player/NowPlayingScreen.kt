@@ -485,7 +485,7 @@ fun NowPlayingScreen(
             Column(
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Spacer(modifier = Modifier.height(AppDimens.ElementSpacing))
+                Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -588,7 +588,7 @@ fun NowPlayingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
+        Spacer(modifier = Modifier.height(AppDimens.PlayerControlsBottomSpacing))
 
         Row(
             modifier = Modifier.fillMaxWidth(),

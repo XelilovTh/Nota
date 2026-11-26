@@ -27,6 +27,7 @@ object AppDimens {
     val PlayerArtworkIconSize = 64.dp
     val PlayerControlSpacing = 12.dp
     val PlayerActionHorizontalPadding = 4.dp
+    val PlayerControlsBottomSpacing = 44.dp
     val ShapeExtraSmall = 4.dp
     val ShapeSmall = 8.dp
     val ShapeMedium = 12.dp
