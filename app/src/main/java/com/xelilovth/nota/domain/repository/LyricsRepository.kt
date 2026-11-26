@@ -5,8 +5,10 @@ import com.xelilovth.nota.domain.model.TrackLyrics
 
 interface LyricsRepository {
     suspend fun getLyrics(track: Track): TrackLyrics?
+    suspend fun fetchOnlineLyrics(track: Track): TrackLyrics? = getLyrics(track)
     suspend fun importLocalLyrics(track: Track, uriString: String): TrackLyrics? = null
     suspend fun generateLyricsWithGemini(track: Track, apiKey: String): TrackLyrics? = null
+    suspend fun generateLyricsWithGroq(track: Track, apiKey: String): TrackLyrics? = null
     suspend fun translateLyrics(
         track: Track,
         lyrics: TrackLyrics,

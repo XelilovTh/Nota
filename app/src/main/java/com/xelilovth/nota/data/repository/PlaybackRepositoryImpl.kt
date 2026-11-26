@@ -14,12 +14,17 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.xelilovth.nota.data.media.PlaybackService
 import com.xelilovth.nota.data.media.PlaybackNavigation
 import com.xelilovth.nota.data.media.PlaybackStateMapper
+import com.xelilovth.nota.data.media.StreamCacheHolder
+import com.xelilovth.nota.data.online.OnlineMusicRepositoryImpl
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.LibraryRepository
+import com.xelilovth.nota.domain.repository.OnlineMusicRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,6 +32,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,15 +48,27 @@ class PlaybackRepositoryImpl @Inject constructor(
     private val player: ExoPlayer,
     private val libraryRepository: LibraryRepository,
     private val settingsRepository: SettingsRepository,
+    private val onlineMusicRepository: OnlineMusicRepository?,
 ) : PlaybackRepository {
+    constructor(
+        context: Context,
+        player: ExoPlayer,
+        libraryRepository: LibraryRepository,
+        settingsRepository: SettingsRepository,
+    ) : this(context, player, libraryRepository, settingsRepository, null)
+
     private val _playbackState = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var progressJob: Job? = null
     private var fadeJob: Job? = null
+    private var resolveJob: Job? = null
+    private val activeOnlineTracks = ConcurrentHashMap<Long, Track>()
+    private val resolvedStreamUris = ConcurrentHashMap<Long, String>()
     private var cachedMediaId: Long? = null
     private var cachedTrack: Track? = null
+    private var lastRecordedRecentTrackId: Long? = null
     private var listeningTrackId: Long? = null
     private var lastListeningTickMs: Long = 0L
     private var accumulatedListenMs: Long = 0L
@@ -84,6 +102,20 @@ class PlaybackRepositoryImpl @Inject constructor(
     }
 
     init {
+        StreamCacheHolder.onlineUriResolver = { onlineUri ->
+            val onlineId = OnlineMusicRepositoryImpl.extractOnlineId(onlineUri)
+            if (onlineId != null) {
+                try {
+                    runBlocking { onlineMusicRepository?.resolveStreamUrl(onlineId) }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+        }
         player.addListener(listener)
         scope.launch {
             settingsRepository.settings
@@ -105,10 +137,64 @@ class PlaybackRepositoryImpl @Inject constructor(
 
         val selectedIndex = queue.indexOfFirst { it.id == track.id }
         val tracks = if (selectedIndex >= 0) queue else listOf(track)
-        val mediaItems = tracks.map(::toMediaItem)
+        tracks.forEach { item ->
+            if (item.isOnline) {
+                activeOnlineTracks[item.id] = item
+                onlineMusicRepository?.cacheOnlineTrack(item)
+            }
+        }
+        val index = if (selectedIndex >= 0) selectedIndex else 0
+        val activeTrack = tracks[index]
+        resolveJob?.cancel()
+
+        if (activeTrack.isOnline && activeTrack.uri.startsWith(OnlineMusicRepositoryImpl.ONLINE_URI_PREFIX)) {
+            val onlineId = activeTrack.onlineId ?: OnlineMusicRepositoryImpl.extractOnlineId(activeTrack.uri)
+            if (onlineId == null) {
+                _playbackState.value = _playbackState.value.copy(errorMessage = "Invalid online track")
+                return
+            }
+            cachedMediaId = activeTrack.id
+            cachedTrack = activeTrack
+            _playbackState.value = _playbackState.value.copy(
+                track = activeTrack,
+                isPlaying = false,
+                errorMessage = null,
+                queue = tracks,
+            )
+            resolveJob = scope.launch {
+                val resolvedUri = try {
+                    onlineMusicRepository?.resolveStreamUrl(onlineId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+                if (resolvedUri.isNullOrBlank()) {
+                    _playbackState.value = _playbackState.value.copy(
+                        isPlaying = false,
+                        errorMessage = "Could not load online stream",
+                    )
+                    return@launch
+                }
+                resolvedStreamUris[activeTrack.id] = resolvedUri
+                val mediaItems = tracks.map { item ->
+                    val effectiveUri = resolvedStreamUris[item.id] ?: item.uri
+                    toMediaItem(item, effectiveUri)
+                }
+                player.setMediaItems(mediaItems, index, 0L)
+                player.prepare()
+                player.play()
+                ensurePlaybackServiceStarted()
+                publishState()
+            }
+            return
+        }
+
+        val mediaItems = tracks.map { item ->
+            toMediaItem(item, resolvedStreamUris[item.id] ?: item.uri)
+        }
         if (mediaItems.isEmpty()) return
 
-        val index = if (selectedIndex >= 0) selectedIndex else 0
         _playbackState.value = _playbackState.value.copy(errorMessage = null)
         player.setMediaItems(mediaItems, index, 0L)
         player.prepare()
@@ -284,9 +370,9 @@ class PlaybackRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun toMediaItem(track: Track): MediaItem = MediaItem.Builder()
+    private fun toMediaItem(track: Track, uriOverride: String = track.uri): MediaItem = MediaItem.Builder()
         .setMediaId(track.id.toString())
-        .setUri(track.uri)
+        .setUri(uriOverride)
         .setMediaMetadata(
             MediaMetadata.Builder()
                 .setTitle(track.title)
@@ -318,7 +404,8 @@ class PlaybackRepositoryImpl @Inject constructor(
 
     private fun publishState() {
         val mediaId = player.currentMediaItem?.mediaId?.toLongOrNull()
-        val tracksById = libraryRepository.tracks.value.associateBy(Track::id)
+        val onlineById = onlineMusicRepository?.getCachedOnlineTracks().orEmpty().associateBy(Track::id)
+        val tracksById = onlineById + activeOnlineTracks + libraryRepository.tracks.value.associateBy(Track::id)
         val track = when {
             mediaId == null -> null
             mediaId == cachedMediaId && cachedTrack != null -> cachedTrack
@@ -326,6 +413,10 @@ class PlaybackRepositoryImpl @Inject constructor(
                 cachedMediaId = mediaId
                 cachedTrack = found
             }
+        }
+        if (track != null && track.id != lastRecordedRecentTrackId) {
+            lastRecordedRecentTrackId = track.id
+            settingsRepository.addRecentTrack(track.id)
         }
         val queue = (0 until player.mediaItemCount).mapNotNull { index ->
             player.getMediaItemAt(index).mediaId.toLongOrNull()?.let(tracksById::get)

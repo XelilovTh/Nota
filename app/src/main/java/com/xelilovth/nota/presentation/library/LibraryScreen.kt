@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.Sort
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -32,7 +33,6 @@ import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,11 +62,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.DeleteTrackResult
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
+import com.xelilovth.nota.ui.components.GlassDropdownMenu
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
+import com.xelilovth.nota.ui.theme.LocalHazeState
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 @Composable
 fun LibraryScreen(
@@ -119,7 +124,10 @@ fun LibraryScreen(
         if (hasPermission) viewModel.scanIfEmpty() else permissionLauncher.launch(permission)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    val libraryHazeState = remember { HazeState() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().hazeSource(state = libraryHazeState)) {
         when {
             !hasPermission -> CenteredMessage {
                 Text("Audio permission is required", style = MaterialTheme.typography.headlineSmall)
@@ -183,12 +191,17 @@ fun LibraryScreen(
                                     IconButton(onClick = { sortMenuExpanded = true }) {
                                         Icon(Icons.AutoMirrored.Outlined.Sort, contentDescription = "Sort")
                                     }
-                                    DropdownMenu(
+                                    GlassDropdownMenu(
                                         expanded = sortMenuExpanded,
                                         onDismissRequest = { sortMenuExpanded = false },
                                     ) {
                                         DropdownMenuItem(
                                             text = { Text("Title") },
+                                            trailingIcon = {
+                                                if (sortOrder == LibrarySort.TITLE) {
+                                                    Icon(Icons.Filled.Check, contentDescription = "Selected")
+                                                }
+                                            },
                                             onClick = {
                                                 viewModel.setSortOrder(LibrarySort.TITLE)
                                                 sortMenuExpanded = false
@@ -196,6 +209,11 @@ fun LibraryScreen(
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Artist") },
+                                            trailingIcon = {
+                                                if (sortOrder == LibrarySort.ARTIST) {
+                                                    Icon(Icons.Filled.Check, contentDescription = "Selected")
+                                                }
+                                            },
                                             onClick = {
                                                 viewModel.setSortOrder(LibrarySort.ARTIST)
                                                 sortMenuExpanded = false
@@ -203,6 +221,11 @@ fun LibraryScreen(
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Duration") },
+                                            trailingIcon = {
+                                                if (sortOrder == LibrarySort.DURATION) {
+                                                    Icon(Icons.Filled.Check, contentDescription = "Selected")
+                                                }
+                                            },
                                             onClick = {
                                                 viewModel.setSortOrder(LibrarySort.DURATION)
                                                 sortMenuExpanded = false
@@ -230,13 +253,14 @@ fun LibraryScreen(
                 }
             }
         }
-    }
+        }
 
-    playlistTargetTrack?.let { target ->
-        AddToPlaylistSheet(
-            track = target,
-            onDismiss = { playlistTargetTrack = null },
-        )
+        CompositionLocalProvider(LocalHazeState provides libraryHazeState) {
+            AddToPlaylistSheet(
+                track = playlistTargetTrack,
+                onDismiss = { playlistTargetTrack = null },
+            )
+        }
     }
 
     editTargetTrack?.let { target ->
@@ -471,7 +495,7 @@ private fun TrackRow(
                         modifier = Modifier.size(AppDimens.IconSizeSmall),
                     )
                 }
-                DropdownMenu(
+                GlassDropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                 ) {

@@ -2,6 +2,7 @@ package com.xelilovth.nota.data.repository
 
 import android.content.Context
 import com.xelilovth.nota.domain.model.AppSettings
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.domain.model.TrackMetadataOverride
 import com.xelilovth.nota.domain.repository.SettingsRepository
@@ -24,6 +25,8 @@ class SettingsRepositoryImpl @Inject constructor(
     override val recentTrackIds: StateFlow<List<Long>> = _recentTrackIds.asStateFlow()
     private val _geminiApiKey = MutableStateFlow(prefs.getString(KEY_GEMINI_API_KEY, "").orEmpty())
     override val geminiApiKey: StateFlow<String> = _geminiApiKey.asStateFlow()
+    private val _groqApiKey = MutableStateFlow(prefs.getString(KEY_GROQ_API_KEY, "").orEmpty())
+    override val groqApiKey: StateFlow<String> = _groqApiKey.asStateFlow()
     private val _favoriteTrackIds = MutableStateFlow(loadFavoriteTrackIds())
     override val favoriteTrackIds: StateFlow<Set<Long>> = _favoriteTrackIds.asStateFlow()
     private val _playCounts = MutableStateFlow(loadPlayCounts())
@@ -56,6 +59,17 @@ class SettingsRepositoryImpl @Inject constructor(
         _settings.value = _settings.value.copy(crossfadeSeconds = seconds)
     }
 
+    override fun setOfflineStorageLocation(location: OfflineStorageLocation) {
+        prefs.edit().putString(KEY_OFFLINE_STORAGE_LOCATION, location.name).apply()
+        _settings.value = _settings.value.copy(offlineStorageLocation = location)
+    }
+
+    override fun setStreamCacheSizeMb(sizeMb: Int) {
+        val coerced = sizeMb.coerceIn(100, 2048)
+        prefs.edit().putInt(KEY_STREAM_CACHE_SIZE_MB, coerced).apply()
+        _settings.value = _settings.value.copy(streamCacheSizeMb = coerced)
+    }
+
     override fun addRecentTrack(trackId: Long) {
         val updated = (listOf(trackId) + _recentTrackIds.value.filterNot { it == trackId }).take(10)
         prefs.edit().putString(KEY_RECENT_TRACK_IDS, updated.joinToString(",")).apply()
@@ -65,6 +79,11 @@ class SettingsRepositoryImpl @Inject constructor(
     override fun setGeminiApiKey(key: String) {
         prefs.edit().putString(KEY_GEMINI_API_KEY, key).apply()
         _geminiApiKey.value = key
+    }
+
+    override fun setGroqApiKey(key: String) {
+        prefs.edit().putString(KEY_GROQ_API_KEY, key).apply()
+        _groqApiKey.value = key
     }
 
     override fun toggleFavorite(trackId: Long) {
@@ -129,10 +148,16 @@ class SettingsRepositoryImpl @Inject constructor(
         val themeMode = ThemeMode.entries.firstOrNull { it.name == themeName } ?: ThemeMode.SYSTEM
         val hideShort = prefs.getBoolean(KEY_HIDE_SHORT_TRACKS, true)
         val crossfadeSeconds = prefs.getInt(KEY_CROSSFADE_SECONDS, 0)
+        val storageName = prefs.getString(KEY_OFFLINE_STORAGE_LOCATION, OfflineStorageLocation.APP_INTERNAL.name)
+        val storageLocation = OfflineStorageLocation.entries.firstOrNull { it.name == storageName }
+            ?: OfflineStorageLocation.APP_INTERNAL
+        val streamCacheSizeMb = prefs.getInt(KEY_STREAM_CACHE_SIZE_MB, 500)
         return AppSettings(
             themeMode = themeMode,
             hideShortTracks = hideShort,
             crossfadeSeconds = crossfadeSeconds,
+            offlineStorageLocation = storageLocation,
+            streamCacheSizeMb = streamCacheSizeMb,
         )
     }
 
@@ -217,6 +242,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_CROSSFADE_SECONDS = "crossfade_seconds"
         const val KEY_RECENT_TRACK_IDS = "recent_track_ids"
         const val KEY_GEMINI_API_KEY = "gemini_api_key"
+        const val KEY_GROQ_API_KEY = "groq_api_key"
         const val KEY_FAVORITE_TRACK_IDS = "favorite_track_ids"
         const val KEY_PLAY_COUNTS = "play_counts"
         const val KEY_LISTEN_DURATIONS_MS = "listen_durations_ms"
@@ -224,5 +250,7 @@ class SettingsRepositoryImpl @Inject constructor(
         const val DEFAULT_LYRICS_TRANSLATION_LANGUAGE = "Azerbaijani"
         const val KEY_EXCLUDED_FOLDERS = "excluded_folders"
         const val KEY_METADATA_OVERRIDES = "metadata_overrides"
+        const val KEY_OFFLINE_STORAGE_LOCATION = "offline_storage_location"
+        const val KEY_STREAM_CACHE_SIZE_MB = "stream_cache_size_mb"
     }
 }

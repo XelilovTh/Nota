@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.xelilovth.nota.domain.model.AutoPlaylist
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.domain.repository.OnlineMusicRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.repository.SettingsRepository
 import com.xelilovth.nota.domain.usecase.ObserveTracksUseCase
@@ -15,6 +16,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -25,23 +27,43 @@ class HomeViewModel @Inject constructor(
     private val playTrack: PlayTrackUseCase,
     private val toggleShuffle: ToggleShuffleUseCase,
     private val settingsRepository: SettingsRepository,
+    private val onlineMusicRepository: OnlineMusicRepository?,
 ) : ViewModel() {
+    constructor(
+        observeTracks: ObserveTracksUseCase,
+        playbackRepository: PlaybackRepository,
+        playTrack: PlayTrackUseCase,
+        toggleShuffle: ToggleShuffleUseCase,
+        settingsRepository: SettingsRepository,
+    ) : this(observeTracks, playbackRepository, playTrack, toggleShuffle, settingsRepository, null)
+
     val tracks: StateFlow<List<Track>> = observeTracks()
+    private val allKnownTracks: StateFlow<List<Track>> = combine(
+        tracks,
+        onlineMusicRepository?.offlineTracks ?: flowOf(emptyList()),
+    ) { libraryTracks, offlineTracks ->
+        val cachedOnline = onlineMusicRepository?.getCachedOnlineTracks().orEmpty()
+        val merged = LinkedHashMap<Long, Track>()
+        cachedOnline.forEach { merged[it.id] = it }
+        offlineTracks.forEach { merged[it.id] = it }
+        libraryTracks.forEach { merged[it.id] = it }
+        merged.values.toList()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val playbackState: StateFlow<PlaybackState> = playbackRepository.playbackState
     val favoriteTrackIds: StateFlow<Set<Long>> = settingsRepository.favoriteTrackIds
     val playCounts: StateFlow<Map<Long, Int>> = settingsRepository.playCounts
     val listenDurationsMs: StateFlow<Map<Long, Long>> = settingsRepository.listenDurationsMs
-    val favoriteTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.favoriteTrackIds) { libraryTracks, favIds ->
-        libraryTracks.filter { it.id in favIds }
+    val favoriteTracks: StateFlow<List<Track>> = combine(allKnownTracks, settingsRepository.favoriteTrackIds) { knownTracks, favIds ->
+        knownTracks.filter { it.id in favIds }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val mostPlayedTracks: StateFlow<List<Track>> = combine(tracks, settingsRepository.listenDurationsMs) { libraryTracks, durations ->
-        libraryTracks
+    val mostPlayedTracks: StateFlow<List<Track>> = combine(allKnownTracks, settingsRepository.listenDurationsMs) { knownTracks, durations ->
+        knownTracks
             .filter { (durations[it.id] ?: 0L) > 0L }
             .sortedByDescending { durations[it.id] ?: 0L }
             .take(10)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val recentlyPlayed: StateFlow<List<Track>> = combine(tracks, settingsRepository.recentTrackIds) { libraryTracks, recentIds ->
-        val byId = libraryTracks.associateBy(Track::id)
+    val recentlyPlayed: StateFlow<List<Track>> = combine(allKnownTracks, settingsRepository.recentTrackIds) { knownTracks, recentIds ->
+        val byId = knownTracks.associateBy(Track::id)
         recentIds.mapNotNull(byId::get)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     private var lastTrackId: Long? = null

@@ -109,12 +109,14 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun scanIfEmptyDoesNotRescanWhenAlreadyPopulatedOrAttempted() {
+    fun scanIfEmptyScansOncePerSessionEvenWhenPopulated() {
         val populatedRepo = FakeLibraryRepository(listOf(track(1L)))
         val populatedVm = createViewModel(populatedRepo)
 
         populatedVm.scanIfEmpty()
-        assertEquals(0, populatedRepo.scanCalls)
+        populatedVm.scanIfEmpty()
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        assertEquals(1, populatedRepo.scanCalls)
 
         val emptyRepo = FakeLibraryRepository(emptyList())
         val emptyVm = createViewModel(emptyRepo)

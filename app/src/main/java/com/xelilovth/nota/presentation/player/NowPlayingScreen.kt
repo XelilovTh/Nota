@@ -34,6 +34,8 @@ import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -57,13 +59,12 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -72,6 +73,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -102,11 +104,17 @@ import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
 import com.xelilovth.nota.ui.components.AudioWaveformVisualizer
+import com.xelilovth.nota.ui.components.GlassBottomSheet
+import com.xelilovth.nota.ui.components.GlassDropdownMenu
 import com.xelilovth.nota.ui.components.GlassSurface
+import com.xelilovth.nota.ui.components.OfflineDownloadDialog
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalGlassColors
+import com.xelilovth.nota.ui.theme.LocalHazeState
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -163,8 +171,11 @@ fun NowPlayingScreen(
     var lyricsExpanded by remember { mutableStateOf(false) }
     val lyricsUiState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    val groqApiKey by viewModel.groqApiKey.collectAsStateWithLifecycle()
     val translationLanguage by viewModel.translationLanguage.collectAsStateWithLifecycle()
     val favoriteTrackIds by viewModel.favoriteTrackIds.collectAsStateWithLifecycle()
+    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
+    val downloadedOnlineIds by viewModel.downloadedOnlineIds.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var showGeminiKeyDialog by remember { mutableStateOf(false) }
@@ -187,6 +198,9 @@ fun NowPlayingScreen(
     var showAddToPlaylist by remember { mutableStateOf(false) }
     var showTrackMenu by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
+    var showAiProviderChooser by remember { mutableStateOf(false) }
+    var selectedAiProvider by remember { mutableStateOf(AiLyricsProvider.GEMINI) }
     var pendingDeleteTrackId by remember { mutableStateOf<Long?>(null) }
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -206,10 +220,14 @@ fun NowPlayingScreen(
         pendingDeleteTrackId = null
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(lyricsExpanded) {
+    val playerHazeState = remember { HazeState() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .hazeSource(state = playerHazeState)
+                .pointerInput(lyricsExpanded) {
                 if (!lyricsExpanded) {
                     detectVerticalDragGestures(
                         onVerticalDrag = { change, dragAmount ->
@@ -256,6 +274,34 @@ fun NowPlayingScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             if (state.track != null) {
+                val canSaveOffline = state.track.isOnline || state.track.onlineId != null
+                val isDownloaded = state.track.onlineId != null && state.track.onlineId in downloadedOnlineIds
+                val progress = downloadProgress[state.track.id]
+                if (canSaveOffline) {
+                    IconButton(
+                        enabled = progress == null,
+                        onClick = {
+                            if (isDownloaded) {
+                                Toast.makeText(context, "Already saved for offline listening", Toast.LENGTH_SHORT).show()
+                            } else {
+                                showDownloadDialog = true
+                            }
+                        },
+                    ) {
+                        if (progress != null) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                strokeWidth = AppDimens.BorderWidth,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = if (isDownloaded) Icons.Filled.DownloadDone else Icons.Outlined.DownloadForOffline,
+                                contentDescription = if (isDownloaded) "Saved offline" else "Save for offline",
+                                tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
                 val isFavorite = state.track.id in favoriteTrackIds
                 IconButton(onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -271,10 +317,22 @@ fun NowPlayingScreen(
                     IconButton(onClick = { showTrackMenu = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "More options")
                     }
-                    DropdownMenu(
+                    GlassDropdownMenu(
                         expanded = showTrackMenu,
                         onDismissRequest = { showTrackMenu = false },
                     ) {
+                        if ((state.track.isOnline || state.track.onlineId != null) && !isDownloaded && progress == null) {
+                            DropdownMenuItem(
+                                text = { Text("Save for offline") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.DownloadForOffline, contentDescription = null)
+                                },
+                                onClick = {
+                                    showTrackMenu = false
+                                    showDownloadDialog = true
+                                },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Add to playlist") },
                             leadingIcon = {
@@ -285,16 +343,29 @@ fun NowPlayingScreen(
                                 showAddToPlaylist = true
                             },
                         )
-                        DropdownMenuItem(
-                            text = { Text("Delete from device") },
-                            leadingIcon = {
-                                Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
-                            },
-                            onClick = {
-                                showTrackMenu = false
-                                showDeleteConfirm = true
-                            },
-                        )
+                        if (!state.track.isOnline && state.track.onlineId == null) {
+                            DropdownMenuItem(
+                                text = { Text("Delete from device") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                                },
+                                onClick = {
+                                    showTrackMenu = false
+                                    showDeleteConfirm = true
+                                },
+                            )
+                        } else if (isDownloaded) {
+                            DropdownMenuItem(
+                                text = { Text("Remove offline download") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                                },
+                                onClick = {
+                                    showTrackMenu = false
+                                    showDeleteConfirm = true
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -452,14 +523,8 @@ fun NowPlayingScreen(
                             lrcLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
                         },
                         onGenerateWithGemini = {
-                            val track = state.track
-                            if (track != null) {
-                                if (geminiApiKey.isBlank()) {
-                                    pendingGeminiAction = PendingGeminiAction.TRANSCRIBE
-                                    showGeminiKeyDialog = true
-                                } else {
-                                    viewModel.generateLyricsWithGemini(track)
-                                }
+                            if (state.track != null) {
+                                showAiProviderChooser = true
                             }
                         },
                         onDeleteLyrics = {
@@ -470,6 +535,10 @@ fun NowPlayingScreen(
                         },
                         onSelectTranslationLanguage = { language ->
                             viewModel.setTranslationLanguage(language, state.track)
+                        },
+                        durationMs = duration,
+                        onFetchOnlineLyrics = {
+                            state.track?.let { viewModel.retryOnlineLyrics(it) }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -665,87 +734,86 @@ fun NowPlayingScreen(
         }
 
         Spacer(modifier = Modifier.height(AppDimens.SectionSpacing))
-    }
+        }
 
-    if (showQueueSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showQueueSheet = false },
-            containerColor = LocalGlassColors.current.surfaceElevatedTint,
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
-                Text(
-                    "Up Next",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = AppDimens.ElementSpacing),
-                )
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = AppDimens.ScreenPadding),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-                ) {
-                    items(queueTracks, key = Track::id, contentType = { "queue_track" }) { track ->
-                        val isCurrent = track.id == state.track?.id
-                        GlassSurface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium,
-                            subtle = !isCurrent,
-                            onClick = {
-                                viewModel.onRowClick(track, queueTracks)
-                                showQueueSheet = false
-                            },
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal = AppDimens.CardPadding,
-                                        vertical = AppDimens.RowVerticalPadding,
-                                    ),
-                                verticalAlignment = Alignment.CenterVertically,
+        CompositionLocalProvider(LocalHazeState provides playerHazeState) {
+            GlassBottomSheet(
+                visible = showQueueSheet,
+                onDismissRequest = { showQueueSheet = false },
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
+                    Text(
+                        "Up Next",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = AppDimens.ElementSpacing),
+                    )
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = AppDimens.ScreenPadding),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        items(queueTracks, key = Track::id, contentType = { "queue_track" }) { track ->
+                            val isCurrent = track.id == state.track?.id
+                            GlassSurface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium,
+                                subtle = !isCurrent,
+                                onClick = {
+                                    viewModel.onRowClick(track, queueTracks)
+                                    showQueueSheet = false
+                                },
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        track.title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        track.artist,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                if (isCurrent) {
-                                    Icon(
-                                        Icons.Outlined.GraphicEq,
-                                        contentDescription = "Playing",
-                                        modifier = Modifier.size(AppDimens.IconSizeSmall),
-                                    )
-                                } else {
-                                    Text(
-                                        formatDuration(track.durationMs),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            horizontal = AppDimens.CardPadding,
+                                            vertical = AppDimens.RowVerticalPadding,
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            track.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            track.artist,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    if (isCurrent) {
+                                        Icon(
+                                            Icons.Outlined.GraphicEq,
+                                            contentDescription = "Playing",
+                                            modifier = Modifier.size(AppDimens.IconSizeSmall),
+                                        )
+                                    } else {
+                                        Text(
+                                            formatDuration(track.durationMs),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            AddToPlaylistSheet(
+                track = if (showAddToPlaylist) state.track else null,
+                onDismiss = { showAddToPlaylist = false },
+            )
         }
     }
 
     val activeTrack = state.track
-    if (showAddToPlaylist && activeTrack != null) {
-        AddToPlaylistSheet(
-            track = activeTrack,
-            onDismiss = { showAddToPlaylist = false },
-        )
-    }
 
     if (showDeleteConfirm && activeTrack != null) {
         Dialog(onDismissRequest = { showDeleteConfirm = false }) {
@@ -809,8 +877,103 @@ fun NowPlayingScreen(
         }
     }
 
+    if (showDownloadDialog) {
+        state.track?.let { target ->
+            OfflineDownloadDialog(
+                onDismiss = { showDownloadDialog = false },
+                onSelectLocation = { location ->
+                    showDownloadDialog = false
+                    viewModel.downloadTrackForOffline(target, location) { result ->
+                        val msg = if (result.isSuccess) {
+                            "Saved for offline listening"
+                        } else {
+                            "Offline download failed"
+                        }
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    }
+                },
+            )
+        }
+    }
+
+    if (showAiProviderChooser) {
+        val track = state.track
+        Dialog(onDismissRequest = { showAiProviderChooser = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                ) {
+                    Text("Choose AI provider", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "If the selected provider fails, Nota will automatically fall back to the other if configured.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    listOf(
+                        Triple(AiLyricsProvider.GEMINI, "Gemini AI", geminiApiKey.isNotBlank()),
+                        Triple(AiLyricsProvider.GROQ, "Groq Whisper", groqApiKey.isNotBlank()),
+                    ).forEach { (provider, label, hasKey) ->
+                        GlassSurface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            subtle = true,
+                            onClick = {
+                                showAiProviderChooser = false
+                                selectedAiProvider = provider
+                                if (track != null) {
+                                    if (!hasKey) {
+                                        pendingGeminiAction = PendingGeminiAction.TRANSCRIBE
+                                        showGeminiKeyDialog = true
+                                    } else {
+                                        viewModel.transcribeWithProvider(track, provider)
+                                    }
+                                }
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = AppDimens.CardPadding, vertical = AppDimens.RowVerticalPadding),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(label, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    if (hasKey) "Configured" else "Add API key",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (hasKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = { showAiProviderChooser = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (showGeminiKeyDialog) {
-        var keyInput by remember { mutableStateOf("") }
+        var selectedProvider by remember(selectedAiProvider) {
+            mutableStateOf(if (selectedAiProvider == AiLyricsProvider.GROQ) 1 else 0)
+        }
+        var keyInput by remember(selectedProvider, geminiApiKey, groqApiKey) {
+            mutableStateOf(if (selectedProvider == 0) geminiApiKey else groqApiKey)
+        }
         Dialog(onDismissRequest = {
             showGeminiKeyDialog = false
             pendingGeminiAction = null
@@ -828,9 +991,34 @@ fun NowPlayingScreen(
                     verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
                 ) {
                     Text(
-                        stringResource(R.string.lyrics_gemini_key_title),
+                        stringResource(R.string.lyrics_ai_keys_title),
                         style = MaterialTheme.typography.titleLarge,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        listOf("Gemini", "Groq").forEachIndexed { index, label ->
+                            val isSelected = selectedProvider == index
+                            GlassSurface(
+                                modifier = Modifier.weight(1f),
+                                shape = CircleShape,
+                                elevated = isSelected,
+                                subtle = !isSelected,
+                                onClick = { selectedProvider = index },
+                            ) {
+                                Text(
+                                    text = label,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = AppDimens.RowVerticalPadding),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                     GlassSurface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = CircleShape,
@@ -840,7 +1028,13 @@ fun NowPlayingScreen(
                             value = keyInput,
                             onValueChange = { keyInput = it },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text(stringResource(R.string.lyrics_gemini_key_hint)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(
+                                        if (selectedProvider == 0) R.string.lyrics_gemini_key_hint else R.string.lyrics_groq_key_hint,
+                                    ),
+                                )
+                            },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -865,14 +1059,21 @@ fun NowPlayingScreen(
                         Button(
                             onClick = {
                                 val trimmedKey = keyInput.trim()
-                                viewModel.saveGeminiApiKey(trimmedKey)
+                                if (selectedProvider == 0) {
+                                    viewModel.saveGeminiApiKey(trimmedKey)
+                                } else {
+                                    viewModel.saveGroqApiKey(trimmedKey)
+                                }
                                 showGeminiKeyDialog = false
                                 val action = pendingGeminiAction
                                 pendingGeminiAction = null
                                 state.track?.let { track ->
                                     when (action) {
                                         PendingGeminiAction.TRANSLATE -> viewModel.toggleLyricsTranslation(track, trimmedKey)
-                                        PendingGeminiAction.TRANSCRIBE, null -> viewModel.generateLyricsWithGemini(track, trimmedKey)
+                                        PendingGeminiAction.TRANSCRIBE, null -> {
+                                            val provider = if (selectedProvider == 0) AiLyricsProvider.GEMINI else AiLyricsProvider.GROQ
+                                            viewModel.transcribeWithProvider(track, provider, trimmedKey)
+                                        }
                                     }
                                 }
                             },
@@ -1003,6 +1204,7 @@ private fun CircularArcPlayerArt(
             TrackArtwork(
                 trackId = track?.id,
                 trackUri = track?.uri,
+                artworkUrl = track?.artworkUrl,
                 modifier = Modifier.fillMaxSize(),
                 shape = CircleShape,
                 iconPadding = AppDimens.ScreenPadding,

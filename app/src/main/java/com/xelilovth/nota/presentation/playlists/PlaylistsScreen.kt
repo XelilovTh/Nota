@@ -20,7 +20,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +42,7 @@ import com.xelilovth.nota.domain.model.CustomPlaylist
 import com.xelilovth.nota.domain.model.PlaylistCollectionType
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
+import com.xelilovth.nota.ui.components.GlassDropdownMenu
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -90,8 +90,12 @@ fun PlaylistsScreen(
             ) {
                 Column {
                     Text("Playlists", style = MaterialTheme.typography.headlineMedium)
+                    val playlistCount = userPlaylists.size
+                    val collectionCount = userCollections.size + groups.size
+                    val playlistLabel = if (playlistCount == 1) "playlist" else "playlists"
+                    val collectionLabel = if (collectionCount == 1) "album & folder" else "albums & folders"
                     Text(
-                        "${userPlaylists.size} playlists · ${userCollections.size + groups.size} albums & folders",
+                        "$playlistCount $playlistLabel · $collectionCount $collectionLabel",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -208,10 +212,33 @@ fun PlaylistsScreen(
             GlassSurface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge, elevated = true, blurBackdrop = true) {
                 Column(modifier = Modifier.fillMaxWidth().padding(AppDimens.ScreenPadding), verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing)) {
                     Text("Create new", style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = { createType = PlaylistCollectionType.PLAYLIST; showCreateMenu = false; showCreateDialog = true }) { Text("New Playlist") }
-                    TextButton(onClick = { createType = PlaylistCollectionType.ALBUM; showCreateMenu = false; showCreateDialog = true }) { Text("New Album") }
-                    TextButton(onClick = { createType = PlaylistCollectionType.FOLDER; showCreateMenu = false; showCreateDialog = true }) { Text("New Folder") }
-                    TextButton(onClick = { showCreateMenu = false }) { Text("Cancel") }
+                    listOf(
+                        "New Playlist" to PlaylistCollectionType.PLAYLIST,
+                        "New Album" to PlaylistCollectionType.ALBUM,
+                        "New Folder" to PlaylistCollectionType.FOLDER,
+                    ).forEach { (label, type) ->
+                        GlassSurface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            subtle = true,
+                            onClick = {
+                                createType = type
+                                showCreateMenu = false
+                                showCreateDialog = true
+                            },
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = AppDimens.CardPadding, vertical = AppDimens.RowVerticalPadding),
+                            )
+                        }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showCreateMenu = false }) { Text("Cancel") }
+                    }
                 }
             }
         }
@@ -346,7 +373,7 @@ private fun CustomPlaylistRow(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(Icons.Filled.MoreVert, contentDescription = "Collection options")
                 }
-                DropdownMenu(
+                GlassDropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
                 ) {

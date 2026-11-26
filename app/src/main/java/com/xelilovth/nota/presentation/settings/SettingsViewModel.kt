@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.xelilovth.nota.data.media.SleepTimerManager
 import com.xelilovth.nota.domain.model.AppSettings
 import com.xelilovth.nota.domain.model.DeleteTrackResult
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.LibraryRepository
@@ -28,6 +29,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.settings
     val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
+    val groqApiKey: StateFlow<String> = settingsRepository.groqApiKey
     val discoveredFolders: StateFlow<List<String>> = libraryRepository.allDiscoveredFolders
     val excludedFolders: StateFlow<Set<String>> = settingsRepository.excludedFolders
     val tracks = observeTracks()
@@ -45,7 +47,15 @@ class SettingsViewModel @Inject constructor(
 
     fun setCrossfadeSeconds(seconds: Int) = settingsRepository.setCrossfadeSeconds(seconds)
 
+    fun setOfflineStorageLocation(location: OfflineStorageLocation) =
+        settingsRepository.setOfflineStorageLocation(location)
+
+    fun setStreamCacheSizeMb(sizeMb: Int) =
+        settingsRepository.setStreamCacheSizeMb(sizeMb)
+
     fun setGeminiApiKey(key: String) = settingsRepository.setGeminiApiKey(key.trim())
+
+    fun setGroqApiKey(key: String) = settingsRepository.setGroqApiKey(key.trim())
 
     fun findDuplicateGroups(): List<List<Track>> {
         return tracks.value

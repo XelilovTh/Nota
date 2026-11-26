@@ -91,6 +91,7 @@ fun MiniPlayer(
                     TrackArtwork(
                         trackId = track.id,
                         trackUri = track.uri,
+                        artworkUrl = track.artworkUrl,
                         modifier = Modifier.size(AppDimens.ArtworkSmallSize),
                     )
                     Column(Modifier.weight(1f)) {

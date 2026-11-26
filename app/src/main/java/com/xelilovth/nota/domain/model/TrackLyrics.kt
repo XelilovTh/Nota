@@ -6,6 +6,7 @@ enum class LyricsSource(val label: String) {
     LYRICS_OVH("Lyrics.ovh"),
     LOCAL_FILE("Local .lrc"),
     GEMINI("Gemini AI"),
+    GROQ("Groq Whisper"),
 }
 
 enum class LyricsSyncType {

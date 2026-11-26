@@ -58,15 +58,16 @@ fun TrackArtwork(
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.small,
     iconPadding: Dp = AppDimens.ElementSpacing,
+    artworkUrl: String? = null,
 ) {
     val context = LocalContext.current
     val parsedUri = remember(trackUri) { trackUri?.let(Uri::parse) }
-    var bitmap by remember(trackId) {
+    var bitmap by remember(trackId, artworkUrl) {
         mutableStateOf(if (trackId != null) ArtworkCache.get(trackId) else null)
     }
 
-    LaunchedEffect(trackId, trackUri) {
-        if (trackId == null || parsedUri == null) {
+    LaunchedEffect(trackId, trackUri, artworkUrl) {
+        if (trackId == null) {
             bitmap = null
             return@LaunchedEffect
         }
@@ -80,7 +81,17 @@ fun TrackArtwork(
             return@LaunchedEffect
         }
         val loaded = withContext(Dispatchers.IO) {
-            loadEmbeddedArtwork(context, parsedUri)?.asImageBitmap()
+            val embedded = if (parsedUri != null && (parsedUri.scheme == "content" || parsedUri.scheme == "file")) {
+                loadEmbeddedArtwork(context, parsedUri)
+            } else {
+                null
+            }
+            val remote = if (embedded == null && !artworkUrl.isNullOrBlank()) {
+                loadRemoteArtwork(artworkUrl)
+            } else {
+                null
+            }
+            (embedded ?: remote)?.asImageBitmap()
         }
         ArtworkCache.put(trackId, loaded)
         bitmap = loaded
@@ -134,6 +145,20 @@ private fun loadEmbeddedArtwork(context: Context, uri: Uri): Bitmap? {
         }
     }
 }
+
+private fun loadRemoteArtwork(url: String): Bitmap? = runCatching {
+    val connection = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+        connectTimeout = 8_000
+        readTimeout = 10_000
+        instanceFollowRedirects = true
+    }
+    try {
+        if (connection.responseCode !in 200..299) return null
+        connection.inputStream.use { BitmapFactory.decodeStream(it) }
+    } finally {
+        connection.disconnect()
+    }
+}.getOrNull()
 
 fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs.coerceAtLeast(0L) / 1_000L

@@ -13,10 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -35,25 +33,26 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.CustomPlaylist
 import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.ui.components.GlassBottomSheet
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.theme.AppDimens
-import com.xelilovth.nota.ui.theme.LocalGlassColors
+import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddToPlaylistSheet(
-    track: Track,
+    track: Track?,
     onDismiss: () -> Unit,
     viewModel: PlaylistsViewModel = hiltViewModel(),
 ) {
     val customPlaylists by viewModel.customPlaylists.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
+    GlassBottomSheet(
+        visible = track != null,
         onDismissRequest = onDismiss,
-        containerColor = LocalGlassColors.current.surfaceElevatedTint,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
+        if (track != null) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
             Text(
                 "Add to playlist",
                 style = MaterialTheme.typography.titleLarge,
@@ -84,7 +83,7 @@ fun AddToPlaylistSheet(
                 }
             }
             LazyColumn(
-                contentPadding = PaddingValues(bottom = AppDimens.ScreenPadding),
+                contentPadding = PaddingValues(bottom = LocalBottomContentPadding.current),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
             ) {
                 items(customPlaylists, key = CustomPlaylist::id) { playlist ->
@@ -121,9 +120,10 @@ fun AddToPlaylistSheet(
                 }
             }
         }
+        }
     }
 
-    if (showCreateDialog) {
+    if (showCreateDialog && track != null) {
         PlaylistNameDialog(
             title = "New playlist",
             initialName = "",

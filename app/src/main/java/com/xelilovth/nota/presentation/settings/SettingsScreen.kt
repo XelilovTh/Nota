@@ -25,6 +25,8 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +53,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
@@ -58,6 +62,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.R
 import com.xelilovth.nota.domain.model.DeleteTrackResult
+import com.xelilovth.nota.data.media.StreamCacheHolder
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.formatDuration
@@ -73,6 +79,7 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    val groqApiKey by viewModel.groqApiKey.collectAsStateWithLifecycle()
     val discoveredFolders by viewModel.discoveredFolders.collectAsStateWithLifecycle()
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
     val tracks by viewModel.tracks.collectAsStateWithLifecycle()
@@ -335,19 +342,144 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                stringResource(R.string.lyrics_gemini_key_title),
+                                stringResource(R.string.lyrics_ai_keys_title),
                                 style = MaterialTheme.typography.titleMedium,
                             )
+                            val keyStatus = when {
+                                geminiApiKey.isNotBlank() && groqApiKey.isNotBlank() -> "Gemini & Groq configured"
+                                geminiApiKey.isNotBlank() -> "Gemini configured"
+                                groqApiKey.isNotBlank() -> "Groq configured"
+                                else -> "Not set"
+                            }
                             Text(
-                                if (geminiApiKey.isNotBlank()) "Configured" else "Not set",
+                                keyStatus,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         Icon(
                             Icons.Outlined.Key,
-                            contentDescription = stringResource(R.string.lyrics_gemini_key_title),
+                            contentDescription = stringResource(R.string.lyrics_ai_keys_title),
                         )
+                    }
+                }
+            }
+        }
+
+        item {
+            SectionLabel("Online & Offline Storage")
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth().padding(top = AppDimens.ElementSpacing),
+                shape = MaterialTheme.shapes.large,
+                subtle = false,
+            ) {
+                var cacheBytes by remember { mutableStateOf(StreamCacheHolder.getCacheSizeBytes(context)) }
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(AppDimens.CardPadding),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        Text("Offline download location", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (settings.offlineStorageLocation == OfflineStorageLocation.PUBLIC_MUSIC) {
+                                "Saved to Music/Nota on device storage"
+                            } else {
+                                "Saved privately inside Nota"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                        ) {
+                            listOf(
+                                OfflineStorageLocation.APP_INTERNAL to "App Internal",
+                                OfflineStorageLocation.PUBLIC_MUSIC to "Music / Nota",
+                            ).forEach { (location, label) ->
+                                val selected = settings.offlineStorageLocation == location
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { viewModel.setOfflineStorageLocation(location) },
+                                    border = null,
+                                    label = {
+                                        Text(
+                                            label,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(AppDimens.CardPadding),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        Text("Stream cache limit", style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                        ) {
+                            listOf(250 to "250 MB", 500 to "500 MB", 1024 to "1 GB").forEach { (sizeMb, label) ->
+                                val selected = settings.streamCacheSizeMb == sizeMb
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { viewModel.setStreamCacheSizeMb(sizeMb) },
+                                    border = null,
+                                    label = {
+                                        Text(
+                                            label,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                StreamCacheHolder.clearCache(context)
+                                cacheBytes = StreamCacheHolder.getCacheSizeBytes(context)
+                                Toast.makeText(context, "Stream cache cleared", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(AppDimens.CardPadding),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Clear stream cache", style = MaterialTheme.typography.titleMedium)
+                            val cacheMb = cacheBytes / (1024L * 1024L)
+                            Text(
+                                "Currently using $cacheMb MB",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "Clear stream cache")
                     }
                 }
             }
@@ -366,7 +498,7 @@ fun SettingsScreen(
                 ) {
                     Text("Nota", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Version 0.1.0 · Minimalist local audio player",
+                        "Version 0.3.0 · Local & online music player",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -557,7 +689,11 @@ fun SettingsScreen(
     }
 
     if (showGeminiKeyDialog) {
-        var keyInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
+        var selectedProvider by remember { mutableStateOf(0) } // 0 = Gemini, 1 = Groq
+        var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
+        var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
+        var showKeyText by remember { mutableStateOf(false) }
+        val activeInput = if (selectedProvider == 0) geminiInput else groqInput
         Dialog(onDismissRequest = { showGeminiKeyDialog = false }) {
             GlassSurface(
                 modifier = Modifier.fillMaxWidth(),
@@ -572,19 +708,61 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
                 ) {
                     Text(
-                        stringResource(R.string.lyrics_gemini_key_title),
+                        stringResource(R.string.lyrics_ai_keys_title),
                         style = MaterialTheme.typography.titleLarge,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
+                    ) {
+                        listOf("Gemini" to geminiInput.isNotBlank(), "Groq" to groqInput.isNotBlank()).forEachIndexed { index, (label, hasKey) ->
+                            val isSelected = selectedProvider == index
+                            GlassSurface(
+                                modifier = Modifier.weight(1f),
+                                shape = CircleShape,
+                                elevated = isSelected,
+                                subtle = !isSelected,
+                                onClick = { selectedProvider = index },
+                            ) {
+                                Text(
+                                    text = if (hasKey) "$label ✓" else label,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = AppDimens.RowVerticalPadding),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                     GlassSurface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = CircleShape,
-                        subtle = true,
+                        subtle = false,
                     ) {
                         TextField(
-                            value = keyInput,
-                            onValueChange = { keyInput = it },
+                            value = activeInput,
+                            onValueChange = { value ->
+                                if (selectedProvider == 0) geminiInput = value else groqInput = value
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text(stringResource(R.string.lyrics_gemini_key_hint)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(
+                                        if (selectedProvider == 0) R.string.lyrics_gemini_key_hint else R.string.lyrics_groq_key_hint,
+                                    ),
+                                )
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { showKeyText = !showKeyText }) {
+                                    Icon(
+                                        imageVector = if (showKeyText) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                        contentDescription = if (showKeyText) "Hide API key" else "Show API key",
+                                    )
+                                }
+                            },
+                            visualTransformation = if (showKeyText) VisualTransformation.None else PasswordVisualTransformation(),
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
@@ -605,15 +783,21 @@ fun SettingsScreen(
                         }
                         TextButton(
                             onClick = {
-                                viewModel.setGeminiApiKey("")
-                                showGeminiKeyDialog = false
+                                if (selectedProvider == 0) {
+                                    geminiInput = ""
+                                    viewModel.setGeminiApiKey("")
+                                } else {
+                                    groqInput = ""
+                                    viewModel.setGroqApiKey("")
+                                }
                             },
                         ) {
-                            Text("Clear")
+                            Text(if (selectedProvider == 0) "Clear Gemini" else "Clear Groq")
                         }
                         Button(
                             onClick = {
-                                viewModel.setGeminiApiKey(keyInput)
+                                viewModel.setGeminiApiKey(geminiInput)
+                                viewModel.setGroqApiKey(groqInput)
                                 showGeminiKeyDialog = false
                             },
                         ) {

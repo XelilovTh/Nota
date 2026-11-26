@@ -7,6 +7,8 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.util.Size
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -15,17 +17,35 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -454,6 +474,111 @@ fun GlassSurface(
         } else {
             CompositionLocalProvider(LocalContentColor provides onSurface) {
                 content()
+            }
+        }
+    }
+}
+
+@Composable
+fun GlassDropdownMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val glass = LocalGlassColors.current
+    val shape = MaterialTheme.shapes.large
+    val borderBrush = remember(glass.borderHighlight, glass.borderEdge) {
+        Brush.linearGradient(colors = listOf(glass.borderHighlight, glass.borderEdge))
+    }
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        modifier = modifier,
+        shape = shape,
+        containerColor = glass.sheetBackground,
+        tonalElevation = AppDimens.Zero,
+        shadowElevation = AppDimens.Zero,
+        border = BorderStroke(AppDimens.GlassBorderWidth, borderBrush),
+        content = content,
+    )
+}
+
+@Composable
+fun GlassBottomSheet(
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val glass = LocalGlassColors.current
+    BackHandler(enabled = visible) { onDismissRequest() }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(durationMillis = 200)),
+        exit = fadeOut(tween(durationMillis = 180)),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            val scrimInteraction = remember { MutableInteractionSource() }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(glass.sheetScrim)
+                    .clickable(
+                        interactionSource = scrimInteraction,
+                        indication = null,
+                        onClick = onDismissRequest,
+                    ),
+            )
+            val sheetInteraction = remember { MutableInteractionSource() }
+            GlassSurface(
+                modifier = modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.68f)
+                    .animateEnterExit(
+                        enter = slideInVertically(
+                            animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                            initialOffsetY = { it },
+                        ),
+                        exit = slideOutVertically(
+                            animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                            targetOffsetY = { it },
+                        ),
+                    )
+                    .clickable(
+                        interactionSource = sheetInteraction,
+                        indication = null,
+                        onClick = {},
+                    ),
+                shape = RoundedCornerShape(
+                    topStart = AppDimens.ShapeExtraLarge,
+                    topEnd = AppDimens.ShapeExtraLarge,
+                ),
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding(),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = AppDimens.ElementSpacing),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(AppDimens.LyricsHandleWidth)
+                                .height(AppDimens.LyricsHandleThickness)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)),
+                        )
+                    }
+                    content()
+                }
             }
         }
     }

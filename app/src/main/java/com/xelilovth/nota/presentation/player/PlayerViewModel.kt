@@ -2,10 +2,12 @@ package com.xelilovth.nota.presentation.player
 
 import androidx.lifecycle.ViewModel
 import com.xelilovth.nota.domain.model.DeleteTrackResult
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.TrackLyrics
 import com.xelilovth.nota.domain.repository.LibraryRepository
+import com.xelilovth.nota.domain.repository.OnlineMusicRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.repository.LyricsRepository
 import com.xelilovth.nota.domain.repository.SettingsRepository
@@ -27,6 +29,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
+enum class AiLyricsProvider { GEMINI, GROQ }
+
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repository: PlaybackRepository,
@@ -40,11 +44,44 @@ class PlayerViewModel @Inject constructor(
     private val seekToUseCase: SeekToUseCase,
     private val toggleShuffleUseCase: ToggleShuffleUseCase,
     private val cycleRepeatModeUseCase: CycleRepeatModeUseCase,
+    private val onlineMusicRepository: OnlineMusicRepository?,
 ) : ViewModel() {
+    constructor(
+        repository: PlaybackRepository,
+        libraryRepository: LibraryRepository,
+        lyricsRepository: LyricsRepository,
+        settingsRepository: SettingsRepository,
+        playTrack: PlayTrackUseCase,
+        togglePlayPauseUseCase: TogglePlayPauseUseCase,
+        skipNextUseCase: SkipNextUseCase,
+        skipPreviousUseCase: SkipPreviousUseCase,
+        seekToUseCase: SeekToUseCase,
+        toggleShuffleUseCase: ToggleShuffleUseCase,
+        cycleRepeatModeUseCase: CycleRepeatModeUseCase,
+    ) : this(
+        repository,
+        libraryRepository,
+        lyricsRepository,
+        settingsRepository,
+        playTrack,
+        togglePlayPauseUseCase,
+        skipNextUseCase,
+        skipPreviousUseCase,
+        seekToUseCase,
+        toggleShuffleUseCase,
+        cycleRepeatModeUseCase,
+        null,
+    )
+
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
     val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
+    val groqApiKey: StateFlow<String> = settingsRepository.groqApiKey
     val translationLanguage: StateFlow<String> = settingsRepository.lyricsTranslationLanguage
     val favoriteTrackIds: StateFlow<Set<Long>> = settingsRepository.favoriteTrackIds
+    val downloadProgress: StateFlow<Map<Long, Int>> =
+        onlineMusicRepository?.downloadProgress ?: MutableStateFlow(emptyMap())
+    val downloadedOnlineIds: StateFlow<Set<String>> =
+        onlineMusicRepository?.downloadedOnlineIds ?: MutableStateFlow(emptySet())
     private val _lyricsState = MutableStateFlow(LyricsUiState())
     val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
     private var lyricsJob: Job? = null
@@ -106,7 +143,196 @@ class PlayerViewModel @Inject constructor(
 
     fun saveGeminiApiKey(key: String) = settingsRepository.setGeminiApiKey(key.trim())
 
+    fun saveGroqApiKey(key: String) = settingsRepository.setGroqApiKey(key.trim())
+
+    fun transcribeWithProvider(
+        track: Track,
+        preferredProvider: AiLyricsProvider,
+        apiKeyOverride: String? = null,
+    ) {
+        if (track.uri.startsWith("nota://")) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = "Download track offline first to transcribe with AI",
+            )
+            return
+        }
+        val geminiKey = if (preferredProvider == AiLyricsProvider.GEMINI && apiKeyOverride != null) {
+            apiKeyOverride.trim()
+        } else {
+            geminiApiKey.value.trim()
+        }
+        val groqKey = if (preferredProvider == AiLyricsProvider.GROQ && apiKeyOverride != null) {
+            apiKeyOverride.trim()
+        } else {
+            groqApiKey.value.trim()
+        }
+        val primaryKey = if (preferredProvider == AiLyricsProvider.GEMINI) geminiKey else groqKey
+        if (primaryKey.isBlank()) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = "${if (preferredProvider == AiLyricsProvider.GEMINI) "Gemini" else "Groq"} API key is required",
+            )
+            return
+        }
+
+        lyricsJob?.cancel()
+        _lyricsState.value = _lyricsState.value.copy(
+            trackId = track.id,
+            isLoading = true,
+            notFound = false,
+            errorMessage = null,
+        )
+        lyricsJob = viewModelScope.launch {
+            val primaryResult = runCatching {
+                when (preferredProvider) {
+                    AiLyricsProvider.GEMINI -> lyricsRepository.generateLyricsWithGemini(track, geminiKey)
+                    AiLyricsProvider.GROQ -> lyricsRepository.generateLyricsWithGroq(track, groqKey)
+                }
+            }.getOrNull()
+
+            val fallbackResult = if (primaryResult == null) {
+                when (preferredProvider) {
+                    AiLyricsProvider.GEMINI -> if (groqKey.isNotBlank()) {
+                        runCatching { lyricsRepository.generateLyricsWithGroq(track, groqKey) }.getOrNull()
+                    } else {
+                        null
+                    }
+                    AiLyricsProvider.GROQ -> if (geminiKey.isNotBlank()) {
+                        runCatching { lyricsRepository.generateLyricsWithGemini(track, geminiKey) }.getOrNull()
+                    } else {
+                        null
+                    }
+                }
+            } else {
+                null
+            }
+
+            val lyrics = primaryResult ?: fallbackResult
+            val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = if (lyrics != null) {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = lyrics,
+                        notFound = false,
+                        syncOffsetMs = offsetMs,
+                    )
+                } else {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = _lyricsState.value.lyrics,
+                        notFound = _lyricsState.value.lyrics == null,
+                        syncOffsetMs = offsetMs,
+                        errorMessage = "AI transcription failed (check API key, audio size, or connection)",
+                    )
+                }
+            }
+        }
+    }
+
+    fun generateLyricsWithAi(track: Track) {
+        val geminiKey = geminiApiKey.value.trim()
+        val groqKey = groqApiKey.value.trim()
+        if (geminiKey.isBlank() && groqKey.isBlank()) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = "Gemini or Groq API key is required",
+            )
+            return
+        }
+        lyricsJob?.cancel()
+        _lyricsState.value = _lyricsState.value.copy(
+            trackId = track.id,
+            isLoading = true,
+            notFound = false,
+            errorMessage = null,
+        )
+        lyricsJob = viewModelScope.launch {
+            val lyrics = (if (geminiKey.isNotBlank()) {
+                runCatching { lyricsRepository.generateLyricsWithGemini(track, geminiKey) }.getOrNull()
+            } else {
+                null
+            }) ?: if (groqKey.isNotBlank()) {
+                runCatching { lyricsRepository.generateLyricsWithGroq(track, groqKey) }.getOrNull()
+            } else {
+                null
+            }
+            val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = if (lyrics != null) {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = lyrics,
+                        notFound = false,
+                        syncOffsetMs = offsetMs,
+                    )
+                } else {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = _lyricsState.value.lyrics,
+                        notFound = _lyricsState.value.lyrics == null,
+                        syncOffsetMs = offsetMs,
+                        errorMessage = "Could not transcribe lyrics with AI",
+                    )
+                }
+            }
+        }
+    }
+
+    fun generateLyricsWithGroq(track: Track, apiKeyOverride: String? = null) {
+        val apiKey = (apiKeyOverride ?: groqApiKey.value).trim()
+        if (apiKey.isBlank()) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = "Groq API key is required",
+            )
+            return
+        }
+        lyricsJob?.cancel()
+        _lyricsState.value = _lyricsState.value.copy(
+            trackId = track.id,
+            isLoading = true,
+            notFound = false,
+            errorMessage = null,
+        )
+        lyricsJob = viewModelScope.launch {
+            val lyrics = runCatching { lyricsRepository.generateLyricsWithGroq(track, apiKey) }.getOrNull()
+            val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = if (lyrics != null) {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = lyrics,
+                        notFound = false,
+                        syncOffsetMs = offsetMs,
+                    )
+                } else {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = _lyricsState.value.lyrics,
+                        notFound = _lyricsState.value.lyrics == null,
+                        syncOffsetMs = offsetMs,
+                        errorMessage = "Could not transcribe lyrics with Groq",
+                    )
+                }
+            }
+        }
+    }
+
     fun generateLyricsWithGemini(track: Track, apiKeyOverride: String? = null) {
+        if (track.uri.startsWith("nota://")) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = "Download track offline first to transcribe with AI",
+            )
+            return
+        }
         val apiKey = (apiKeyOverride ?: geminiApiKey.value).trim()
         if (apiKey.isBlank()) {
             _lyricsState.value = _lyricsState.value.copy(
@@ -249,6 +475,36 @@ class PlayerViewModel @Inject constructor(
 
     fun confirmTrackDeleted(trackId: Long) {
         libraryRepository.onTrackDeletedFromDevice(trackId)
+    }
+
+    fun retryOnlineLyrics(track: Track) {
+        lyricsJob?.cancel()
+        _lyricsState.value = LyricsUiState(trackId = track.id, isLoading = true)
+        lyricsJob = viewModelScope.launch {
+            val lyrics = runCatching { lyricsRepository.fetchOnlineLyrics(track) }.getOrNull()
+            val offsetMs = lyricsRepository.getSyncOffsetMs(track.id)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = LyricsUiState(
+                    trackId = track.id,
+                    lyrics = lyrics,
+                    syncOffsetMs = offsetMs,
+                    isLoading = false,
+                    notFound = lyrics == null,
+                )
+            }
+        }
+    }
+
+    fun downloadTrackForOffline(
+        track: Track,
+        location: OfflineStorageLocation,
+        onResult: (Result<Track>) -> Unit,
+    ) {
+        val repo = onlineMusicRepository ?: return
+        settingsRepository.setOfflineStorageLocation(location)
+        viewModelScope.launch {
+            onResult(repo.downloadForOffline(track, location))
+        }
     }
     fun onRowClick(track: Track, libraryTracks: List<Track>) {
         val queue = if (libraryTracks.any { it.id == track.id }) libraryTracks else listOf(track)
