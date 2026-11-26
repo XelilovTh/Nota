@@ -49,12 +49,34 @@ class LyricsRepositoryImpl @Inject constructor(
             return@withContext diskCached
         }
 
-        val result = try {
-            fetchFromLrclib(track) ?: fetchFromLyricsOvh(track)
+        val betterLyrics = try {
+            fetchFromBetterLyrics(track)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            runCatching { fetchFromLyricsOvh(track) }.getOrNull()
+            null
+        }
+
+        val result = if (
+            betterLyrics != null &&
+            (betterLyrics.instrumental || betterLyrics.syncType != LyricsSyncType.PLAIN)
+        ) {
+            betterLyrics
+        } else {
+            val lrclib = try {
+                fetchFromLrclib(track)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            lrclib ?: betterLyrics ?: try {
+                fetchFromLyricsOvh(track)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
         }
         if (result != null) {
             writeDiskCache(track.id, result)
@@ -188,6 +210,27 @@ class LyricsRepositoryImpl @Inject constructor(
             syncType = syncType,
             instrumental = instrumental,
         )
+    }
+
+    private fun fetchFromBetterLyrics(track: Track): TrackLyrics? {
+        if (track.title.isBlank() || track.artist.isBlank()) return null
+        val durationSeconds = (track.durationMs / 1_000L).toInt().takeIf { it in 1..3_600 }
+        val uri = Uri.parse("https://lyrics-api.boidu.dev/getLyrics").buildUpon()
+            .appendQueryParameter("s", track.title)
+            .appendQueryParameter("a", track.artist)
+            .apply {
+                durationSeconds?.let { appendQueryParameter("d", it.toString()) }
+                track.album.takeIf { it.isNotBlank() && !it.equals("Unknown album", true) }
+                    ?.let { appendQueryParameter("al", it) }
+            }
+            .build()
+        val json = requestJson(uri.toString()) ?: return null
+        if (json.optBoolean("error")) return null
+        if (json.optBoolean("instrumental")) {
+            return TrackLyrics(emptyList(), LyricsSource.BETTER_LYRICS, LyricsSyncType.PLAIN, instrumental = true)
+        }
+        val ttml = json.optString("ttml").takeUnless { it == "null" || it.isBlank() } ?: return null
+        return LyricsParser.fromTtml(ttml, track.durationMs)
     }
 
     private fun fetchFromLrclib(track: Track): TrackLyrics? {

@@ -5,13 +5,20 @@ import com.xelilovth.nota.domain.model.LyricWord
 import com.xelilovth.nota.domain.model.LyricsSource
 import com.xelilovth.nota.domain.model.LyricsSyncType
 import com.xelilovth.nota.domain.model.TrackLyrics
+import java.io.StringReader
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
+import kotlin.math.roundToLong
+import org.w3c.dom.Element
+import org.w3c.dom.Node
+import org.xml.sax.InputSource
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
 internal object LyricsParser {
     private val lrcTimestamp = Regex("""\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?]\s*(.*)""")
-    private val leadingPlusMarker = Regex("""^\+\s+""")
+    private val leadingPlusMarker = Regex("""^\+(?:\s+|$)""")
 
     private fun cleanLineText(raw: String): String =
         raw.trimStart().replace(leadingPlusMarker, "").trim()
@@ -173,5 +180,147 @@ internal object LyricsParser {
             if (plainLines.isNotEmpty()) return TrackLyrics(plainLines, source, LyricsSyncType.PLAIN)
         }
         return null
+    }
+
+    fun fromTtml(ttml: String, durationMs: Long = 0L): TrackLyrics? {
+        if (ttml.isBlank()) return null
+        val document = runCatching {
+            val factory = DocumentBuilderFactory.newInstance().apply {
+                setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+                isNamespaceAware = false
+                isExpandEntityReferences = false
+            }
+            factory.newDocumentBuilder().parse(InputSource(StringReader(ttml)))
+        }.getOrNull() ?: return null
+
+        val root = document.documentElement ?: return null
+        val body = findFirstElementByLocalName(root, "body") ?: root
+        val pElements = collectElementsByLocalName(body, "p")
+
+        val parsed = pElements.mapNotNull { p ->
+            val pStart = parseTtmlTimeMs(p.getAttribute("begin"))
+            val pEnd = parseTtmlTimeMs(p.getAttribute("end"))
+
+            val spanElements = mutableListOf<Element>()
+            collectTimedSpans(p, spanElements)
+            val words = spanElements.mapNotNull { span ->
+                val wStart = parseTtmlTimeMs(span.getAttribute("begin")) ?: return@mapNotNull null
+                val wEnd = parseTtmlTimeMs(span.getAttribute("end"))?.takeIf { it > wStart }
+                val cleanWord = span.textContent.trim()
+                if (cleanWord.isBlank()) return@mapNotNull null
+                LyricWord(text = cleanWord, startMs = wStart, endMs = wEnd)
+            }
+
+            val rawLineText = if (words.isNotEmpty()) {
+                words.joinToString(" ") { it.text.trim() }
+            } else {
+                p.textContent.trim()
+            }
+            val lineText = cleanLineText(rawLineText)
+            if (lineText.isBlank()) return@mapNotNull null
+
+            val lineStart = pStart ?: words.firstOrNull()?.startMs
+            val lineEnd = (pEnd ?: words.lastOrNull()?.endMs)
+                ?.takeIf { lineStart == null || it > lineStart }
+
+            LyricLine(
+                text = lineText,
+                startMs = lineStart,
+                endMs = lineEnd,
+                words = words,
+            )
+        }.sortedBy { it.startMs ?: Long.MAX_VALUE }
+
+        if (parsed.isEmpty()) return null
+
+        val lines = parsed.mapIndexed { index, line ->
+            val nextLineStart = parsed.getOrNull(index + 1)?.startMs
+            val inferredEnd = line.endMs
+                ?: nextLineStart?.takeIf { line.startMs == null || it > line.startMs }
+                ?: durationMs.takeIf { it > 0L && (line.startMs == null || it > line.startMs) }
+            line.copy(endMs = inferredEnd)
+        }
+
+        val syncType = when {
+            lines.any { it.words.isNotEmpty() } -> LyricsSyncType.WORD
+            lines.any { it.startMs != null } -> LyricsSyncType.LINE
+            else -> LyricsSyncType.PLAIN
+        }
+        return TrackLyrics(lines, LyricsSource.BETTER_LYRICS, syncType)
+    }
+
+    internal fun parseTtmlTimeMs(raw: String): Long? {
+        val value = raw.trim()
+        if (value.isEmpty()) return null
+        if (value.endsWith("s", ignoreCase = true) && !value.endsWith("ms", ignoreCase = true)) {
+            val seconds = value.dropLast(1).toDoubleOrNull()
+                ?.takeIf { it.isFinite() && it >= 0.0 } ?: return null
+            return (seconds * 1_000.0).roundToLong()
+        }
+        if (':' in value) {
+            val parts = value.split(':')
+            return when (parts.size) {
+                2 -> {
+                    val minutes = parts[0].toLongOrNull()?.takeIf { it >= 0L } ?: return null
+                    val seconds = parts[1].toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: return null
+                    minutes * 60_000L + (seconds * 1_000.0).roundToLong()
+                }
+                3 -> {
+                    val hours = parts[0].toLongOrNull()?.takeIf { it >= 0L } ?: return null
+                    val minutes = parts[1].toLongOrNull()?.takeIf { it >= 0L } ?: return null
+                    val seconds = parts[2].toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: return null
+                    (hours * 3_600L + minutes * 60L) * 1_000L + (seconds * 1_000.0).roundToLong()
+                }
+                else -> null
+            }
+        }
+        val seconds = value.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: return null
+        return (seconds * 1_000.0).roundToLong()
+    }
+
+    private fun localTagName(element: Element): String =
+        element.localName ?: element.tagName.substringAfter(':')
+
+    private fun findFirstElementByLocalName(root: Element, target: String): Element? {
+        if (localTagName(root) == target) return root
+        val children = root.childNodes
+        for (i in 0 until children.length) {
+            val child = children.item(i) as? Element ?: continue
+            findFirstElementByLocalName(child, target)?.let { return it }
+        }
+        return null
+    }
+
+    private fun collectElementsByLocalName(root: Element, target: String): List<Element> {
+        val result = mutableListOf<Element>()
+        fun visit(node: Node) {
+            val children = node.childNodes
+            for (i in 0 until children.length) {
+                val child = children.item(i) as? Element ?: continue
+                if (localTagName(child) == target) {
+                    result.add(child)
+                } else {
+                    visit(child)
+                }
+            }
+        }
+        visit(root)
+        return result
+    }
+
+    private fun collectTimedSpans(parent: Node, out: MutableList<Element>) {
+        val children = parent.childNodes
+        for (i in 0 until children.length) {
+            val child = children.item(i) as? Element ?: continue
+            val role = child.getAttribute("ttm:role").ifBlank { child.getAttribute("role") }
+            if (role.contains("bg", ignoreCase = true) || role.contains("background", ignoreCase = true)) {
+                continue
+            }
+            if (localTagName(child) == "span" && child.hasAttribute("begin")) {
+                out.add(child)
+            } else {
+                collectTimedSpans(child, out)
+            }
+        }
     }
 }

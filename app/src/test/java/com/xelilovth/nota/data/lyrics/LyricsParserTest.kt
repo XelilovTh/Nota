@@ -231,4 +231,74 @@ class LyricsParserTest {
         assertEquals(115, exactDuration)
         assertEquals(80, mismatchedDuration)
     }
+
+    @Test
+    fun parsesWordSyncedTtml() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+              <body>
+                <div>
+                  <p begin="00:01.000" end="00:03.500">
+                    <span begin="00:01.000" end="00:01.500">Hello</span>
+                    <span begin="00:01.600" end="00:02.200">world</span>
+                    <span ttm:role="x-bg" begin="00:02.300" end="00:03.000">(ooh)</span>
+                  </p>
+                  <p begin="00:04.000" end="00:06.000">
+                    <span begin="00:04.000" end="00:04.800">+</span>
+                  </p>
+                </div>
+              </body>
+            </tt>
+        """.trimIndent()
+
+        val result = LyricsParser.fromTtml(ttml, durationMs = 10_000L)!!
+
+        assertEquals(LyricsSource.BETTER_LYRICS, result.source)
+        assertEquals(LyricsSyncType.WORD, result.syncType)
+        assertEquals(1, result.lines.size)
+        val line = result.lines.single()
+        assertEquals("Hello world", line.text)
+        assertEquals(1_000L, line.startMs)
+        assertEquals(3_500L, line.endMs)
+        assertEquals(2, line.words.size)
+        assertEquals("Hello", line.words[0].text)
+        assertEquals(1_000L, line.words[0].startMs)
+        assertEquals(1_500L, line.words[0].endMs)
+        assertEquals("world", line.words[1].text)
+        assertEquals(1_600L, line.words[1].startMs)
+        assertEquals(2_200L, line.words[1].endMs)
+    }
+
+    @Test
+    fun parsesLineSyncedTtmlWithVariousTimestampFormats() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml">
+              <body>
+                <div>
+                  <p begin="1.5s" end="3.25s">First line</p>
+                  <p begin="00:04.500">Second line</p>
+                  <p begin="00:00:06.000">Third line</p>
+                </div>
+              </body>
+            </tt>
+        """.trimIndent()
+
+        val result = LyricsParser.fromTtml(ttml, durationMs = 10_000L)!!
+
+        assertEquals(LyricsSource.BETTER_LYRICS, result.source)
+        assertEquals(LyricsSyncType.LINE, result.syncType)
+        assertEquals(3, result.lines.size)
+        assertEquals("First line", result.lines[0].text)
+        assertEquals(1_500L, result.lines[0].startMs)
+        assertEquals(3_250L, result.lines[0].endMs)
+        assertTrue(result.lines[0].words.isEmpty())
+
+        assertEquals("Second line", result.lines[1].text)
+        assertEquals(4_500L, result.lines[1].startMs)
+        assertEquals(6_000L, result.lines[1].endMs)
+
+        assertEquals("Third line", result.lines[2].text)
+        assertEquals(6_000L, result.lines[2].startMs)
+        assertEquals(10_000L, result.lines[2].endMs)
+    }
 }
