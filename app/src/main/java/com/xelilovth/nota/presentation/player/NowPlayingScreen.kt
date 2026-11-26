@@ -796,16 +796,14 @@ fun NowPlayingScreen(
                     }
                 }
             }
+            AddToPlaylistSheet(
+                track = if (showAddToPlaylist) state.track else null,
+                onDismiss = { showAddToPlaylist = false },
+            )
         }
     }
 
     val activeTrack = state.track
-    if (showAddToPlaylist && activeTrack != null) {
-        AddToPlaylistSheet(
-            track = activeTrack,
-            onDismiss = { showAddToPlaylist = false },
-        )
-    }
 
     if (showDeleteConfirm && activeTrack != null) {
         Dialog(onDismissRequest = { showDeleteConfirm = false }) {

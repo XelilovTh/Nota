@@ -24,11 +24,9 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,14 +43,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.groupTracksIntoPlaylists
+import com.xelilovth.nota.ui.components.GlassBottomSheet
 import com.xelilovth.nota.ui.components.GlassSurface
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
-import com.xelilovth.nota.ui.theme.LocalGlassColors
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistDetailScreen(
     playlistId: String,
@@ -294,11 +291,11 @@ fun PlaylistDetailScreen(
         }
     }
 
-    if (showAddSongsSheet && customPlaylist != null) {
-        ModalBottomSheet(
-            onDismissRequest = { showAddSongsSheet = false },
-            containerColor = LocalGlassColors.current.sheetBackground,
-        ) {
+    GlassBottomSheet(
+        visible = showAddSongsSheet && customPlaylist != null,
+        onDismissRequest = { showAddSongsSheet = false },
+    ) {
+        if (customPlaylist != null) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {
                 Text(
                     "Add songs to ${customPlaylist.name}",

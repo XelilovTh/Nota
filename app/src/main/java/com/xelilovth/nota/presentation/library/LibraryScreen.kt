@@ -248,12 +248,10 @@ fun LibraryScreen(
         }
     }
 
-    playlistTargetTrack?.let { target ->
-        AddToPlaylistSheet(
-            track = target,
-            onDismiss = { playlistTargetTrack = null },
-        )
-    }
+    AddToPlaylistSheet(
+        track = playlistTargetTrack,
+        onDismiss = { playlistTargetTrack = null },
+    )
 
     editTargetTrack?.let { target ->
         var titleInput by remember(target.id) { mutableStateOf(target.title) }
