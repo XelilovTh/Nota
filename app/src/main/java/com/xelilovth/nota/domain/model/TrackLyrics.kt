@@ -3,6 +3,7 @@ package com.xelilovth.nota.domain.model
 enum class LyricsSource(val label: String) {
     LRCLIB("LRCLIB"),
     LYRICS_OVH("Lyrics.ovh"),
+    LOCAL_FILE("Local .lrc"),
 }
 
 enum class LyricsSyncType {

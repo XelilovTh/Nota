@@ -53,7 +53,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -116,6 +119,15 @@ fun NowPlayingScreen(
     LaunchedEffect(state.track?.id) {
         val track = state.track
         if (track != null) viewModel.loadLyrics(track) else lyricsExpanded = false
+    }
+    DisposableEffect(lyricsExpanded) {
+        viewModel.setLyricsSyncActive(lyricsExpanded)
+        onDispose { viewModel.setLyricsSyncActive(false) }
+    }
+    val lrcLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            state.track?.let { viewModel.importLocalLyrics(it, uri.toString()) }
+        }
     }
     var showQueueSheet by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
@@ -284,6 +296,13 @@ fun NowPlayingScreen(
                         positionMs = position,
                         isPlaying = state.isPlaying,
                         onCollapse = { lyricsExpanded = false },
+                        onSeekTo = viewModel::seek,
+                        onAdjustOffset = { delta ->
+                            state.track?.let { viewModel.adjustLyricsOffset(it.id, delta) }
+                        },
+                        onImportLyrics = {
+                            lrcLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
+                        },
                         onOpenGenius = {
                             val track = state.track
                             if (track != null) {

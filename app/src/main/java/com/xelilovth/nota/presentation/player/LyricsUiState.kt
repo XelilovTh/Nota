@@ -7,4 +7,5 @@ data class LyricsUiState(
     val isLoading: Boolean = false,
     val lyrics: TrackLyrics? = null,
     val notFound: Boolean = false,
+    val syncOffsetMs: Long = 0L,
 )

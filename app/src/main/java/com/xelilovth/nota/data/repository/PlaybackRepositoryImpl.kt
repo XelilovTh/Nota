@@ -45,6 +45,8 @@ class PlaybackRepositoryImpl @Inject constructor(
     private var progressJob: Job? = null
     private var cachedMediaId: Long? = null
     private var cachedTrack: Track? = null
+    @Volatile
+    private var lyricsSyncActive = false
     internal val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = publishState()
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -114,12 +116,17 @@ class PlaybackRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun setLyricsSyncActive(active: Boolean) {
+        lyricsSyncActive = active
+        if (active) publishState()
+    }
+
     private fun startProgressUpdates() {
         if (progressJob?.isActive == true) return
         progressJob = scope.launch {
             while (isActive && player.isPlaying) {
                 publishState()
-                delay(200L)
+                delay(if (lyricsSyncActive) 50L else 250L)
             }
         }
     }

@@ -67,6 +67,8 @@ object AppDimens {
     val LyricsSwipeTravel = 6.dp
     val LyricsLoadingSpinnerSize = 28.dp
     val LyricsEmptyIconSize = 42.dp
+    val LyricsToolbarIconSize = 20.dp
+    val LyricsToolbarButtonSize = 36.dp
     val LyricsWordFontSize = 20.sp
     val LyricsActiveWordFontSize = 22.sp
     val LyricsLineHeight = 32.sp

@@ -49,6 +49,9 @@ class PlayerViewModelTest {
             playbackState.value = PlaybackState()
             calls += "stop"
         }
+        override fun setLyricsSyncActive(active: Boolean) {
+            calls += "lyricsSync:$active"
+        }
     }
 
     private fun track(id: Long) = Track(
@@ -56,7 +59,14 @@ class PlayerViewModelTest {
     )
 
     private class FakeLyricsRepository : LyricsRepository {
-        override suspend fun getLyrics(track: Track): TrackLyrics? = null
+        var nextLyrics: TrackLyrics? = null
+        var importedLyrics: TrackLyrics? = null
+        val offsets = mutableMapOf<Long, Long>()
+
+        override suspend fun getLyrics(track: Track): TrackLyrics? = nextLyrics
+        override suspend fun importLocalLyrics(track: Track, uriString: String): TrackLyrics? = importedLyrics
+        override suspend fun getSyncOffsetMs(trackId: Long): Long = offsets[trackId] ?: 0L
+        override suspend fun setSyncOffsetMs(trackId: Long, offsetMs: Long) { offsets[trackId] = offsetMs }
     }
 
     private fun viewModel(repository: FakeRepository) = PlayerViewModel(
@@ -137,5 +147,41 @@ class PlayerViewModelTest {
         viewModel.dismiss()
         assertEquals("stop", repository.calls.last())
         assertEquals(0L, viewModel.playbackState.value.positionMs)
+    }
+
+    @Test fun lyricsSyncActiveOffsetAndLocalImportUpdateState() {
+        val repository = FakeRepository()
+        val lyricsRepository = FakeLyricsRepository().apply {
+            offsets[7L] = 500L
+            importedLyrics = TrackLyrics(
+                lines = listOf(com.xelilovth.nota.domain.model.LyricLine("Local line", 1000L, 3000L)),
+                source = com.xelilovth.nota.domain.model.LyricsSource.LOCAL_FILE,
+                syncType = com.xelilovth.nota.domain.model.LyricsSyncType.LINE,
+            )
+        }
+        val viewModel = PlayerViewModel(
+            repository, lyricsRepository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+            SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
+            ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
+        )
+        val sampleTrack = track(7L)
+
+        viewModel.setLyricsSyncActive(true)
+        viewModel.loadLyrics(sampleTrack)
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+
+        assertEquals(500L, viewModel.lyricsState.value.syncOffsetMs)
+        assertTrue(viewModel.lyricsState.value.notFound)
+
+        viewModel.adjustLyricsOffset(7L, -1000L)
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        assertEquals(-500L, viewModel.lyricsState.value.syncOffsetMs)
+        assertEquals(-500L, lyricsRepository.offsets[7L])
+
+        viewModel.importLocalLyrics(sampleTrack, "content://docs/song.lrc")
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        assertFalse(viewModel.lyricsState.value.notFound)
+        assertEquals(com.xelilovth.nota.domain.model.LyricsSource.LOCAL_FILE, viewModel.lyricsState.value.lyrics?.source)
+        assertTrue(repository.calls.contains("lyricsSync:true"))
     }
 }

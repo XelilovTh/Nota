@@ -45,13 +45,44 @@ class PlayerViewModel @Inject constructor(
         _lyricsState.value = LyricsUiState(trackId = track.id, isLoading = true)
         lyricsJob = viewModelScope.launch {
             val lyrics = runCatching { lyricsRepository.getLyrics(track) }.getOrNull()
+            val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
             if (_lyricsState.value.trackId == track.id) {
                 _lyricsState.value = LyricsUiState(
                     trackId = track.id,
                     lyrics = lyrics,
                     notFound = lyrics == null,
+                    syncOffsetMs = offsetMs,
                 )
             }
+        }
+    }
+
+    fun setLyricsSyncActive(active: Boolean) = repository.setLyricsSyncActive(active)
+
+    fun importLocalLyrics(track: Track, uriString: String) {
+        lyricsJob?.cancel()
+        _lyricsState.value = _lyricsState.value.copy(trackId = track.id, isLoading = true, notFound = false)
+        lyricsJob = viewModelScope.launch {
+            val lyrics = runCatching { lyricsRepository.importLocalLyrics(track, uriString) }.getOrNull()
+            val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = LyricsUiState(
+                    trackId = track.id,
+                    lyrics = lyrics,
+                    notFound = lyrics == null,
+                    syncOffsetMs = offsetMs,
+                )
+            }
+        }
+    }
+
+    fun adjustLyricsOffset(trackId: Long, deltaMs: Long) {
+        val current = _lyricsState.value
+        if (current.trackId != trackId) return
+        val updatedOffset = (current.syncOffsetMs + deltaMs).coerceIn(-10_000L, 10_000L)
+        _lyricsState.value = current.copy(syncOffsetMs = updatedOffset)
+        viewModelScope.launch {
+            lyricsRepository.setSyncOffsetMs(trackId, updatedOffset)
         }
     }
     fun onRowClick(track: Track, libraryTracks: List<Track>) {

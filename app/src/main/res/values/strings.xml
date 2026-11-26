@@ -9,4 +9,5 @@
     <string name="lyrics_instrumental">Instrumental track</string>
     <string name="lyrics_instrumental_description">This track has no lyrics</string>
     <string name="lyrics_search_genius">Search on Genius</string>
+    <string name="lyrics_import_lrc">Load .lrc file</string>
 </resources>

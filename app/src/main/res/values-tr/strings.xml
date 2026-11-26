@@ -9,4 +9,5 @@
     <string name="lyrics_instrumental">Enstrümantal parça</string>
     <string name="lyrics_instrumental_description">Bu parçanın sözleri yok</string>
     <string name="lyrics_search_genius">Genius üzerinde ara</string>
+    <string name="lyrics_import_lrc">.lrc dosyası yükle</string>
 </resources>
