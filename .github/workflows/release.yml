@@ -57,14 +57,15 @@ jobs:
 
       - name: Build signed release APK
         env:
-          NOTA_RELEASE_KEYSTORE_PATH: app/keystore/release.keystore
+          NOTA_RELEASE_KEYSTORE_PATH: keystore/release.keystore
           NOTA_RELEASE_STORE_PASSWORD: ${{ secrets.NOTA_RELEASE_STORE_PASSWORD }}
           NOTA_RELEASE_KEY_ALIAS: ${{ secrets.NOTA_RELEASE_KEY_ALIAS }}
           NOTA_RELEASE_KEY_PASSWORD: ${{ secrets.NOTA_RELEASE_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
 
       - name: Verify release APK signature
-        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+        run: >-
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
 
       - name: Publish Release
         env:

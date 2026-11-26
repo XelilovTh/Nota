@@ -1,10 +1,17 @@
 name: Android Build
 on:
+  # Feature branches are validated by their PR event. Restrict push builds to
+  # main so each feature-branch commit does not start a duplicate workflow.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
+
+# Keep only the newest validation run for a given PR/branch.
+concurrency:
+  group: nota-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -58,12 +65,13 @@ jobs:
       - name: Build signed release APK
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
-          NOTA_RELEASE_KEYSTORE_PATH: app/keystore/release.keystore
+          NOTA_RELEASE_KEYSTORE_PATH: keystore/release.keystore
         run: ./gradlew --no-daemon assembleRelease
 
       - name: Verify release APK signature
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        run: "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+        run: >-
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
 
       - name: Test failure diagnostics
         if: failure()
