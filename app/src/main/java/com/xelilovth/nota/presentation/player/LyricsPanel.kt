@@ -1,5 +1,6 @@
 package com.xelilovth.nota.presentation.player
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -8,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -319,8 +322,20 @@ private fun LyricsContent(
     val listState = rememberLazyListState()
     LaunchedEffect(activeLineIndex) {
         if (activeLineIndex >= 0) {
-            val centerOffset = (listState.layoutInfo.viewportSize.height / 3).coerceAtLeast(0)
-            listState.animateScrollToItem(activeLineIndex, scrollOffset = -centerOffset)
+            val layoutInfo = listState.layoutInfo
+            val targetOffset = (layoutInfo.viewportSize.height / 3).coerceAtLeast(0)
+            val visibleItem = layoutInfo.visibleItemsInfo.firstOrNull { it.index == activeLineIndex }
+            if (visibleItem != null) {
+                val delta = (visibleItem.offset - targetOffset).toFloat()
+                if (kotlin.math.abs(delta) > 2f) {
+                    listState.animateScrollBy(
+                        value = delta,
+                        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+                    )
+                }
+            } else {
+                listState.animateScrollToItem(activeLineIndex, scrollOffset = -targetOffset)
+            }
         }
     }
 
@@ -353,36 +368,47 @@ private fun LyricsContent(
                 Modifier
             }
 
+            val lineScale by animateFloatAsState(
+                targetValue = if (isActive || lyrics.syncType == LyricsSyncType.PLAIN) 1.04f else 0.94f,
+                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                label = "lyric-line-scale",
+            )
+            val scaleModifier = Modifier.graphicsLayer {
+                scaleX = lineScale
+                scaleY = lineScale
+            }
+
             if (isActive && lyrics.syncType == LyricsSyncType.WORD && line.words.isNotEmpty()) {
                 SyncedWordLine(
                     line = line,
                     effectivePositionMs = effectivePositionMs,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(scaleModifier)
                         .then(clickableModifier),
                 )
             } else {
                 val alphaTarget = when {
-                    lyrics.syncType == LyricsSyncType.PLAIN -> 0.72f
+                    lyrics.syncType == LyricsSyncType.PLAIN -> 0.78f
                     isActive -> 1f
                     isLightGlass -> 0.45f
                     else -> 0.32f
                 }
                 val alpha by animateFloatAsState(
                     targetValue = alphaTarget,
-                    animationSpec = tween(durationMillis = 150),
+                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
                     label = "lyric-line-alpha",
                 )
                 Text(
                     text = line.text,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(scaleModifier)
                         .then(clickableModifier),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-                    fontSize = when {
-                        lyrics.syncType == LyricsSyncType.PLAIN -> AppDimens.LyricsPlainFontSize
-                        isActive -> AppDimens.LyricsActiveLineFontSize
-                        else -> AppDimens.LyricsInactiveLineFontSize
+                    fontSize = when (lyrics.syncType) {
+                        LyricsSyncType.PLAIN -> AppDimens.LyricsPlainFontSize
+                        LyricsSyncType.WORD, LyricsSyncType.LINE -> AppDimens.LyricsWordFontSize
                     },
                     lineHeight = AppDimens.LyricsLineHeight,
                     textAlign = TextAlign.Center,
@@ -425,6 +451,10 @@ private fun SyncedWordLine(
                 index == activeWordIndex -> SpanStyle(
                     color = primary,
                     fontWeight = FontWeight.ExtraBold,
+                    shadow = Shadow(
+                        color = primary.copy(alpha = 0.42f),
+                        blurRadius = 12f,
+                    ),
                 )
                 else -> SpanStyle(
                     color = onSurface.copy(alpha = upcomingAlpha),
