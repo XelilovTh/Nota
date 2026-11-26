@@ -8,9 +8,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -112,6 +113,7 @@ import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalGlassColors
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.sin
 
@@ -964,28 +966,39 @@ private fun CircularArcPlayerArt(
         modifier = modifier
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
-                detectTapGestures { offset ->
-                    val fraction = touchOffsetToArcProgress(offset, size.width.toFloat(), size.height.toFloat())
-                    onSeekFinish(fraction)
+                val strokePx = AppDimens.CircularSeekbarStroke.toPx()
+                val thumbRadiusPx = AppDimens.CircularSeekbarThumbRadius.toPx()
+                val hitSlopPx = AppDimens.CircularSeekbarHitSlop.toPx()
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val w = size.width.toFloat()
+                    val h = size.height.toFloat()
+                    val inset = thumbRadiusPx + strokePx
+                    val ringRadius = (min(w, h) - inset * 2f) / 2f
+                    val dist = hypot(down.position.x - w / 2f, down.position.y - h / 2f)
+                    if (dist < ringRadius - hitSlopPx || dist > ringRadius + hitSlopPx) {
+                        return@awaitEachGesture
+                    }
+                    down.consume()
+                    var currentFraction = touchOffsetToArcProgress(down.position, w, h)
+                    latestProgress = currentFraction
+                    onProgressChange(currentFraction)
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            change.consume()
+                            onSeekFinish(latestProgress)
+                            break
+                        }
+                        if (change.positionChange() != Offset.Zero) {
+                            change.consume()
+                            currentFraction = touchOffsetToArcProgress(change.position, w, h)
+                            latestProgress = currentFraction
+                            onProgressChange(currentFraction)
+                        }
+                    }
                 }
-            }
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val fraction = touchOffsetToArcProgress(offset, size.width.toFloat(), size.height.toFloat())
-                        latestProgress = fraction
-                        onProgressChange(fraction)
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        val fraction = touchOffsetToArcProgress(change.position, size.width.toFloat(), size.height.toFloat())
-                        latestProgress = fraction
-                        onProgressChange(fraction)
-                    },
-                    onDragEnd = { onSeekFinish(latestProgress) },
-                    onDragCancel = { onSeekFinish(latestProgress) },
-                )
             },
         contentAlignment = Alignment.Center,
     ) {

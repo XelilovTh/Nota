@@ -22,6 +22,7 @@ object AppDimens {
     val CircularSeekbarStroke = 3.dp
     val CircularSeekbarThumbRadius = 6.dp
     val CircularSeekbarRingGap = 10.dp
+    val CircularSeekbarHitSlop = 22.dp
     val PlaylistHeaderArtworkSize = 132.dp
     val PlayerArtworkIconSize = 64.dp
     val PlayerControlSpacing = 12.dp
