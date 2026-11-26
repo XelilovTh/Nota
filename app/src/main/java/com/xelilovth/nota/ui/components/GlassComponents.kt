@@ -29,12 +29,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
@@ -134,22 +135,29 @@ fun BreathingAmbientBackground(
     val isDark = !glassColors.subtleRowBorder
     val context = LocalContext.current
 
-    val infiniteTransition = rememberInfiniteTransition(label = "breathingAmbient")
-    val infiniteBreath by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 5500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "infiniteBreath",
-    )
-    val breathWeight by animateFloatAsState(
+    val infiniteBreathState: State<Float>? = if (isPlaying) {
+        val infiniteTransition = rememberInfiniteTransition(label = "breathingAmbient")
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 5500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "infiniteBreath",
+        )
+    } else {
+        null
+    }
+    val breathWeightState = animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0f,
         animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
         label = "breathWeight",
     )
-    val breath = 0.5f + (infiniteBreath - 0.5f) * breathWeight
+    val readBreath: () -> Float = {
+        val infiniteBreath = infiniteBreathState?.value ?: 0.5f
+        0.5f + (infiniteBreath - 0.5f) * breathWeightState.value
+    }
 
     var artworkBitmap by remember(trackId, trackUri) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(trackId, trackUri) {
@@ -180,14 +188,14 @@ fun BreathingAmbientBackground(
                 contentScale = ContentScale.Crop,
                 colorFilter = grayscaleFilter,
                 alpha = baseAlpha,
+                filterQuality = FilterQuality.Medium,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        val scale = 1.04f + (breath - 0.5f) * 0.06f
+                        val scale = 1.04f + (readBreath() - 0.5f) * 0.06f
                         scaleX = scale
                         scaleY = scale
-                    }
-                    .blur(AppDimens.AmbientArtworkBlur),
+                    },
             )
             Box(
                 modifier = Modifier
@@ -205,7 +213,7 @@ fun BreathingAmbientBackground(
         }
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val delta = breath - 0.5f
+            val delta = readBreath() - 0.5f
 
             val topRightCenter = Offset(
                 x = size.width * (0.88f - delta * 0.05f),
@@ -269,27 +277,31 @@ fun AudioWaveformVisualizer(
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "waveformVisualizer")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2.0 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "wavePhase",
-    )
-    val playWeight by animateFloatAsState(
+    val phaseState: State<Float>? = if (isPlaying) {
+        val infiniteTransition = rememberInfiniteTransition(label = "waveformVisualizer")
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = (2.0 * PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1400, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "wavePhase",
+        )
+    } else {
+        null
+    }
+    val playWeightState = animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0f,
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "wavePlayWeight",
     )
-    val barAlpha by animateFloatAsState(
+    val barAlphaState = animateFloatAsState(
         targetValue = if (isPlaying) 0.78f else 0.28f,
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "waveAlpha",
     )
-    val barColor = MaterialTheme.colorScheme.onSurface.copy(alpha = barAlpha)
+    val onSurface = MaterialTheme.colorScheme.onSurface
 
     val phaseOffsets = remember { floatArrayOf(0.0f, 1.35f, 2.7f, 0.85f, 2.15f) }
     val idleHeights = remember { floatArrayOf(0.28f, 0.44f, 0.56f, 0.38f, 0.26f) }
@@ -300,6 +312,9 @@ fun AudioWaveformVisualizer(
             height = AppDimens.VisualizerHeight,
         ),
     ) {
+        val phase = phaseState?.value ?: 0f
+        val playWeight = playWeightState.value
+        val barColor = onSurface.copy(alpha = barAlphaState.value)
         val barWidthPx = AppDimens.VisualizerBarWidth.toPx()
         val barSpacingPx = AppDimens.VisualizerBarSpacing.toPx()
         val barCount = phaseOffsets.size
@@ -327,23 +342,33 @@ fun AudioWaveformVisualizer(
 
 private fun loadSmallArtworkThumbnail(context: Context, trackUri: String): Bitmap? = runCatching {
     val uri = Uri.parse(trackUri)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    val rawBitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         runCatching {
             context.contentResolver.loadThumbnail(uri, Size(256, 256), null)
-        }.getOrNull()?.let { return@runCatching it }
-    }
-    val retriever = MediaMetadataRetriever()
-    try {
-        retriever.setDataSource(context, uri)
-        val art = retriever.embeddedPicture ?: return@runCatching null
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(art, 0, art.size, bounds)
-        val decodeOptions = BitmapFactory.Options().apply {
-            inSampleSize = calculateThumbnailSampleSize(bounds.outWidth, bounds.outHeight, 256, 256)
+        }.getOrNull()
+    } else {
+        null
+    } ?: run {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, uri)
+            val art = retriever.embeddedPicture ?: return@run null
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(art, 0, art.size, bounds)
+            val decodeOptions = BitmapFactory.Options().apply {
+                inSampleSize = calculateThumbnailSampleSize(bounds.outWidth, bounds.outHeight, 256, 256)
+            }
+            BitmapFactory.decodeByteArray(art, 0, art.size, decodeOptions)
+        } finally {
+            runCatching { retriever.release() }
         }
-        BitmapFactory.decodeByteArray(art, 0, art.size, decodeOptions)
-    } finally {
-        runCatching { retriever.release() }
+    }
+    rawBitmap?.let { bmp ->
+        val scaled = Bitmap.createScaledBitmap(bmp, 32, 32, true)
+        if (scaled !== bmp) {
+            bmp.recycle()
+        }
+        scaled
     }
 }.getOrNull()
 

@@ -55,6 +55,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -291,9 +292,9 @@ fun NowPlayingScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "|",
+                        "·",
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     )
                     val rightTime = if (showRemaining && duration > 0L) {
                         "-${formatDuration((duration - displayPositionMs).coerceAtLeast(0L))}"
@@ -445,6 +446,9 @@ fun NowPlayingScreen(
                             }
                         },
                         enabled = duration > 0L,
+                        colors = SliderDefaults.colors(
+                            inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .height(AppDimens.LyricsScrubberHeight),

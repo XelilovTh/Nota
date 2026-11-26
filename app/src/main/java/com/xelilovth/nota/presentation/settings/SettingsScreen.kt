@@ -60,6 +60,7 @@ import com.xelilovth.nota.R
 import com.xelilovth.nota.domain.model.DeleteTrackResult
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.ui.components.GlassSurface
+import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
 import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 import kotlinx.coroutines.launch
@@ -249,9 +250,10 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            val count = duplicateGroups.size
                             Text("Find duplicates", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                if (duplicateGroups.isEmpty()) "No duplicates found" else "${duplicateGroups.size} duplicate groups",
+                                if (count == 0) "No duplicates found" else "$count duplicate ${if (count == 1) "group" else "groups"}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -494,10 +496,10 @@ fun SettingsScreen(
                                                         overflow = TextOverflow.Ellipsis,
                                                     )
                                                     Text(
-                                                        text = "${track.artist} · ${track.folder}",
+                                                        text = "${track.artist} · ${track.folder}/${android.net.Uri.parse(track.uri).lastPathSegment.orEmpty()} · ${formatDuration(track.durationMs)}",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        maxLines = 1,
+                                                        maxLines = 2,
                                                         overflow = TextOverflow.Ellipsis,
                                                     )
                                                 }

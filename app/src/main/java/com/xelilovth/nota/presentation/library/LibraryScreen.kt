@@ -22,15 +22,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -473,6 +477,12 @@ private fun TrackRow(
                 ) {
                     DropdownMenuItem(
                         text = { Text("Add to playlist") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.AutoMirrored.Outlined.PlaylistAdd,
+                                contentDescription = null,
+                            )
+                        },
                         onClick = {
                             menuExpanded = false
                             onAddToPlaylist()
@@ -480,13 +490,26 @@ private fun TrackRow(
                     )
                     DropdownMenuItem(
                         text = { Text("Edit info") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Edit,
+                                contentDescription = null,
+                            )
+                        },
                         onClick = {
                             menuExpanded = false
                             onEditInfo()
                         },
                     )
+                    HorizontalDivider()
                     DropdownMenuItem(
                         text = { Text("Delete from device") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.DeleteOutline,
+                                contentDescription = null,
+                            )
+                        },
                         onClick = {
                             menuExpanded = false
                             onDeleteFromDevice()

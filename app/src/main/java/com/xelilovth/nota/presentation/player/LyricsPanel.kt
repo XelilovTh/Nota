@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -156,7 +155,7 @@ private fun LyricsHeader(
     onDeleteLyrics: () -> Unit,
     onToggleTranslation: () -> Unit,
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(AppDimens.LyricsHeaderHeight)
@@ -175,13 +174,11 @@ private fun LyricsHeader(
                     onDragCancel = { dragDistance = 0f },
                 )
             },
-        contentAlignment = Alignment.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(
             onClick = onCollapse,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .size(AppDimens.LyricsToolbarButtonSize),
+            modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
         ) {
             Icon(
                 imageVector = Icons.Filled.KeyboardArrowDown,
@@ -191,15 +188,9 @@ private fun LyricsHeader(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(width = AppDimens.LyricsHandleWidth, height = AppDimens.LyricsHandleThickness)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f), CircleShape),
-        )
+        Spacer(modifier = Modifier.weight(1f))
 
         Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppDimens.ShapeExtraSmall),
         ) {
