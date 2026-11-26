@@ -137,8 +137,22 @@ fun NowPlayingScreen(
 
     var isDragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(0f) }
-    val displayProgress = if (isDragging) dragProgress else playerProgress
-    val displayPositionMs = if (isDragging && duration > 0L) (dragProgress * duration).toLong() else position
+    var pendingSeekProgress by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(position, isDragging) {
+        if (!isDragging && pendingSeekProgress != null) {
+            kotlinx.coroutines.delay(180L)
+            pendingSeekProgress = null
+        }
+    }
+    val displayProgress = when {
+        isDragging -> dragProgress
+        pendingSeekProgress != null -> pendingSeekProgress!!
+        else -> playerProgress
+    }
+    val displayPositionMs = when {
+        (isDragging || pendingSeekProgress != null) && duration > 0L -> (displayProgress * duration).toLong()
+        else -> position
+    }
 
     var showRemaining by remember { mutableStateOf(false) }
     var lyricsExpanded by remember { mutableStateOf(false) }
@@ -152,9 +166,15 @@ fun NowPlayingScreen(
     var pendingGeminiAction by remember { mutableStateOf<PendingGeminiAction?>(null) }
 
     var isDismissDragging by remember { mutableStateOf(false) }
+    var isDismissing by remember { mutableStateOf(false) }
+    var dismissTargetY by remember { mutableFloatStateOf(0f) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val animatedDismissOffsetY by animateFloatAsState(
-        targetValue = if (isDismissDragging) dragOffsetY else 0f,
+        targetValue = when {
+            isDismissDragging -> dragOffsetY
+            isDismissing -> dismissTargetY
+            else -> 0f
+        },
         label = "nowPlayingDismissOffset",
     )
     val effectiveDismissOffsetY = if (isDismissDragging) dragOffsetY else animatedDismissOffsetY
@@ -218,9 +238,15 @@ fun NowPlayingScreen(
                         onDragEnd = {
                             val threshold = AppDimens.SwipeDismissThreshold.toPx()
                             val shouldDismiss = dragOffsetY > threshold
-                            isDismissDragging = false
-                            dragOffsetY = 0f
-                            if (shouldDismiss) onBack()
+                            if (shouldDismiss) {
+                                dismissTargetY = dragOffsetY + 900f
+                                isDismissing = true
+                                isDismissDragging = false
+                                onBack()
+                            } else {
+                                isDismissDragging = false
+                                dragOffsetY = 0f
+                            }
                         },
                         onDragCancel = {
                             isDismissDragging = false
@@ -379,6 +405,7 @@ fun NowPlayingScreen(
                         dragProgress = next
                     },
                     onSeekFinish = { finalProgress ->
+                        pendingSeekProgress = finalProgress
                         isDragging = false
                         if (duration > 0L) {
                             viewModel.seek((finalProgress * duration).toLong())
@@ -411,9 +438,15 @@ fun NowPlayingScreen(
                                 if (dragOffsetY > 0f) {
                                     val threshold = AppDimens.SwipeDismissThreshold.toPx()
                                     val shouldDismiss = dragOffsetY > threshold
-                                    isDismissDragging = false
-                                    dragOffsetY = 0f
-                                    if (shouldDismiss) onBack()
+                                    if (shouldDismiss) {
+                                        dismissTargetY = dragOffsetY + 900f
+                                        isDismissing = true
+                                        isDismissDragging = false
+                                        onBack()
+                                    } else {
+                                        isDismissDragging = false
+                                        dragOffsetY = 0f
+                                    }
                                 } else if (upwardDrag < -AppDimens.LyricsDragThreshold.toPx()) {
                                     lyricsExpanded = true
                                 }
@@ -532,6 +565,7 @@ fun NowPlayingScreen(
                             dragProgress = next
                         },
                         onValueChangeFinished = {
+                            pendingSeekProgress = dragProgress
                             isDragging = false
                             if (duration > 0L) {
                                 viewModel.seek((dragProgress * duration).toLong())
