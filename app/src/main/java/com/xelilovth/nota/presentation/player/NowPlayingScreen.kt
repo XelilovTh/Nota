@@ -106,6 +106,7 @@ import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.presentation.playlists.AddToPlaylistSheet
 import com.xelilovth.nota.ui.components.AudioWaveformVisualizer
 import com.xelilovth.nota.ui.components.GlassSurface
+import com.xelilovth.nota.ui.components.OfflineDownloadDialog
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -192,6 +193,7 @@ fun NowPlayingScreen(
     var showAddToPlaylist by remember { mutableStateOf(false) }
     var showTrackMenu by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
     var pendingDeleteTrackId by remember { mutableStateOf<Long?>(null) }
     val deleteLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
@@ -261,19 +263,17 @@ fun NowPlayingScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             if (state.track != null) {
-                if (state.track.isOnline) {
-                    val isDownloaded = state.track.onlineId != null && state.track.onlineId in downloadedOnlineIds
-                    val progress = downloadProgress[state.track.id]
+                val canSaveOffline = state.track.isOnline || state.track.onlineId != null
+                val isDownloaded = state.track.onlineId != null && state.track.onlineId in downloadedOnlineIds
+                val progress = downloadProgress[state.track.id]
+                if (canSaveOffline) {
                     IconButton(
-                        enabled = progress == null && !isDownloaded,
+                        enabled = progress == null,
                         onClick = {
-                            viewModel.downloadTrackForOffline(state.track) { result ->
-                                val msg = if (result.isSuccess) {
-                                    "Saved for offline listening"
-                                } else {
-                                    "Offline download failed"
-                                }
-                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            if (isDownloaded) {
+                                Toast.makeText(context, "Already saved for offline listening", Toast.LENGTH_SHORT).show()
+                            } else {
+                                showDownloadDialog = true
                             }
                         },
                     ) {
@@ -310,6 +310,18 @@ fun NowPlayingScreen(
                         expanded = showTrackMenu,
                         onDismissRequest = { showTrackMenu = false },
                     ) {
+                        if ((state.track.isOnline || state.track.onlineId != null) && !isDownloaded && progress == null) {
+                            DropdownMenuItem(
+                                text = { Text("Save for offline") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.DownloadForOffline, contentDescription = null)
+                                },
+                                onClick = {
+                                    showTrackMenu = false
+                                    showDownloadDialog = true
+                                },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Add to playlist") },
                             leadingIcon = {
@@ -505,6 +517,10 @@ fun NowPlayingScreen(
                         },
                         onSelectTranslationLanguage = { language ->
                             viewModel.setTranslationLanguage(language, state.track)
+                        },
+                        durationMs = duration,
+                        onFetchOnlineLyrics = {
+                            state.track?.let { viewModel.retryOnlineLyrics(it) }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -841,6 +857,25 @@ fun NowPlayingScreen(
                     }
                 }
             }
+        }
+    }
+
+    if (showDownloadDialog) {
+        state.track?.let { target ->
+            OfflineDownloadDialog(
+                onDismiss = { showDownloadDialog = false },
+                onSelectLocation = { location ->
+                    showDownloadDialog = false
+                    viewModel.downloadTrackForOffline(target, location) { result ->
+                        val msg = if (result.isSuccess) {
+                            "Saved for offline listening"
+                        } else {
+                            "Offline download failed"
+                        }
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    }
+                },
+            )
         }
     }
 

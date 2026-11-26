@@ -2,6 +2,7 @@ package com.xelilovth.nota.presentation.player
 
 import androidx.lifecycle.ViewModel
 import com.xelilovth.nota.domain.model.DeleteTrackResult
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.TrackLyrics
@@ -284,10 +285,32 @@ class PlayerViewModel @Inject constructor(
         libraryRepository.onTrackDeletedFromDevice(trackId)
     }
 
-    fun downloadTrackForOffline(track: Track, onResult: (Result<Track>) -> Unit) {
+    fun retryOnlineLyrics(track: Track) {
+        lyricsJob?.cancel()
+        _lyricsState.value = LyricsUiState(trackId = track.id, isLoading = true)
+        lyricsJob = viewModelScope.launch {
+            val lyrics = runCatching { lyricsRepository.fetchOnlineLyrics(track) }.getOrNull()
+            val offsetMs = lyricsRepository.getSyncOffsetMs(track.id)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = LyricsUiState(
+                    trackId = track.id,
+                    lyrics = lyrics,
+                    syncOffsetMs = offsetMs,
+                    isLoading = false,
+                    notFound = lyrics == null,
+                )
+            }
+        }
+    }
+
+    fun downloadTrackForOffline(
+        track: Track,
+        location: OfflineStorageLocation,
+        onResult: (Result<Track>) -> Unit,
+    ) {
         val repo = onlineMusicRepository ?: return
+        settingsRepository.setOfflineStorageLocation(location)
         viewModelScope.launch {
-            val location = settingsRepository.settings.value.offlineStorageLocation
             onResult(repo.downloadForOffline(track, location))
         }
     }

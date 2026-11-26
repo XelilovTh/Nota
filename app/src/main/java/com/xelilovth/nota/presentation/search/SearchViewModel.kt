@@ -2,6 +2,7 @@ package com.xelilovth.nota.presentation.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.OnlineMusicRepository
 import com.xelilovth.nota.domain.repository.SettingsRepository
@@ -63,9 +64,13 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun downloadForOffline(track: Track, onResult: (Result<Track>) -> Unit) {
+    fun downloadForOffline(
+        track: Track,
+        location: OfflineStorageLocation,
+        onResult: (Result<Track>) -> Unit,
+    ) {
+        settingsRepository.setOfflineStorageLocation(location)
         viewModelScope.launch {
-            val location = settingsRepository.settings.value.offlineStorageLocation
             onResult(onlineMusicRepository.downloadForOffline(track, location))
         }
     }

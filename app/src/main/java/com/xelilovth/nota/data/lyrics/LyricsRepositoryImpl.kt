@@ -69,40 +69,106 @@ class LyricsRepositoryImpl @Inject constructor(
             null -> Unit
         }
 
-        val betterLyrics = try {
-            fetchFromBetterLyrics(track)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
-        }
-
-        val result = if (
-            betterLyrics != null &&
-            (betterLyrics.instrumental || betterLyrics.syncType != LyricsSyncType.PLAIN)
-        ) {
-            betterLyrics
-        } else {
-            val lrclib = try {
-                fetchFromLrclib(track)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                null
-            }
-            lrclib ?: betterLyrics ?: try {
-                fetchFromLyricsOvh(track)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                null
-            }
-        }
+        val result = fetchOnlineLyricsInternal(track)
         if (result != null) {
             writeDiskCache(track.id, result)
         }
         cache[track.id] = CachedLyrics(result, now)
         result
+    }
+
+    override suspend fun fetchOnlineLyrics(track: Track): TrackLyrics? = withContext(ioDispatcher) {
+        cache.remove(track.id)
+        runCatching { File(cacheDir, "${track.id}.json").delete() }
+        val result = fetchOnlineLyricsInternal(track)
+        if (result != null) {
+            writeDiskCache(track.id, result)
+        }
+        cache[track.id] = CachedLyrics(result, System.currentTimeMillis())
+        result
+    }
+
+    private suspend fun fetchOnlineLyricsInternal(track: Track): TrackLyrics? {
+        val cleanTrack = normalizedSearchTrack(track)
+        val candidates = if (cleanTrack != track) listOf(cleanTrack, track) else listOf(track)
+        var plainFallback: TrackLyrics? = null
+
+        for (candidate in candidates) {
+            val betterLyrics = try {
+                fetchFromBetterLyrics(candidate)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            if (betterLyrics != null) {
+                if (betterLyrics.instrumental || betterLyrics.syncType != LyricsSyncType.PLAIN) {
+                    return betterLyrics
+                }
+                if (plainFallback == null) plainFallback = betterLyrics
+            }
+
+            val lrclib = try {
+                fetchFromLrclib(candidate)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            if (lrclib != null) {
+                if (lrclib.instrumental || lrclib.syncType != LyricsSyncType.PLAIN) {
+                    return lrclib
+                }
+                if (plainFallback == null) plainFallback = lrclib
+            }
+        }
+
+        return plainFallback ?: candidates.firstNotNullOfOrNull { candidate ->
+            try {
+                fetchFromLyricsOvh(candidate)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    private fun normalizedSearchTrack(track: Track): Track {
+        val cleanAlbum = if (
+            track.album.equals("Online", ignoreCase = true) ||
+            track.album.equals("Unknown album", ignoreCase = true)
+        ) {
+            ""
+        } else {
+            track.album
+        }
+        val cleanArtist = track.artist
+            .replace(Regex("\\s*-\\s*Topic$", RegexOption.IGNORE_CASE), "")
+            .trim()
+        var cleanTitle = track.title
+            .replace(
+                Regex(
+                    "\\s*[\\(\\[]\\s*(?:official\\s*(?:music\\s*)?(?:video|audio|lyric(?:s)?)|lyric(?:s)?\\s*video|music\\s*from[^\\)\\]]*|sped\\s*up|slowed[^\\)\\]]*|audio|hd|4k)\\s*[\\)\\]]",
+                    RegexOption.IGNORE_CASE,
+                ),
+                "",
+            )
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        val dashIdx = cleanTitle.indexOf(" - ")
+        if (dashIdx > 0 && dashIdx < cleanTitle.length - 3) {
+            val left = cleanTitle.substring(0, dashIdx).trim()
+            val right = cleanTitle.substring(dashIdx + 3).trim()
+            if (cleanArtist.contains(left, ignoreCase = true) || left.contains(cleanArtist, ignoreCase = true)) {
+                cleanTitle = right
+            }
+        }
+        return track.copy(
+            title = cleanTitle.ifBlank { track.title },
+            artist = cleanArtist.ifBlank { track.artist },
+            album = cleanAlbum,
+        )
     }
 
     override suspend fun importLocalLyrics(track: Track, uriString: String): TrackLyrics? =
@@ -641,8 +707,11 @@ class LyricsRepositoryImpl @Inject constructor(
             .appendQueryParameter("a", track.artist)
             .apply {
                 durationSeconds?.let { appendQueryParameter("d", it.toString()) }
-                track.album.takeIf { it.isNotBlank() && !it.equals("Unknown album", true) }
-                    ?.let { appendQueryParameter("al", it) }
+                track.album.takeIf {
+                    it.isNotBlank() &&
+                        !it.equals("Unknown album", true) &&
+                        !it.equals("Online", true)
+                }?.let { appendQueryParameter("al", it) }
             }
             .build()
         val json = requestJson(uri.toString()) ?: return null
@@ -661,8 +730,11 @@ class LyricsRepositoryImpl @Inject constructor(
             .appendQueryParameter("track_name", track.title)
             .appendQueryParameter("artist_name", track.artist)
             .apply {
-                track.album.takeIf { it.isNotBlank() && !it.equals("Unknown album", true) }
-                    ?.let { appendQueryParameter("album_name", it) }
+                track.album.takeIf {
+                    it.isNotBlank() &&
+                        !it.equals("Unknown album", true) &&
+                        !it.equals("Online", true)
+                }?.let { appendQueryParameter("album_name", it) }
                 durationSeconds?.let { appendQueryParameter("duration", it.toString()) }
             }
             .build()
@@ -681,8 +753,11 @@ class LyricsRepositoryImpl @Inject constructor(
             .appendQueryParameter("track_name", track.title)
             .appendQueryParameter("artist_name", track.artist)
             .apply {
-                track.album.takeIf { it.isNotBlank() && !it.equals("Unknown album", true) }
-                    ?.let { appendQueryParameter("album_name", it) }
+                track.album.takeIf {
+                    it.isNotBlank() &&
+                        !it.equals("Unknown album", true) &&
+                        !it.equals("Online", true)
+                }?.let { appendQueryParameter("album_name", it) }
             }
             .build()
         val candidates = requestArray(searchUri.toString()) ?: return plainFallback

@@ -53,6 +53,7 @@ import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.model.filterTracks
 import com.xelilovth.nota.presentation.home.CompactTrackRow
 import com.xelilovth.nota.ui.components.GlassSurface
+import com.xelilovth.nota.ui.components.OfflineDownloadDialog
 import com.xelilovth.nota.ui.components.TrackArtwork
 import com.xelilovth.nota.ui.components.formatDuration
 import com.xelilovth.nota.ui.theme.AppDimens
@@ -83,6 +84,7 @@ fun SearchScreen(
     var sourceMode by rememberSaveable { mutableStateOf(SearchSourceMode.DEVICE) }
     var query by rememberSaveable { mutableStateOf("") }
     var localResults by remember(tracks) { mutableStateOf(tracks) }
+    var pendingDownloadTrack by remember { mutableStateOf<Track?>(null) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
 
@@ -289,14 +291,7 @@ fun SearchScreen(
                                         }
                                     },
                                     onDownload = {
-                                        viewModel.downloadForOffline(track) { result ->
-                                            val msg = if (result.isSuccess) {
-                                                "Saved for offline listening"
-                                            } else {
-                                                "Offline download failed"
-                                            }
-                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                        }
+                                        pendingDownloadTrack = track
                                     },
                                 )
                             }
@@ -305,6 +300,23 @@ fun SearchScreen(
                 }
             }
         }
+    }
+
+    pendingDownloadTrack?.let { target ->
+        OfflineDownloadDialog(
+            onDismiss = { pendingDownloadTrack = null },
+            onSelectLocation = { location ->
+                pendingDownloadTrack = null
+                viewModel.downloadForOffline(target, location) { result ->
+                    val msg = if (result.isSuccess) {
+                        "Saved for offline listening"
+                    } else {
+                        "Offline download failed"
+                    }
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
     }
 }
 

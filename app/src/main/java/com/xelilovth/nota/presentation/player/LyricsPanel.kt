@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -94,6 +95,8 @@ internal fun LyricsPanel(
     onToggleTranslation: () -> Unit,
     onSelectTranslationLanguage: (String) -> Unit,
     modifier: Modifier = Modifier,
+    durationMs: Long = 0L,
+    onFetchOnlineLyrics: (() -> Unit)? = null,
 ) {
     val showOffsetControls = state.lyrics != null &&
         !state.lyrics.instrumental &&
@@ -134,6 +137,7 @@ internal fun LyricsPanel(
                     errorMessage = state.errorMessage,
                     onImportLyrics = onImportLyrics,
                     onGenerateWithGemini = null,
+                    onFetchOnlineLyrics = null,
                 )
                 state.lyrics == null -> EmptyLyrics(
                     titleRes = R.string.lyrics_not_available,
@@ -141,10 +145,12 @@ internal fun LyricsPanel(
                     errorMessage = state.errorMessage,
                     onImportLyrics = onImportLyrics,
                     onGenerateWithGemini = onGenerateWithGemini,
+                    onFetchOnlineLyrics = onFetchOnlineLyrics,
                 )
                 else -> LyricsContent(
                     lyrics = state.lyrics,
                     positionMs = positionMs,
+                    durationMs = durationMs,
                     syncOffsetMs = state.syncOffsetMs,
                     showTranslation = state.showTranslation,
                     isPlaying = isPlaying,
@@ -456,6 +462,7 @@ private fun EmptyLyrics(
     errorMessage: String?,
     onImportLyrics: () -> Unit,
     onGenerateWithGemini: (() -> Unit)?,
+    onFetchOnlineLyrics: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -498,6 +505,11 @@ private fun EmptyLyrics(
                     Text(stringResource(R.string.lyrics_generate_gemini))
                 }
             }
+            if (onFetchOnlineLyrics != null) {
+                OutlinedButton(onClick = onFetchOnlineLyrics) {
+                    Text(stringResource(R.string.lyrics_fetch_online))
+                }
+            }
             TextButton(onClick = onImportLyrics) {
                 Text(stringResource(R.string.lyrics_import_lrc))
             }
@@ -509,6 +521,7 @@ private fun EmptyLyrics(
 private fun LyricsContent(
     lyrics: TrackLyrics,
     positionMs: Long,
+    durationMs: Long,
     syncOffsetMs: Long,
     showTranslation: Boolean,
     @Suppress("UNUSED_PARAMETER") isPlaying: Boolean,
@@ -518,7 +531,13 @@ private fun LyricsContent(
     val effectivePositionMs = (positionMs + syncOffsetMs).coerceAtLeast(0L)
 
     val activeLineIndex = if (lyrics.syncType == LyricsSyncType.PLAIN) {
-        -1
+        if (durationMs > 0L && lines.isNotEmpty()) {
+            ((effectivePositionMs.toDouble() / durationMs.toDouble()) * lines.size)
+                .toInt()
+                .coerceIn(0, lines.lastIndex)
+        } else {
+            -1
+        }
     } else {
         lines.indexOfLast { line ->
             val start = line.startMs
@@ -577,7 +596,7 @@ private fun LyricsContent(
             }
 
             val lineScale by animateFloatAsState(
-                targetValue = if (isActive || lyrics.syncType == LyricsSyncType.PLAIN) 1.04f else 0.94f,
+                targetValue = if (isActive || (lyrics.syncType == LyricsSyncType.PLAIN && activeLineIndex < 0)) 1.04f else 0.94f,
                 animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
                 label = "lyric-line-scale",
             )
@@ -601,7 +620,9 @@ private fun LyricsContent(
                     )
                 } else {
                     val alphaTarget = when {
-                        lyrics.syncType == LyricsSyncType.PLAIN -> 0.78f
+                        lyrics.syncType == LyricsSyncType.PLAIN && activeLineIndex < 0 -> 0.78f
+                        lyrics.syncType == LyricsSyncType.PLAIN && isActive -> 1f
+                        lyrics.syncType == LyricsSyncType.PLAIN -> 0.45f
                         isActive -> 1f
                         isLightGlass -> 0.45f
                         else -> 0.32f

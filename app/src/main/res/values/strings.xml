@@ -9,6 +9,7 @@
     <string name="lyrics_instrumental">Instrumental track</string>
     <string name="lyrics_instrumental_description">This track has no lyrics</string>
     <string name="lyrics_generate_gemini">Transcribe with Gemini</string>
+    <string name="lyrics_fetch_online">Search LRC online</string>
     <string name="lyrics_import_lrc">Load .lrc file</string>
     <string name="lyrics_delete">Delete lyrics</string>
     <string name="lyrics_gemini_key_title">Gemini API Key</string>
