@@ -87,7 +87,7 @@ fun NotaApp() {
         if (!granted) {
             Toast.makeText(
                 context,
-                "Bildiriş icazəsi olmadan arxa planda idarəetmə işləməyəcək",
+                "Notification permission is required for background playback controls",
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -111,7 +111,7 @@ fun NotaApp() {
             } else {
                 Toast.makeText(
                     context,
-                    "Bildiriş icazəsi olmadan arxa planda idarəetmə işləməyəcək",
+                    "Notification permission is required for background playback controls",
                     Toast.LENGTH_LONG,
                 ).show()
                 action()

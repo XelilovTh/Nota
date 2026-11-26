@@ -45,6 +45,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,7 +54,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import android.net.Uri
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -69,12 +72,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import com.xelilovth.nota.R
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.Track
@@ -115,7 +121,8 @@ fun NowPlayingScreen(
     var showRemaining by remember { mutableStateOf(false) }
     var lyricsExpanded by remember { mutableStateOf(false) }
     val lyricsUiState by viewModel.lyricsState.collectAsStateWithLifecycle()
-    val uriHandler = LocalUriHandler.current
+    val geminiApiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+    var showGeminiKeyDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.track?.id) {
         val track = state.track
@@ -304,12 +311,18 @@ fun NowPlayingScreen(
                         onImportLyrics = {
                             lrcLauncher.launch(arrayOf("text/*", "application/octet-stream", "*/*"))
                         },
-                        onOpenGenius = {
+                        onGenerateWithGemini = {
                             val track = state.track
                             if (track != null) {
-                                val query = Uri.encode("${track.artist} ${track.title}")
-                                runCatching { uriHandler.openUri("https://genius.com/search?q=$query") }
+                                if (geminiApiKey.isBlank()) {
+                                    showGeminiKeyDialog = true
+                                } else {
+                                    viewModel.generateLyricsWithGemini(track)
+                                }
                             }
+                        },
+                        onDeleteLyrics = {
+                            state.track?.let { viewModel.deleteLyrics(it.id) }
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -570,6 +583,70 @@ fun NowPlayingScreen(
             track = activeTrack,
             onDismiss = { showAddToPlaylist = false },
         )
+    }
+
+    if (showGeminiKeyDialog) {
+        var keyInput by remember { mutableStateOf("") }
+        Dialog(onDismissRequest = { showGeminiKeyDialog = false }) {
+            GlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                elevated = true,
+                blurBackdrop = true,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SectionSpacing),
+                ) {
+                    Text(
+                        stringResource(R.string.lyrics_gemini_key_title),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    GlassSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = CircleShape,
+                        subtle = true,
+                    ) {
+                        TextField(
+                            value = keyInput,
+                            onValueChange = { keyInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text(stringResource(R.string.lyrics_gemini_key_hint)) },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent,
+                            ),
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing, Alignment.End),
+                    ) {
+                        TextButton(onClick = { showGeminiKeyDialog = false }) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                val trimmedKey = keyInput.trim()
+                                viewModel.saveGeminiApiKey(trimmedKey)
+                                showGeminiKeyDialog = false
+                                state.track?.let { viewModel.generateLyricsWithGemini(it, trimmedKey) }
+                            },
+                            enabled = keyInput.isNotBlank(),
+                        ) {
+                            Text("Save & Transcribe")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

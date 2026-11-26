@@ -8,6 +8,10 @@
     <string name="lyrics_not_found_description">We could not find matching lyrics for this track</string>
     <string name="lyrics_instrumental">Instrumental track</string>
     <string name="lyrics_instrumental_description">This track has no lyrics</string>
-    <string name="lyrics_search_genius">Search on Genius</string>
+    <string name="lyrics_generate_gemini">Transcribe with Gemini</string>
     <string name="lyrics_import_lrc">Load .lrc file</string>
+    <string name="lyrics_delete">Delete lyrics</string>
+    <string name="lyrics_gemini_key_title">Gemini API Key</string>
+    <string name="lyrics_gemini_key_hint">Paste your Gemini API key</string>
+    <string name="lyrics_gemini_error">Could not transcribe lyrics with Gemini</string>
 </resources>

@@ -5,6 +5,7 @@ import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.repository.LyricsRepository
+import com.xelilovth.nota.domain.repository.SettingsRepository
 import com.xelilovth.nota.domain.usecase.CycleRepeatModeUseCase
 import com.xelilovth.nota.domain.usecase.PlayTrackUseCase
 import com.xelilovth.nota.domain.usecase.SeekToUseCase
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class PlayerViewModel @Inject constructor(
     private val repository: PlaybackRepository,
     private val lyricsRepository: LyricsRepository,
+    private val settingsRepository: SettingsRepository,
     private val playTrack: PlayTrackUseCase,
     private val togglePlayPauseUseCase: TogglePlayPauseUseCase,
     private val skipNextUseCase: SkipNextUseCase,
@@ -34,6 +36,7 @@ class PlayerViewModel @Inject constructor(
     private val cycleRepeatModeUseCase: CycleRepeatModeUseCase,
 ) : ViewModel() {
     val playbackState: StateFlow<PlaybackState> = repository.playbackState
+    val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
     private val _lyricsState = MutableStateFlow(LyricsUiState())
     val lyricsState: StateFlow<LyricsUiState> = _lyricsState.asStateFlow()
     private var lyricsJob: Job? = null
@@ -73,6 +76,61 @@ class PlayerViewModel @Inject constructor(
                     syncOffsetMs = offsetMs,
                 )
             }
+        }
+    }
+
+    fun saveGeminiApiKey(key: String) = settingsRepository.setGeminiApiKey(key.trim())
+
+    fun generateLyricsWithGemini(track: Track, apiKeyOverride: String? = null) {
+        val apiKey = (apiKeyOverride ?: geminiApiKey.value).trim()
+        if (apiKey.isBlank()) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = "Gemini API key is required",
+            )
+            return
+        }
+        lyricsJob?.cancel()
+        _lyricsState.value = _lyricsState.value.copy(
+            trackId = track.id,
+            isLoading = true,
+            notFound = false,
+            errorMessage = null,
+        )
+        lyricsJob = viewModelScope.launch {
+            val lyrics = runCatching { lyricsRepository.generateLyricsWithGemini(track, apiKey) }.getOrNull()
+            val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
+            if (_lyricsState.value.trackId == track.id) {
+                _lyricsState.value = if (lyrics != null) {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = lyrics,
+                        notFound = false,
+                        syncOffsetMs = offsetMs,
+                    )
+                } else {
+                    LyricsUiState(
+                        trackId = track.id,
+                        lyrics = _lyricsState.value.lyrics,
+                        notFound = _lyricsState.value.lyrics == null,
+                        syncOffsetMs = offsetMs,
+                        errorMessage = "Could not transcribe lyrics with Gemini",
+                    )
+                }
+            }
+        }
+    }
+
+    fun deleteLyrics(trackId: Long) {
+        lyricsJob?.cancel()
+        _lyricsState.value = LyricsUiState(
+            trackId = trackId,
+            notFound = true,
+            syncOffsetMs = _lyricsState.value.syncOffsetMs,
+        )
+        viewModelScope.launch {
+            lyricsRepository.deleteLyrics(trackId)
         }
     }
 

@@ -30,9 +30,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,7 +78,8 @@ internal fun LyricsPanel(
     onSeekTo: (Long) -> Unit,
     onAdjustOffset: (Long) -> Unit,
     onImportLyrics: () -> Unit,
-    onOpenGenius: () -> Unit,
+    onGenerateWithGemini: () -> Unit,
+    onDeleteLyrics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val showOffsetControls = state.lyrics != null &&
@@ -96,9 +99,11 @@ internal fun LyricsPanel(
             LyricsHeader(
                 syncOffsetMs = state.syncOffsetMs,
                 showOffsetControls = showOffsetControls,
+                hasLyrics = state.lyrics != null,
                 onCollapse = onCollapse,
                 onAdjustOffset = onAdjustOffset,
                 onImportLyrics = onImportLyrics,
+                onDeleteLyrics = onDeleteLyrics,
             )
 
             when {
@@ -106,14 +111,16 @@ internal fun LyricsPanel(
                 state.lyrics?.instrumental == true -> EmptyLyrics(
                     titleRes = R.string.lyrics_instrumental,
                     subtitleRes = R.string.lyrics_instrumental_description,
+                    errorMessage = state.errorMessage,
                     onImportLyrics = onImportLyrics,
-                    onOpenGenius = null,
+                    onGenerateWithGemini = null,
                 )
                 state.lyrics == null -> EmptyLyrics(
                     titleRes = R.string.lyrics_not_available,
                     subtitleRes = R.string.lyrics_not_found_description,
+                    errorMessage = state.errorMessage,
                     onImportLyrics = onImportLyrics,
-                    onOpenGenius = onOpenGenius,
+                    onGenerateWithGemini = onGenerateWithGemini,
                 )
                 else -> LyricsContent(
                     lyrics = state.lyrics,
@@ -131,9 +138,11 @@ internal fun LyricsPanel(
 private fun LyricsHeader(
     syncOffsetMs: Long,
     showOffsetControls: Boolean,
+    hasLyrics: Boolean,
     onCollapse: () -> Unit,
     onAdjustOffset: (Long) -> Unit,
     onImportLyrics: () -> Unit,
+    onDeleteLyrics: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -212,6 +221,19 @@ private fun LyricsHeader(
                     )
                 }
             }
+            if (hasLyrics) {
+                IconButton(
+                    onClick = onDeleteLyrics,
+                    modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DeleteOutline,
+                        contentDescription = stringResource(R.string.lyrics_delete),
+                        modifier = Modifier.size(AppDimens.LyricsToolbarIconSize),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             IconButton(
                 onClick = onImportLyrics,
                 modifier = Modifier.size(AppDimens.LyricsToolbarButtonSize),
@@ -256,8 +278,9 @@ private fun LoadingLyrics() {
 private fun EmptyLyrics(
     titleRes: Int,
     subtitleRes: Int,
+    errorMessage: String?,
     onImportLyrics: () -> Unit,
-    onOpenGenius: (() -> Unit)?,
+    onGenerateWithGemini: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
@@ -281,18 +304,27 @@ private fun EmptyLyrics(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(AppDimens.ElementSpacing))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
-            verticalAlignment = Alignment.CenterVertically,
+        if (!errorMessage.isNullOrBlank()) {
+            Spacer(Modifier.height(AppDimens.ElementSpacing))
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(Modifier.height(AppDimens.SectionSpacing))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppDimens.ElementSpacing),
         ) {
+            if (onGenerateWithGemini != null) {
+                Button(onClick = onGenerateWithGemini) {
+                    Text(stringResource(R.string.lyrics_generate_gemini))
+                }
+            }
             TextButton(onClick = onImportLyrics) {
                 Text(stringResource(R.string.lyrics_import_lrc))
-            }
-            if (onOpenGenius != null) {
-                TextButton(onClick = onOpenGenius) {
-                    Text(stringResource(R.string.lyrics_search_genius))
-                }
             }
         }
     }

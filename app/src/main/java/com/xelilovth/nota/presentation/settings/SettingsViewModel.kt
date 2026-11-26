@@ -23,6 +23,7 @@ class SettingsViewModel @Inject constructor(
     private val sleepTimerManager: SleepTimerManager,
 ) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.settings
+    val geminiApiKey: StateFlow<String> = settingsRepository.geminiApiKey
     val tracks = observeTracks()
     val sleepTimerRemainingSeconds: StateFlow<Long?> = sleepTimerManager.remainingSeconds
 
@@ -32,6 +33,8 @@ class SettingsViewModel @Inject constructor(
     fun setThemeMode(mode: ThemeMode) = settingsRepository.setThemeMode(mode)
 
     fun setHideShortTracks(hide: Boolean) = settingsRepository.setHideShortTracks(hide)
+
+    fun setGeminiApiKey(key: String) = settingsRepository.setGeminiApiKey(key.trim())
 
     fun rescanLibrary() {
         if (_isScanning.value) return

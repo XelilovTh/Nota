@@ -1,10 +1,13 @@
 package com.xelilovth.nota.presentation.player
 
+import com.xelilovth.nota.domain.model.AppSettings
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
+import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.domain.model.Track
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.repository.LyricsRepository
+import com.xelilovth.nota.domain.repository.SettingsRepository
 import com.xelilovth.nota.domain.model.TrackLyrics
 import com.xelilovth.nota.domain.usecase.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,16 +64,40 @@ class PlayerViewModelTest {
     private class FakeLyricsRepository : LyricsRepository {
         var nextLyrics: TrackLyrics? = null
         var importedLyrics: TrackLyrics? = null
+        var geminiLyrics: TrackLyrics? = null
+        val deletedTrackIds = mutableListOf<Long>()
         val offsets = mutableMapOf<Long, Long>()
 
         override suspend fun getLyrics(track: Track): TrackLyrics? = nextLyrics
         override suspend fun importLocalLyrics(track: Track, uriString: String): TrackLyrics? = importedLyrics
+        override suspend fun generateLyricsWithGemini(track: Track, apiKey: String): TrackLyrics? = geminiLyrics
+        override suspend fun deleteLyrics(trackId: Long) { deletedTrackIds += trackId }
         override suspend fun getSyncOffsetMs(trackId: Long): Long = offsets[trackId] ?: 0L
         override suspend fun setSyncOffsetMs(trackId: Long, offsetMs: Long) { offsets[trackId] = offsetMs }
     }
 
+    private class FakeSettingsRepository : SettingsRepository {
+        override val settings = MutableStateFlow(AppSettings())
+        override val recentTrackIds = MutableStateFlow<List<Long>>(emptyList())
+        private val _geminiApiKey = MutableStateFlow("")
+        override val geminiApiKey = _geminiApiKey
+
+        override fun setThemeMode(mode: ThemeMode) {
+            settings.value = settings.value.copy(themeMode = mode)
+        }
+        override fun setHideShortTracks(hide: Boolean) {
+            settings.value = settings.value.copy(hideShortTracks = hide)
+        }
+        override fun addRecentTrack(trackId: Long) {
+            recentTrackIds.value = (listOf(trackId) + recentTrackIds.value.filterNot { it == trackId }).take(10)
+        }
+        override fun setGeminiApiKey(key: String) {
+            _geminiApiKey.value = key
+        }
+    }
+
     private fun viewModel(repository: FakeRepository) = PlayerViewModel(
-        repository, FakeLyricsRepository(), PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+        repository, FakeLyricsRepository(), FakeSettingsRepository(), PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
         SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
         ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
     )
@@ -159,8 +186,9 @@ class PlayerViewModelTest {
                 syncType = com.xelilovth.nota.domain.model.LyricsSyncType.LINE,
             )
         }
+        val settingsRepository = FakeSettingsRepository()
         val viewModel = PlayerViewModel(
-            repository, lyricsRepository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+            repository, lyricsRepository, settingsRepository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
             SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
             ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
         )
@@ -183,5 +211,38 @@ class PlayerViewModelTest {
         assertFalse(viewModel.lyricsState.value.notFound)
         assertEquals(com.xelilovth.nota.domain.model.LyricsSource.LOCAL_FILE, viewModel.lyricsState.value.lyrics?.source)
         assertTrue(repository.calls.contains("lyricsSync:true"))
+    }
+
+    @Test fun geminiGenerationApiKeyAndDeleteLyricsUpdateState() {
+        val repository = FakeRepository()
+        val lyricsRepository = FakeLyricsRepository().apply {
+            geminiLyrics = TrackLyrics(
+                lines = listOf(com.xelilovth.nota.domain.model.LyricLine("Gemini line", 500L, 2500L)),
+                source = com.xelilovth.nota.domain.model.LyricsSource.GEMINI,
+                syncType = com.xelilovth.nota.domain.model.LyricsSyncType.LINE,
+            )
+        }
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = PlayerViewModel(
+            repository, lyricsRepository, settingsRepository, PlayTrackUseCase(repository), TogglePlayPauseUseCase(repository),
+            SkipNextUseCase(repository), SkipPreviousUseCase(repository), SeekToUseCase(repository),
+            ToggleShuffleUseCase(repository), CycleRepeatModeUseCase(repository),
+        )
+        val sampleTrack = track(11L)
+
+        viewModel.saveGeminiApiKey("  test-key  ")
+        assertEquals("test-key", viewModel.geminiApiKey.value)
+
+        viewModel.generateLyricsWithGemini(sampleTrack)
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        assertFalse(viewModel.lyricsState.value.notFound)
+        assertEquals(com.xelilovth.nota.domain.model.LyricsSource.GEMINI, viewModel.lyricsState.value.lyrics?.source)
+        assertEquals(null, viewModel.lyricsState.value.errorMessage)
+
+        viewModel.deleteLyrics(11L)
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        assertTrue(viewModel.lyricsState.value.notFound)
+        assertEquals(null, viewModel.lyricsState.value.lyrics)
+        assertEquals(listOf(11L), lyricsRepository.deletedTrackIds)
     }
 }

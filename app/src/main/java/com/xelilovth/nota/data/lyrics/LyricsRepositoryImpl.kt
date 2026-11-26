@@ -2,6 +2,7 @@ package com.xelilovth.nota.data.lyrics
 
 import android.content.Context
 import android.net.Uri
+import android.util.Base64
 import com.xelilovth.nota.di.IoDispatcher
 import com.xelilovth.nota.domain.model.LyricLine
 import com.xelilovth.nota.domain.model.LyricWord
@@ -31,6 +32,11 @@ class LyricsRepositoryImpl @Inject constructor(
 ) : LyricsRepository {
     private data class CachedLyrics(val value: TrackLyrics?, val savedAtMs: Long)
 
+    private sealed interface DiskCacheEntry {
+        data object Deleted : DiskCacheEntry
+        data class Found(val lyrics: TrackLyrics) : DiskCacheEntry
+    }
+
     private val cache = ConcurrentHashMap<Long, CachedLyrics>()
     private val cacheDir by lazy { File(context.filesDir, LYRICS_CACHE_DIR) }
     private val offsetsPrefs by lazy {
@@ -43,10 +49,16 @@ class LyricsRepositoryImpl @Inject constructor(
         val cacheTtl = if (cached?.value == null) MISS_CACHE_TTL_MS else CACHE_TTL_MS
         if (cached != null && now - cached.savedAtMs < cacheTtl) return@withContext cached.value
 
-        val diskCached = readDiskCache(track.id)
-        if (diskCached != null) {
-            cache[track.id] = CachedLyrics(diskCached, now)
-            return@withContext diskCached
+        when (val diskCached = readDiskCache(track.id)) {
+            DiskCacheEntry.Deleted -> {
+                cache[track.id] = CachedLyrics(null, now)
+                return@withContext null
+            }
+            is DiskCacheEntry.Found -> {
+                cache[track.id] = CachedLyrics(diskCached.lyrics, now)
+                return@withContext diskCached.lyrics
+            }
+            null -> Unit
         }
 
         val betterLyrics = try {
@@ -107,6 +119,125 @@ class LyricsRepositoryImpl @Inject constructor(
             parsed
         }
 
+    override suspend fun generateLyricsWithGemini(track: Track, apiKey: String): TrackLyrics? =
+        withContext(ioDispatcher) {
+            val trimmedKey = apiKey.trim()
+            if (trimmedKey.isBlank()) return@withContext null
+
+            val trackUri = Uri.parse(track.uri)
+            val audioBytes = runCatching {
+                context.contentResolver.openInputStream(trackUri)?.use { it.readBytes() }
+            }.getOrNull() ?: return@withContext null
+            if (audioBytes.isEmpty() || audioBytes.size > MAX_GEMINI_INLINE_BYTES) {
+                return@withContext null
+            }
+
+            val mimeType = context.contentResolver.getType(trackUri) ?: "audio/mpeg"
+            val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
+            val prompt = buildString {
+                append("Listen carefully to this audio track and transcribe the lyrics into synchronized LRC format.\n")
+                append("Output ONLY valid LRC lines with timestamps in [mm:ss.xx] format, e.g.:\n")
+                append("[00:12.34] First line of lyrics\n")
+                append("Do not include any markdown formatting, code fences, explanations, or metadata tags.\n")
+                append("If the track is purely instrumental with no vocals, output ONLY: [INSTRUMENTAL]")
+            }
+            val requestBody = JSONObject().apply {
+                put(
+                    "contents",
+                    JSONArray().put(
+                        JSONObject().apply {
+                            put(
+                                "parts",
+                                JSONArray()
+                                    .put(
+                                        JSONObject().apply {
+                                            put(
+                                                "inline_data",
+                                                JSONObject().apply {
+                                                    put("mime_type", mimeType)
+                                                    put("data", base64Audio)
+                                                },
+                                            )
+                                        },
+                                    )
+                                    .put(
+                                        JSONObject().apply {
+                                            put("text", prompt)
+                                        },
+                                    ),
+                            )
+                        },
+                    ),
+                )
+            }
+
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${Uri.encode(trimmedKey)}"
+            val responseJson = try {
+                postJson(url, requestBody)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            } ?: return@withContext null
+
+            val rawText = responseJson
+                .optJSONArray("candidates")
+                ?.optJSONObject(0)
+                ?.optJSONObject("content")
+                ?.optJSONArray("parts")
+                ?.optJSONObject(0)
+                ?.optString("text")
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: return@withContext null
+
+            val cleaned = stripMarkdownFences(rawText).trim()
+            if (cleaned.isBlank()) return@withContext null
+
+            val parsed = if (cleaned.equals("[INSTRUMENTAL]", ignoreCase = true)) {
+                TrackLyrics(
+                    lines = emptyList(),
+                    source = LyricsSource.GEMINI,
+                    syncType = LyricsSyncType.PLAIN,
+                    instrumental = true,
+                )
+            } else {
+                val lrcLines = LyricsParser.fromLrc(cleaned, track.durationMs)
+                if (lrcLines.isNotEmpty()) {
+                    TrackLyrics(
+                        lines = lrcLines,
+                        source = LyricsSource.GEMINI,
+                        syncType = LyricsSyncType.LINE,
+                    )
+                } else {
+                    LyricsParser.fromPlain(cleaned).takeIf { it.isNotEmpty() }?.let { plainLines ->
+                        TrackLyrics(
+                            lines = plainLines,
+                            source = LyricsSource.GEMINI,
+                            syncType = LyricsSyncType.PLAIN,
+                        )
+                    }
+                }
+            } ?: return@withContext null
+
+            writeDiskCache(track.id, parsed)
+            cache[track.id] = CachedLyrics(parsed, System.currentTimeMillis())
+            parsed
+        }
+
+    override suspend fun deleteLyrics(trackId: Long) {
+        withContext(ioDispatcher) {
+            cache.remove(trackId)
+            runCatching {
+                if (!cacheDir.exists()) cacheDir.mkdirs()
+                File(cacheDir, "$trackId.json").writeText(
+                    JSONObject().put("deleted", true).toString(),
+                    Charsets.UTF_8,
+                )
+            }
+        }
+    }
+
     override suspend fun getSyncOffsetMs(trackId: Long): Long = withContext(ioDispatcher) {
         offsetsPrefs.getLong(trackId.toString(), 0L)
     }
@@ -117,11 +248,16 @@ class LyricsRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun readDiskCache(trackId: Long): TrackLyrics? {
+    private fun readDiskCache(trackId: Long): DiskCacheEntry? {
         val file = File(cacheDir, "$trackId.json")
         if (!file.isFile) return null
         return runCatching {
-            deserializeLyrics(JSONObject(file.readText(Charsets.UTF_8)))
+            val json = JSONObject(file.readText(Charsets.UTF_8))
+            if (json.optBoolean("deleted", false)) {
+                DiskCacheEntry.Deleted
+            } else {
+                deserializeLyrics(json)?.let { DiskCacheEntry.Found(it) }
+            }
         }.getOrNull()
     }
 
@@ -318,6 +454,43 @@ class LyricsRepositoryImpl @Inject constructor(
         }
     }
 
+    private fun stripMarkdownFences(text: String): String {
+        val lines = text.lines()
+        val withoutStart = if (lines.firstOrNull()?.trim()?.startsWith("```") == true) {
+            lines.drop(1)
+        } else {
+            lines
+        }
+        val withoutEnd = if (withoutStart.lastOrNull()?.trim() == "```") {
+            withoutStart.dropLast(1)
+        } else {
+            withoutStart
+        }
+        return withoutEnd.joinToString("\n")
+    }
+
+    private fun postJson(url: String, body: JSONObject): JSONObject? {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = GEMINI_CONNECT_TIMEOUT_MS
+            readTimeout = GEMINI_READ_TIMEOUT_MS
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            setRequestProperty("Accept", "application/json")
+        }
+        return try {
+            connection.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
+                writer.write(body.toString())
+            }
+            val status = connection.responseCode
+            if (status !in 200..299) return null
+            val responseText = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            runCatching { JSONObject(responseText) }.getOrNull()
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun requestJson(url: String): JSONObject? {
         val response = request(url) ?: return null
         return runCatching { JSONObject(response) }.getOrNull()
@@ -352,6 +525,9 @@ class LyricsRepositoryImpl @Inject constructor(
         const val OFFSETS_PREFS_NAME = "nota_lyrics_offsets"
         const val CONNECT_TIMEOUT_MS = 5_000
         const val READ_TIMEOUT_MS = 7_000
+        const val GEMINI_CONNECT_TIMEOUT_MS = 15_000
+        const val GEMINI_READ_TIMEOUT_MS = 90_000
+        const val MAX_GEMINI_INLINE_BYTES = 15 * 1024 * 1024
         const val CACHE_TTL_MS = 6 * 60 * 60 * 1_000L
         const val MISS_CACHE_TTL_MS = 10 * 60 * 1_000L
         const val MIN_MATCH_SCORE = 75

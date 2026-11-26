@@ -20,6 +20,8 @@ class SettingsRepositoryImpl @Inject constructor(
     override val settings: StateFlow<AppSettings> = _settings.asStateFlow()
     private val _recentTrackIds = MutableStateFlow(loadRecentTrackIds())
     override val recentTrackIds: StateFlow<List<Long>> = _recentTrackIds.asStateFlow()
+    private val _geminiApiKey = MutableStateFlow(prefs.getString(KEY_GEMINI_API_KEY, "").orEmpty())
+    override val geminiApiKey: StateFlow<String> = _geminiApiKey.asStateFlow()
 
     override fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
@@ -35,6 +37,11 @@ class SettingsRepositoryImpl @Inject constructor(
         val updated = (listOf(trackId) + _recentTrackIds.value.filterNot { it == trackId }).take(10)
         prefs.edit().putString(KEY_RECENT_TRACK_IDS, updated.joinToString(",")).apply()
         _recentTrackIds.value = updated
+    }
+
+    override fun setGeminiApiKey(key: String) {
+        prefs.edit().putString(KEY_GEMINI_API_KEY, key).apply()
+        _geminiApiKey.value = key
     }
 
     private fun loadSettings(): AppSettings {
@@ -57,5 +64,6 @@ class SettingsRepositoryImpl @Inject constructor(
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_HIDE_SHORT_TRACKS = "hide_short_tracks"
         const val KEY_RECENT_TRACK_IDS = "recent_track_ids"
+        const val KEY_GEMINI_API_KEY = "gemini_api_key"
     }
 }
