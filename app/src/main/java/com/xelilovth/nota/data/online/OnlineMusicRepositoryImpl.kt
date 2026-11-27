@@ -53,6 +53,9 @@ class OnlineMusicRepositoryImpl @Inject constructor(
     private val _offlineTracks = MutableStateFlow<List<Track>>(emptyList())
     override val offlineTracks: StateFlow<List<Track>> = _offlineTracks.asStateFlow()
 
+    private val _cachedOnlineTracks = MutableStateFlow<List<Track>>(emptyList())
+    override val cachedOnlineTracks: StateFlow<List<Track>> = _cachedOnlineTracks.asStateFlow()
+
     private val _downloadProgress = MutableStateFlow<Map<Long, Int>>(emptyMap())
     override val downloadProgress: StateFlow<Map<Long, Int>> = _downloadProgress.asStateFlow()
 
@@ -433,6 +436,7 @@ class OnlineMusicRepositoryImpl @Inject constructor(
 
     private fun cacheOnlineTrackInternal(track: Track) {
         onlineMetaMap[track.id] = track
+        _cachedOnlineTracks.value = onlineMetaMap.values.toList()
     }
 
     private fun persistOnlineMeta() {
@@ -453,6 +457,7 @@ class OnlineMusicRepositoryImpl @Inject constructor(
                 val track = jsonToTrack(array.optJSONObject(i) ?: continue) ?: continue
                 onlineMetaMap[track.id] = track
             }
+            _cachedOnlineTracks.value = onlineMetaMap.values.toList()
         }
     }
 

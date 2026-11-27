@@ -42,6 +42,7 @@ import com.xelilovth.nota.ui.theme.LocalBottomContentPadding
 fun AddToPlaylistSheet(
     track: Track?,
     onDismiss: () -> Unit,
+    blurBackdrop: Boolean = true,
     viewModel: PlaylistsViewModel = hiltViewModel(),
 ) {
     val customPlaylists by viewModel.customPlaylists.collectAsStateWithLifecycle()
@@ -50,6 +51,7 @@ fun AddToPlaylistSheet(
     GlassBottomSheet(
         visible = track != null,
         onDismissRequest = onDismiss,
+        blurBackdrop = blurBackdrop,
     ) {
         if (track != null) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.ScreenPadding)) {

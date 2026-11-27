@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface OnlineMusicRepository {
     val offlineTracks: StateFlow<List<Track>> get() = MutableStateFlow(emptyList())
+    val cachedOnlineTracks: StateFlow<List<Track>> get() = MutableStateFlow(emptyList())
     val downloadProgress: StateFlow<Map<Long, Int>> get() = MutableStateFlow(emptyMap())
     val downloadedOnlineIds: StateFlow<Set<String>> get() = MutableStateFlow(emptySet())
 

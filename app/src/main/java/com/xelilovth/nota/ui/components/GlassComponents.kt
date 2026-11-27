@@ -509,6 +509,7 @@ fun GlassBottomSheet(
     visible: Boolean,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    blurBackdrop: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val glass = LocalGlassColors.current
@@ -556,11 +557,12 @@ fun GlassBottomSheet(
                     topEnd = AppDimens.ShapeExtraLarge,
                 ),
                 elevated = true,
-                blurBackdrop = true,
+                blurBackdrop = blurBackdrop,
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(if (blurBackdrop) Modifier else Modifier.background(glass.sheetBackground))
                         .navigationBarsPadding(),
                 ) {
                     Box(

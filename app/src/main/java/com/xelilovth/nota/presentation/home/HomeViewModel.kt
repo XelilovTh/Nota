@@ -41,8 +41,8 @@ class HomeViewModel @Inject constructor(
     private val allKnownTracks: StateFlow<List<Track>> = combine(
         tracks,
         onlineMusicRepository?.offlineTracks ?: flowOf(emptyList()),
-    ) { libraryTracks, offlineTracks ->
-        val cachedOnline = onlineMusicRepository?.getCachedOnlineTracks().orEmpty()
+        onlineMusicRepository?.cachedOnlineTracks ?: flowOf(emptyList()),
+    ) { libraryTracks, offlineTracks, cachedOnline ->
         val merged = LinkedHashMap<Long, Track>()
         cachedOnline.forEach { merged[it.id] = it }
         offlineTracks.forEach { merged[it.id] = it }
