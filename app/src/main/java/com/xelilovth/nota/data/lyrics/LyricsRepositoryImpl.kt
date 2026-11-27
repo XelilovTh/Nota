@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Base64
+import android.webkit.MimeTypeMap
 import com.xelilovth.nota.di.IoDispatcher
 import com.xelilovth.nota.domain.model.LyricLine
 import com.xelilovth.nota.domain.model.LyricWord
@@ -202,15 +203,9 @@ class LyricsRepositoryImpl @Inject constructor(
             val trimmedKey = apiKey.trim()
             if (trimmedKey.isBlank()) return@withContext null
 
-            val trackUri = Uri.parse(track.uri)
-            val audioBytes = runCatching {
-                context.contentResolver.openInputStream(trackUri)?.use { it.readBytes() }
-            }.getOrNull() ?: return@withContext null
-            if (audioBytes.isEmpty() || audioBytes.size > MAX_GEMINI_INLINE_BYTES) {
-                return@withContext null
-            }
+            val (audioBytes, mimeType) = readAudioForTranscription(track, MAX_GEMINI_INLINE_BYTES)
+                ?: return@withContext null
 
-            val mimeType = context.contentResolver.getType(trackUri) ?: "audio/mpeg"
             val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
             val prompt = "Listen carefully to this audio track and transcribe every sung word accurately in Enhanced LRC format: [mm:ss.xx] <mm:ss.xx>word1 <mm:ss.xx>word2 ... Give each line a [mm:ss.xx] start timestamp and each word inside the line its own <mm:ss.xx> timestamp matching when that word is sung. Output ONLY valid Enhanced LRC lines without markdown code blocks or explanations. If the track is purely instrumental, output exactly [INSTRUMENTAL]."
             val requestBody = JSONObject().apply {
@@ -309,15 +304,8 @@ class LyricsRepositoryImpl @Inject constructor(
             val trimmedKey = apiKey.trim()
             if (trimmedKey.isBlank()) return@withContext null
 
-            val trackUri = Uri.parse(track.uri)
-            val audioBytes = runCatching {
-                context.contentResolver.openInputStream(trackUri)?.use { it.readBytes() }
-            }.getOrNull() ?: return@withContext null
-            if (audioBytes.isEmpty() || audioBytes.size > MAX_GROQ_INLINE_BYTES) {
-                return@withContext null
-            }
-
-            val mimeType = context.contentResolver.getType(trackUri) ?: "audio/mpeg"
+            val (audioBytes, mimeType) = readAudioForTranscription(track, MAX_GROQ_INLINE_BYTES)
+                ?: return@withContext null
             val ext = extensionForMimeType(mimeType)
             val responseJson = try {
                 postGroqTranscription(
@@ -991,6 +979,37 @@ class LyricsRepositoryImpl @Inject constructor(
 
     private fun sanitizeFileName(raw: String): String =
         raw.replace(Regex("[\\\\/:*?\"<>|]"), "_").replace(Regex("\\s+"), " ").trim()
+
+    private fun readAudioForTranscription(track: Track, maxBytes: Int): Pair<ByteArray, String>? {
+        val trackUri = Uri.parse(track.uri)
+        val audioBytes = runCatching {
+            when (trackUri.scheme) {
+                "file" -> trackUri.path?.let { File(it) }?.takeIf { it.isFile }?.readBytes()
+                else -> context.contentResolver.openInputStream(trackUri)?.use { it.readBytes() }
+            }
+        }.getOrNull() ?: return null
+        if (audioBytes.isEmpty() || audioBytes.size > maxBytes) {
+            return null
+        }
+        return audioBytes to resolveAudioMimeType(trackUri)
+    }
+
+    private fun resolveAudioMimeType(uri: Uri): String {
+        context.contentResolver.getType(uri)?.takeIf { it.isNotBlank() }?.let { return it }
+        val ext = MimeTypeMap.getFileExtensionFromUrl(uri.toString())
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?: uri.path?.substringAfterLast('.', "")?.lowercase().orEmpty()
+        return when (ext) {
+            "m4a", "mp4" -> "audio/mp4"
+            "ogg", "opus" -> "audio/ogg"
+            "flac" -> "audio/flac"
+            "wav" -> "audio/wav"
+            "webm" -> "audio/webm"
+            "aac" -> "audio/aac"
+            else -> "audio/mpeg"
+        }
+    }
 
     private fun extensionForMimeType(mimeType: String): String = when {
         mimeType.contains("mp4", ignoreCase = true) || mimeType.contains("m4a", ignoreCase = true) -> "m4a"

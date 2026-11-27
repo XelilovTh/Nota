@@ -1,10 +1,12 @@
 package com.xelilovth.nota.presentation.player
 
 import com.xelilovth.nota.domain.model.AppSettings
+import com.xelilovth.nota.domain.model.OfflineStorageLocation
 import com.xelilovth.nota.domain.model.PlaybackState
 import com.xelilovth.nota.domain.model.RepeatMode
 import com.xelilovth.nota.domain.model.ThemeMode
 import com.xelilovth.nota.domain.model.Track
+import com.xelilovth.nota.domain.repository.OnlineMusicRepository
 import com.xelilovth.nota.domain.repository.PlaybackRepository
 import com.xelilovth.nota.domain.repository.LyricsRepository
 import com.xelilovth.nota.domain.repository.SettingsRepository
@@ -65,15 +67,33 @@ class PlayerViewModelTest {
         var nextLyrics: TrackLyrics? = null
         var importedLyrics: TrackLyrics? = null
         var geminiLyrics: TrackLyrics? = null
+        var groqLyrics: TrackLyrics? = null
+        var lastTranscribedTrack: Track? = null
         val deletedTrackIds = mutableListOf<Long>()
         val offsets = mutableMapOf<Long, Long>()
 
         override suspend fun getLyrics(track: Track): TrackLyrics? = nextLyrics
         override suspend fun importLocalLyrics(track: Track, uriString: String): TrackLyrics? = importedLyrics
-        override suspend fun generateLyricsWithGemini(track: Track, apiKey: String): TrackLyrics? = geminiLyrics
+        override suspend fun generateLyricsWithGemini(track: Track, apiKey: String): TrackLyrics? {
+            lastTranscribedTrack = track
+            return geminiLyrics
+        }
+        override suspend fun generateLyricsWithGroq(track: Track, apiKey: String): TrackLyrics? {
+            lastTranscribedTrack = track
+            return groqLyrics
+        }
         override suspend fun deleteLyrics(trackId: Long) { deletedTrackIds += trackId }
         override suspend fun getSyncOffsetMs(trackId: Long): Long = offsets[trackId] ?: 0L
         override suspend fun setSyncOffsetMs(trackId: Long, offsetMs: Long) { offsets[trackId] = offsetMs }
+    }
+
+    private class FakeOnlineMusicRepository : OnlineMusicRepository {
+        override val offlineTracks = MutableStateFlow<List<Track>>(emptyList())
+        override suspend fun searchOnline(query: String): Result<List<Track>> = Result.success(emptyList())
+        override suspend fun resolveStreamUrl(onlineId: String): String? = null
+        override suspend fun downloadForOffline(track: Track, location: OfflineStorageLocation): Result<Track> =
+            Result.failure(UnsupportedOperationException())
+        override suspend fun removeOfflineTrack(track: Track) = Unit
     }
 
     private class FakeSettingsRepository : SettingsRepository {
@@ -249,5 +269,86 @@ class PlayerViewModelTest {
         assertTrue(viewModel.lyricsState.value.notFound)
         assertEquals(null, viewModel.lyricsState.value.lyrics)
         assertEquals(listOf(11L), lyricsRepository.deletedTrackIds)
+    }
+
+    @Test fun transcribeWithProviderUsesDownloadedOfflineCopyWithoutSwitchingAwayFromOnlineTrack() {
+        val repository = FakeRepository()
+        val onlineTrack = Track(
+            id = -5001L,
+            uri = "nota://online/vid1",
+            title = "Online Song",
+            artist = "Artist",
+            album = "Online",
+            durationMs = 180_000L,
+            folder = "Online",
+            isOnline = true,
+            onlineId = "vid1",
+        )
+        val offlineTrack = onlineTrack.copy(
+            uri = "file:///data/user/0/com.xelilovth.nota/files/offline_tracks/vid1.m4a",
+            folder = "Offline",
+            isOnline = false,
+        )
+        val lyricsRepository = FakeLyricsRepository().apply {
+            geminiLyrics = TrackLyrics(
+                lines = listOf(com.xelilovth.nota.domain.model.LyricLine("Transcribed", 1000L, 3000L)),
+                source = com.xelilovth.nota.domain.model.LyricsSource.GEMINI,
+                syncType = com.xelilovth.nota.domain.model.LyricsSyncType.LINE,
+            )
+        }
+        val settingsRepository = FakeSettingsRepository()
+        val onlineRepository = FakeOnlineMusicRepository()
+        val viewModel = PlayerViewModel(
+            repository,
+            FakeLibraryRepository(),
+            lyricsRepository,
+            settingsRepository,
+            PlayTrackUseCase(repository),
+            TogglePlayPauseUseCase(repository),
+            SkipNextUseCase(repository),
+            SkipPreviousUseCase(repository),
+            SeekToUseCase(repository),
+            ToggleShuffleUseCase(repository),
+            CycleRepeatModeUseCase(repository),
+            onlineRepository,
+        )
+        viewModel.saveGeminiApiKey("gemini-key")
+
+        viewModel.transcribeWithProvider(onlineTrack, AiLyricsProvider.GEMINI)
+        assertEquals("Download track offline first to transcribe with AI", viewModel.lyricsState.value.errorMessage)
+
+        onlineRepository.offlineTracks.value = listOf(offlineTrack)
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        assertEquals(null, viewModel.lyricsState.value.errorMessage)
+
+        // Even if the UI still passes the original onlineTrack snapshot, ViewModel resolves the offline file.
+        viewModel.transcribeWithProvider(onlineTrack, AiLyricsProvider.GEMINI)
+        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+
+        assertEquals(offlineTrack, lyricsRepository.lastTranscribedTrack)
+        assertEquals(com.xelilovth.nota.domain.model.LyricsSource.GEMINI, viewModel.lyricsState.value.lyrics?.source)
+        assertEquals(null, viewModel.lyricsState.value.errorMessage)
+    }
+
+    @Test fun groqAndAiTranscribeAlsoRequireDownloadWhenOnlineTrackNotDownloaded() {
+        val repository = FakeRepository()
+        val onlineTrack = Track(
+            id = -5002L,
+            uri = "nota://online/vid2",
+            title = "Stream Song",
+            artist = "Artist",
+            album = "Online",
+            durationMs = 120_000L,
+            folder = "Online",
+            isOnline = true,
+            onlineId = "vid2",
+        )
+        val viewModel = viewModel(repository)
+
+        viewModel.generateLyricsWithGroq(onlineTrack, "groq-key")
+        assertEquals("Download track offline first to transcribe with AI", viewModel.lyricsState.value.errorMessage)
+
+        viewModel.generateLyricsWithAi(onlineTrack)
+        assertEquals("Download track offline first to transcribe with AI", viewModel.lyricsState.value.errorMessage)
     }
 }
