@@ -99,6 +99,25 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
         }
+        onlineMusicRepository?.let { onlineRepo ->
+            viewModelScope.launch {
+                onlineRepo.offlineTracks.collect { offlineTracks ->
+                    val currentLyrics = _lyricsState.value
+                    if (currentLyrics.errorMessage != DOWNLOAD_REQUIRED_FOR_AI_MESSAGE) return@collect
+                    val activeTrack = playbackState.value.track
+                    val hasLocalAudio = offlineTracks.any { offline ->
+                        !offline.uri.startsWith(ONLINE_URI_PREFIX) &&
+                            (
+                                offline.id == currentLyrics.trackId ||
+                                    (activeTrack?.onlineId != null && offline.onlineId == activeTrack.onlineId)
+                                )
+                    }
+                    if (hasLocalAudio) {
+                        _lyricsState.value = currentLyrics.copy(errorMessage = null)
+                    }
+                }
+            }
+        }
     }
 
     fun toggleFavorite(trackId: Long) = settingsRepository.toggleFavorite(trackId)
@@ -145,16 +164,25 @@ class PlayerViewModel @Inject constructor(
 
     fun saveGroqApiKey(key: String) = settingsRepository.setGroqApiKey(key.trim())
 
+    private fun resolvePlayableAudioTrack(track: Track): Track {
+        if (!track.uri.startsWith(ONLINE_URI_PREFIX)) return track
+        return onlineMusicRepository?.offlineTracks?.value?.firstOrNull { offline ->
+            !offline.uri.startsWith(ONLINE_URI_PREFIX) &&
+                (offline.id == track.id || (track.onlineId != null && offline.onlineId == track.onlineId))
+        } ?: track
+    }
+
     fun transcribeWithProvider(
         track: Track,
         preferredProvider: AiLyricsProvider,
         apiKeyOverride: String? = null,
     ) {
-        if (track.uri.startsWith("nota://")) {
+        val targetTrack = resolvePlayableAudioTrack(track)
+        if (targetTrack.uri.startsWith(ONLINE_URI_PREFIX)) {
             _lyricsState.value = _lyricsState.value.copy(
                 trackId = track.id,
                 isLoading = false,
-                errorMessage = "Download track offline first to transcribe with AI",
+                errorMessage = DOWNLOAD_REQUIRED_FOR_AI_MESSAGE,
             )
             return
         }
@@ -188,20 +216,20 @@ class PlayerViewModel @Inject constructor(
         lyricsJob = viewModelScope.launch {
             val primaryResult = runCatching {
                 when (preferredProvider) {
-                    AiLyricsProvider.GEMINI -> lyricsRepository.generateLyricsWithGemini(track, geminiKey)
-                    AiLyricsProvider.GROQ -> lyricsRepository.generateLyricsWithGroq(track, groqKey)
+                    AiLyricsProvider.GEMINI -> lyricsRepository.generateLyricsWithGemini(targetTrack, geminiKey)
+                    AiLyricsProvider.GROQ -> lyricsRepository.generateLyricsWithGroq(targetTrack, groqKey)
                 }
             }.getOrNull()
 
             val fallbackResult = if (primaryResult == null) {
                 when (preferredProvider) {
                     AiLyricsProvider.GEMINI -> if (groqKey.isNotBlank()) {
-                        runCatching { lyricsRepository.generateLyricsWithGroq(track, groqKey) }.getOrNull()
+                        runCatching { lyricsRepository.generateLyricsWithGroq(targetTrack, groqKey) }.getOrNull()
                     } else {
                         null
                     }
                     AiLyricsProvider.GROQ -> if (geminiKey.isNotBlank()) {
-                        runCatching { lyricsRepository.generateLyricsWithGemini(track, geminiKey) }.getOrNull()
+                        runCatching { lyricsRepository.generateLyricsWithGemini(targetTrack, geminiKey) }.getOrNull()
                     } else {
                         null
                     }
@@ -234,6 +262,15 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun generateLyricsWithAi(track: Track) {
+        val targetTrack = resolvePlayableAudioTrack(track)
+        if (targetTrack.uri.startsWith(ONLINE_URI_PREFIX)) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = DOWNLOAD_REQUIRED_FOR_AI_MESSAGE,
+            )
+            return
+        }
         val geminiKey = geminiApiKey.value.trim()
         val groqKey = groqApiKey.value.trim()
         if (geminiKey.isBlank() && groqKey.isBlank()) {
@@ -253,11 +290,11 @@ class PlayerViewModel @Inject constructor(
         )
         lyricsJob = viewModelScope.launch {
             val lyrics = (if (geminiKey.isNotBlank()) {
-                runCatching { lyricsRepository.generateLyricsWithGemini(track, geminiKey) }.getOrNull()
+                runCatching { lyricsRepository.generateLyricsWithGemini(targetTrack, geminiKey) }.getOrNull()
             } else {
                 null
             }) ?: if (groqKey.isNotBlank()) {
-                runCatching { lyricsRepository.generateLyricsWithGroq(track, groqKey) }.getOrNull()
+                runCatching { lyricsRepository.generateLyricsWithGroq(targetTrack, groqKey) }.getOrNull()
             } else {
                 null
             }
@@ -284,6 +321,15 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun generateLyricsWithGroq(track: Track, apiKeyOverride: String? = null) {
+        val targetTrack = resolvePlayableAudioTrack(track)
+        if (targetTrack.uri.startsWith(ONLINE_URI_PREFIX)) {
+            _lyricsState.value = _lyricsState.value.copy(
+                trackId = track.id,
+                isLoading = false,
+                errorMessage = DOWNLOAD_REQUIRED_FOR_AI_MESSAGE,
+            )
+            return
+        }
         val apiKey = (apiKeyOverride ?: groqApiKey.value).trim()
         if (apiKey.isBlank()) {
             _lyricsState.value = _lyricsState.value.copy(
@@ -301,7 +347,7 @@ class PlayerViewModel @Inject constructor(
             errorMessage = null,
         )
         lyricsJob = viewModelScope.launch {
-            val lyrics = runCatching { lyricsRepository.generateLyricsWithGroq(track, apiKey) }.getOrNull()
+            val lyrics = runCatching { lyricsRepository.generateLyricsWithGroq(targetTrack, apiKey) }.getOrNull()
             val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
             if (_lyricsState.value.trackId == track.id) {
                 _lyricsState.value = if (lyrics != null) {
@@ -325,11 +371,12 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun generateLyricsWithGemini(track: Track, apiKeyOverride: String? = null) {
-        if (track.uri.startsWith("nota://")) {
+        val targetTrack = resolvePlayableAudioTrack(track)
+        if (targetTrack.uri.startsWith(ONLINE_URI_PREFIX)) {
             _lyricsState.value = _lyricsState.value.copy(
                 trackId = track.id,
                 isLoading = false,
-                errorMessage = "Download track offline first to transcribe with AI",
+                errorMessage = DOWNLOAD_REQUIRED_FOR_AI_MESSAGE,
             )
             return
         }
@@ -350,7 +397,7 @@ class PlayerViewModel @Inject constructor(
             errorMessage = null,
         )
         lyricsJob = viewModelScope.launch {
-            val lyrics = runCatching { lyricsRepository.generateLyricsWithGemini(track, apiKey) }.getOrNull()
+            val lyrics = runCatching { lyricsRepository.generateLyricsWithGemini(targetTrack, apiKey) }.getOrNull()
             val offsetMs = runCatching { lyricsRepository.getSyncOffsetMs(track.id) }.getOrDefault(0L)
             if (_lyricsState.value.trackId == track.id) {
                 _lyricsState.value = if (lyrics != null) {
@@ -519,4 +566,9 @@ class PlayerViewModel @Inject constructor(
     fun toggleShuffle() = toggleShuffleUseCase()
     fun cycleRepeatMode() = cycleRepeatModeUseCase()
     fun dismiss() = repository.stopPlayback()
+
+    private companion object {
+        const val ONLINE_URI_PREFIX = "nota://"
+        const val DOWNLOAD_REQUIRED_FOR_AI_MESSAGE = "Download track offline first to transcribe with AI"
+    }
 }

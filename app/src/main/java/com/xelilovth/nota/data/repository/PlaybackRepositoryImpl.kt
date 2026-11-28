@@ -3,7 +3,11 @@ package com.xelilovth.nota.data.repository
 import androidx.annotation.OptIn
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.SystemClock
+import java.io.File
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -57,6 +61,7 @@ class PlaybackRepositoryImpl @Inject constructor(
         settingsRepository: SettingsRepository,
     ) : this(context, player, libraryRepository, settingsRepository, null)
 
+    private val prefs = context.getSharedPreferences(PLAYBACK_PREFS_NAME, Context.MODE_PRIVATE)
     private val _playbackState = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
@@ -65,6 +70,7 @@ class PlaybackRepositoryImpl @Inject constructor(
     private var fadeJob: Job? = null
     private var resolveJob: Job? = null
     private val activeOnlineTracks = ConcurrentHashMap<Long, Track>()
+    private val restoredTracksById = ConcurrentHashMap<Long, Track>()
     private val resolvedStreamUris = ConcurrentHashMap<Long, String>()
     private var cachedMediaId: Long? = null
     private var cachedTrack: Track? = null
@@ -86,6 +92,7 @@ class PlaybackRepositoryImpl @Inject constructor(
                 progressJob?.cancel()
                 fadeJob?.cancel()
                 player.volume = 1.0f
+                savePositionSnapshot()
             }
             publishState()
         }
@@ -97,6 +104,7 @@ class PlaybackRepositoryImpl @Inject constructor(
                 player.volume = 1.0f
             }
             publishState()
+            savePlaybackSnapshot(player.currentPosition.coerceAtLeast(0L))
         }
         override fun onPlayerError(error: PlaybackException) = handlePlayerError(error)
     }
@@ -129,14 +137,40 @@ class PlaybackRepositoryImpl @Inject constructor(
                     }
                 }
         }
-        publishState()
+        onlineMusicRepository?.let { onlineRepo ->
+            scope.launch {
+                onlineRepo.offlineTracks.collect {
+                    publishState()
+                }
+            }
+        }
+        if (player.mediaItemCount == 0) {
+            restorePlaybackSnapshot()
+        } else {
+            publishState()
+        }
     }
 
     override fun playTrack(track: Track, queue: List<Track>) {
+        playTrackInternal(track, queue, 0L)
+    }
+
+    private fun playTrackInternal(track: Track, queue: List<Track>, startPositionMs: Long) {
         if (queue.isEmpty()) return
 
-        val selectedIndex = queue.indexOfFirst { it.id == track.id }
-        val tracks = if (selectedIndex >= 0) queue else listOf(track)
+        val offlineById = onlineMusicRepository?.offlineTracks?.value.orEmpty().associateBy(Track::id)
+        val offlineByOnlineId = onlineMusicRepository?.offlineTracks?.value.orEmpty()
+            .mapNotNull { item -> item.onlineId?.let { it to item } }
+            .toMap()
+        val normalizedQueue = queue.map { item ->
+            offlineById[item.id]
+                ?: item.onlineId?.let(offlineByOnlineId::get)
+                ?: item
+        }
+        val selectedIndex = normalizedQueue.indexOfFirst { it.id == track.id }
+        val tracks = if (selectedIndex >= 0) normalizedQueue else listOf(
+            offlineById[track.id] ?: track.onlineId?.let(offlineByOnlineId::get) ?: track,
+        )
         tracks.forEach { item ->
             if (item.isOnline) {
                 activeOnlineTracks[item.id] = item
@@ -145,6 +179,7 @@ class PlaybackRepositoryImpl @Inject constructor(
         }
         val index = if (selectedIndex >= 0) selectedIndex else 0
         val activeTrack = tracks[index]
+        val clampedStartMs = startPositionMs.coerceAtLeast(0L)
         resolveJob?.cancel()
 
         if (activeTrack.isOnline && activeTrack.uri.startsWith(OnlineMusicRepositoryImpl.ONLINE_URI_PREFIX)) {
@@ -158,9 +193,12 @@ class PlaybackRepositoryImpl @Inject constructor(
             _playbackState.value = _playbackState.value.copy(
                 track = activeTrack,
                 isPlaying = false,
+                positionMs = clampedStartMs,
+                durationMs = activeTrack.durationMs,
                 errorMessage = null,
                 queue = tracks,
             )
+            savePlaybackSnapshot(clampedStartMs, activeTrack, tracks)
             resolveJob = scope.launch {
                 val resolvedUri = try {
                     onlineMusicRepository?.resolveStreamUrl(onlineId)
@@ -181,11 +219,12 @@ class PlaybackRepositoryImpl @Inject constructor(
                     val effectiveUri = resolvedStreamUris[item.id] ?: item.uri
                     toMediaItem(item, effectiveUri)
                 }
-                player.setMediaItems(mediaItems, index, 0L)
+                player.setMediaItems(mediaItems, index, clampedStartMs)
                 player.prepare()
                 player.play()
                 ensurePlaybackServiceStarted()
                 publishState()
+                savePlaybackSnapshot(clampedStartMs)
             }
             return
         }
@@ -196,20 +235,75 @@ class PlaybackRepositoryImpl @Inject constructor(
         if (mediaItems.isEmpty()) return
 
         _playbackState.value = _playbackState.value.copy(errorMessage = null)
-        player.setMediaItems(mediaItems, index, 0L)
+        player.setMediaItems(mediaItems, index, clampedStartMs)
         player.prepare()
         player.play()
         ensurePlaybackServiceStarted()
         publishState()
+        savePlaybackSnapshot(clampedStartMs)
     }
 
     override fun togglePlayPause() {
         if (player.isPlaying) {
             player.pause()
-        } else if (player.mediaItemCount > 0) {
-            ensurePlaybackServiceStarted()
-            player.play()
+            savePositionSnapshot()
+            publishState()
+            return
         }
+
+        val activeTrack = resolveCurrentTrack() ?: _playbackState.value.track ?: cachedTrack
+        if (player.mediaItemCount == 0) {
+            if (activeTrack != null) {
+                val queue = _playbackState.value.queue.ifEmpty { listOf(activeTrack) }
+                val resumePos = _playbackState.value.positionMs.coerceAtLeast(0L)
+                playTrackInternal(activeTrack, queue, resumePos)
+            } else {
+                publishState()
+            }
+            return
+        }
+
+        val currentItemUri = player.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
+        val needsPrepare = player.playbackState == Player.STATE_IDLE || player.playerError != null
+        val isEnded = player.playbackState == Player.STATE_ENDED
+        val needsOnlineReResolve = activeTrack != null &&
+            (activeTrack.isOnline || activeTrack.uri.startsWith(OnlineMusicRepositoryImpl.ONLINE_URI_PREFIX)) &&
+            (
+                player.playerError != null ||
+                    (
+                        needsPrepare && (
+                            resolvedStreamUris[activeTrack.id] == null ||
+                                currentItemUri.startsWith(OnlineMusicRepositoryImpl.ONLINE_URI_PREFIX)
+                            )
+                        )
+                )
+        val upgradedToOffline = activeTrack != null &&
+            !activeTrack.isOnline &&
+            !activeTrack.uri.startsWith(OnlineMusicRepositoryImpl.ONLINE_URI_PREFIX) &&
+            currentItemUri != activeTrack.uri &&
+            needsPrepare
+
+        if (needsOnlineReResolve || upgradedToOffline) {
+            if (player.playerError != null && activeTrack != null) {
+                resolvedStreamUris.remove(activeTrack.id)
+            }
+            val resumePos = if (isEnded) 0L else player.currentPosition.coerceAtLeast(0L)
+            val queue = resolveCurrentQueue().ifEmpty { listOfNotNull(activeTrack) }
+            if (activeTrack != null && queue.isNotEmpty()) {
+                playTrackInternal(activeTrack, queue, resumePos)
+                return
+            }
+        }
+
+        if (isEnded) {
+            player.seekTo(player.currentMediaItemIndex.coerceAtLeast(0), 0L)
+        }
+        if (needsPrepare) {
+            player.prepare()
+        }
+        _playbackState.value = _playbackState.value.copy(errorMessage = null)
+        ensurePlaybackServiceStarted()
+        player.play()
         publishState()
     }
 
@@ -219,14 +313,25 @@ class PlaybackRepositoryImpl @Inject constructor(
             if (crossfadeSeconds > 0 && player.isPlaying) startFadeIn()
         }
         publishState()
+        savePlaybackSnapshot(player.currentPosition.coerceAtLeast(0L))
     }
     override fun skipPrevious() {
         PlaybackNavigation.skipPrevious(player)
         if (crossfadeSeconds > 0 && player.isPlaying) startFadeIn()
         publishState()
+        savePlaybackSnapshot(player.currentPosition.coerceAtLeast(0L))
     }
-    override fun seekTo(positionMs: Long) { player.seekTo(positionMs.coerceAtLeast(0L)); publishState() }
-    override fun toggleShuffle() { player.shuffleModeEnabled = !player.shuffleModeEnabled; publishState() }
+    override fun seekTo(positionMs: Long) {
+        val coerced = positionMs.coerceAtLeast(0L)
+        player.seekTo(coerced)
+        savePositionSnapshot(coerced)
+        publishState()
+    }
+    override fun toggleShuffle() {
+        player.shuffleModeEnabled = !player.shuffleModeEnabled
+        publishState()
+        savePlaybackSnapshot(player.currentPosition.coerceAtLeast(0L))
+    }
     override fun cycleRepeatMode() {
         player.repeatMode = when (player.repeatMode) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
@@ -234,17 +339,20 @@ class PlaybackRepositoryImpl @Inject constructor(
             else -> Player.REPEAT_MODE_OFF
         }
         publishState()
+        savePlaybackSnapshot(player.currentPosition.coerceAtLeast(0L))
     }
 
     override fun stopPlayback() {
         flushListeningTime(resetTick = true)
         progressJob?.cancel()
         fadeJob?.cancel()
+        resolveJob?.cancel()
         player.volume = 1.0f
         cachedMediaId = null
         cachedTrack = null
         player.stop()
         player.clearMediaItems()
+        clearPlaybackSnapshot()
         _playbackState.value = _playbackState.value.copy(errorMessage = null)
         publishState()
         try {
@@ -303,6 +411,7 @@ class PlaybackRepositoryImpl @Inject constructor(
         if (accumulatedListenMs >= LISTEN_FLUSH_THRESHOLD_MS) {
             settingsRepository.addListenDuration(currentTrackId, accumulatedListenMs)
             accumulatedListenMs = 0L
+            savePositionSnapshot()
         }
     }
 
@@ -385,6 +494,7 @@ class PlaybackRepositoryImpl @Inject constructor(
     internal fun handlePlayerError(error: PlaybackException) {
         flushListeningTime(resetTick = true)
         progressJob?.cancel()
+        savePositionSnapshot()
         _playbackState.value = _playbackState.value.copy(
             isPlaying = false,
             errorMessage = error.message ?: "Playback failed (${error.errorCode})",
@@ -402,37 +512,195 @@ class PlaybackRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun publishState() {
-        val mediaId = player.currentMediaItem?.mediaId?.toLongOrNull()
+    private fun buildTracksById(): Map<Long, Track> {
         val onlineById = onlineMusicRepository?.getCachedOnlineTracks().orEmpty().associateBy(Track::id)
-        val tracksById = onlineById + activeOnlineTracks + libraryRepository.tracks.value.associateBy(Track::id)
-        val track = when {
-            mediaId == null -> null
-            mediaId == cachedMediaId && cachedTrack != null -> cachedTrack
-            else -> tracksById[mediaId].also { found ->
+        val offlineById = onlineMusicRepository?.offlineTracks?.value.orEmpty().associateBy(Track::id)
+        return restoredTracksById +
+            onlineById +
+            activeOnlineTracks +
+            offlineById +
+            libraryRepository.tracks.value.associateBy(Track::id)
+    }
+
+    private fun resolveCurrentTrack(tracksById: Map<Long, Track> = buildTracksById()): Track? {
+        val mediaId = player.currentMediaItem?.mediaId?.toLongOrNull() ?: return null
+        val latest = tracksById[mediaId]
+        return when {
+            latest != null -> latest.also { found ->
                 cachedMediaId = mediaId
                 cachedTrack = found
             }
+            mediaId == cachedMediaId && cachedTrack != null -> cachedTrack
+            else -> null
         }
+    }
+
+    private fun resolveCurrentQueue(tracksById: Map<Long, Track> = buildTracksById()): List<Track> =
+        (0 until player.mediaItemCount).mapNotNull { index ->
+            player.getMediaItemAt(index).mediaId.toLongOrNull()?.let(tracksById::get)
+        }
+
+    private fun publishState() {
+        val tracksById = buildTracksById()
+        val track = resolveCurrentTrack(tracksById)
         if (track != null && track.id != lastRecordedRecentTrackId) {
             lastRecordedRecentTrackId = track.id
             settingsRepository.addRecentTrack(track.id)
         }
-        val queue = (0 until player.mediaItemCount).mapNotNull { index ->
-            player.getMediaItemAt(index).mediaId.toLongOrNull()?.let(tracksById::get)
-        }
+        val queue = resolveCurrentQueue(tracksById)
         _playbackState.value = PlaybackStateMapper.map(
             playerState = player.playbackState,
             isPlaying = player.isPlaying,
             positionMs = player.currentPosition,
-            durationMs = player.duration.takeIf { it >= 0L } ?: 0L,
+            durationMs = player.duration.takeIf { it > 0L } ?: track?.durationMs ?: 0L,
             track = track,
             shuffle = player.shuffleModeEnabled,
             repeatMode = player.repeatMode,
         ).copy(errorMessage = _playbackState.value.errorMessage, queue = queue)
     }
 
+    private fun savePositionSnapshot(positionOverrideMs: Long? = null) {
+        val track = resolveCurrentTrack() ?: _playbackState.value.track ?: cachedTrack ?: return
+        val positionMs = (positionOverrideMs ?: player.currentPosition).coerceAtLeast(0L)
+        savePlaybackSnapshot(positionMs, track, resolveCurrentQueue())
+    }
+
+    private fun savePlaybackSnapshot(
+        positionMs: Long,
+        activeTrackOverride: Track? = null,
+        queueOverride: List<Track>? = null,
+    ) {
+        val activeTrack = activeTrackOverride ?: resolveCurrentTrack() ?: _playbackState.value.track ?: cachedTrack ?: return
+        val rawQueue = queueOverride?.takeIf { it.isNotEmpty() } ?: resolveCurrentQueue().ifEmpty { listOf(activeTrack) }
+        val boundedQueue = boundQueueAroundTrack(rawQueue, activeTrack.id, MAX_PERSISTED_QUEUE_ITEMS)
+        val payload = JSONObject().apply {
+            put("activeTrackId", activeTrack.id)
+            put("positionMs", positionMs.coerceAtLeast(0L))
+            put("shuffle", player.shuffleModeEnabled)
+            put("repeatMode", player.repeatMode)
+            put(
+                "queue",
+                JSONArray().apply {
+                    boundedQueue.forEach { put(trackToJson(it)) }
+                },
+            )
+        }
+        prefs.edit().putString(KEY_PLAYBACK_SNAPSHOT, payload.toString()).apply()
+    }
+
+    private fun clearPlaybackSnapshot() {
+        restoredTracksById.clear()
+        prefs.edit().remove(KEY_PLAYBACK_SNAPSHOT).apply()
+    }
+
+    private fun restorePlaybackSnapshot() {
+        val raw = prefs.getString(KEY_PLAYBACK_SNAPSHOT, null)
+        if (raw.isNullOrBlank()) {
+            publishState()
+            return
+        }
+        val snapshot = runCatching { JSONObject(raw) }.getOrNull()
+        if (snapshot == null) {
+            publishState()
+            return
+        }
+        val activeTrackId = snapshot.optLong("activeTrackId", Long.MIN_VALUE)
+        if (activeTrackId == Long.MIN_VALUE) {
+            publishState()
+            return
+        }
+        val savedPositionMs = snapshot.optLong("positionMs", 0L).coerceAtLeast(0L)
+        val savedShuffle = snapshot.optBoolean("shuffle", false)
+        val savedRepeatMode = snapshot.optInt("repeatMode", Player.REPEAT_MODE_OFF)
+        val queueArray = snapshot.optJSONArray("queue")
+        if (queueArray == null || queueArray.length() == 0) {
+            publishState()
+            return
+        }
+
+        val offlineById = onlineMusicRepository?.offlineTracks?.value.orEmpty().associateBy(Track::id)
+        val offlineByOnlineId = onlineMusicRepository?.offlineTracks?.value.orEmpty()
+            .mapNotNull { item -> item.onlineId?.let { it to item } }
+            .toMap()
+
+        val restoredQueue = (0 until queueArray.length()).mapNotNull { idx ->
+            val parsed = jsonToTrack(queueArray.optJSONObject(idx) ?: return@mapNotNull null) ?: return@mapNotNull null
+            val upgraded = offlineById[parsed.id] ?: parsed.onlineId?.let(offlineByOnlineId::get) ?: parsed
+            if (isRestorableTrack(upgraded)) upgraded else null
+        }
+        val index = restoredQueue.indexOfFirst { it.id == activeTrackId }
+        if (index < 0) {
+            publishState()
+            return
+        }
+
+        val activeTrack = restoredQueue[index]
+        restoredTracksById.clear()
+        restoredQueue.forEach { item ->
+            restoredTracksById[item.id] = item
+            if (item.isOnline) {
+                activeOnlineTracks[item.id] = item
+            }
+        }
+        cachedMediaId = activeTrack.id
+        cachedTrack = activeTrack
+        lastRecordedRecentTrackId = activeTrack.id
+        player.shuffleModeEnabled = savedShuffle
+        player.repeatMode = savedRepeatMode
+        player.setMediaItems(restoredQueue.map { toMediaItem(it) }, index, savedPositionMs)
+        publishState()
+    }
+
+    private fun isRestorableTrack(track: Track): Boolean {
+        val parsed = runCatching { Uri.parse(track.uri) }.getOrNull() ?: return false
+        return when (parsed.scheme) {
+            "file" -> parsed.path?.let { File(it).exists() } == true
+            else -> track.uri.isNotBlank()
+        }
+    }
+
+    private fun boundQueueAroundTrack(queue: List<Track>, activeTrackId: Long, maxItems: Int): List<Track> {
+        if (queue.size <= maxItems) return queue
+        val activeIndex = queue.indexOfFirst { it.id == activeTrackId }.coerceAtLeast(0)
+        val half = maxItems / 2
+        val start = (activeIndex - half).coerceIn(0, (queue.size - maxItems).coerceAtLeast(0))
+        val end = (start + maxItems).coerceAtMost(queue.size)
+        return queue.subList(start, end)
+    }
+
+    private fun trackToJson(track: Track): JSONObject = JSONObject().apply {
+        put("id", track.id)
+        put("uri", track.uri)
+        put("title", track.title)
+        put("artist", track.artist)
+        put("album", track.album)
+        put("durationMs", track.durationMs)
+        put("folder", track.folder)
+        put("isOnline", track.isOnline)
+        if (track.onlineId != null) put("onlineId", track.onlineId)
+        if (track.artworkUrl != null) put("artworkUrl", track.artworkUrl)
+    }
+
+    private fun jsonToTrack(obj: JSONObject): Track? {
+        val uri = obj.optString("uri").takeIf { it.isNotBlank() } ?: return null
+        return Track(
+            id = obj.optLong("id"),
+            uri = uri,
+            title = obj.optString("title"),
+            artist = obj.optString("artist"),
+            album = obj.optString("album"),
+            durationMs = obj.optLong("durationMs"),
+            folder = obj.optString("folder"),
+            isOnline = obj.optBoolean("isOnline", false),
+            onlineId = obj.optString("onlineId").takeIf { it.isNotBlank() },
+            artworkUrl = obj.optString("artworkUrl").takeIf { it.isNotBlank() },
+        )
+    }
+
     private companion object {
         const val LISTEN_FLUSH_THRESHOLD_MS = 2_000L
+        const val PLAYBACK_PREFS_NAME = "nota_playback_state"
+        const val KEY_PLAYBACK_SNAPSHOT = "playback_snapshot"
+        const val MAX_PERSISTED_QUEUE_ITEMS = 100
     }
 }

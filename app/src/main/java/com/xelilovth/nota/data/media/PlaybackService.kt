@@ -69,6 +69,12 @@ class PlaybackService : Service() {
                 if (player.isPlaying) {
                     player.pause()
                 } else if (player.mediaItemCount > 0) {
+                    if (player.playbackState == Player.STATE_ENDED) {
+                        player.seekTo(player.currentMediaItemIndex.coerceAtLeast(0), 0L)
+                    }
+                    if (player.playbackState == Player.STATE_IDLE || player.playerError != null) {
+                        player.prepare()
+                    }
                     player.play()
                 }
                 updateNotification()
